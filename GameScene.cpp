@@ -26,6 +26,7 @@ void GameScene::Initialize() {
 	textureHandle_ = TextureManager::Load("uvChecker.png");
 	assert(textureHandle_);
 	camera_.Initialize();
+
 	
 
 	player_ = new Player();
