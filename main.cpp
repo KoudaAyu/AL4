@@ -43,6 +43,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		gameScene->Draw();
 
 #ifdef _DEBUG
+
+		AxisIndicator::GetInstance()->Draw();
+
 		imguiManager->Draw();
 #endif //  _DEBUG
 
