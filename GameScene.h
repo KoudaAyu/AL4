@@ -2,6 +2,8 @@
 
 #include "KamataEngine.h"
 
+#include"Player.h"
+
 class GameScene {
 public:
 
@@ -19,6 +21,13 @@ private:
 	const int32_t kWindowWidth = 1280;
 	const int32_t kWindowHeight = 720;
 
+	KamataEngine::Model* model_ = nullptr;
+	KamataEngine::Camera camera_;
+
+	uint32_t textureHandle_ = 0u;
+
 	//デバックカメラ
 	KamataEngine::DebugCamera* debugCamera_ = nullptr;
+
+	Player* player_ = nullptr;
 };
