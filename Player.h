@@ -1,4 +1,7 @@
 #pragma once
+#define NOMINMAX
+#include <Windows.h>
+
 #include"KamataEngine.h"
 
 enum class LRDirection
@@ -27,6 +30,7 @@ private:
 
 	KamataEngine::Vector3 velocity_ = {};
 
+	// 向き
 	LRDirection lrDirection_ = LRDirection::Right;
 
 	//慣性移動
@@ -37,5 +41,14 @@ private:
 
 	//速度制限
 	static inline const float kLimitSpeed = 2.0f;
+
+	//旋回開始時の角度
+	float turnFirstRotationY_ = 0.0f;
+
+	//旋回タイマー
+	float turnTimer_ = 0.0f;
+
+	//旋回にかかる時間<秒>
+	static inline const float kTimeTurn = 0.3f;
 };
 
