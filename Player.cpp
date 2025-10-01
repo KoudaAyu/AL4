@@ -1,5 +1,6 @@
 #include "Player.h"
 
+#include <algorithm>
 #include<cassert>
 #include <numbers>
 
@@ -28,11 +29,25 @@ void Player::Update() {
 		Vector3 acceleration = {};
 		if (Input::GetInstance()->PushKey(DIK_RIGHT))
 		{
+			if (velocity_.x < 0.0f)
+			{
+				velocity_.x *= (1.0f - kAttenuation);
+			}
 			acceleration.x += kAcceleration;
 		} else if (Input::GetInstance()->PushKey(DIK_LEFT)) {
 			acceleration.x -= kAcceleration;
+			if (velocity_.x > 0.0f) {
+				velocity_.x *= (1.0f - kAttenuation);
+			}
 		}
 		velocity_ += acceleration;
+		// 速度制限
+		velocity_.x = std::clamp(velocity_.x, -kLimitSpeed, kLimitSpeed);
+	}
+	else
+	{
+		velocity_.x *= (1.0f - kAttenuation);
+
 	}
 
 	worldTransform_.translation_ += velocity_;

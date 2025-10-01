@@ -31,5 +31,11 @@ private:
 
 	//慣性移動
 	static inline const float kAcceleration = 0.05f;
+
+	//速度減少率
+	static inline const float kAttenuation = 0.1f;
+
+	//速度制限
+	static inline const float kLimitSpeed = 2.0f;
 };
 
