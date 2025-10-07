@@ -67,6 +67,11 @@ private:
 	std::vector < KamataEngine::Vector3 > bodyParts_;
 	std::deque<KamataEngine::WorldTransform> bodyPartTransforms_;	
 
+	//Playerの切り捨てた部分を壁にする
+	std::vector<KamataEngine::Vector3> wallPositions_;
+	std::deque<KamataEngine::WorldTransform> wallTransforms_; // ←追加
+
+
 	// 追従遅延フレーム数
 	static constexpr size_t kFollowDelay = 60; // 例: 5フレーム遅れ
 

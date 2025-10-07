@@ -167,6 +167,10 @@ void Player::Draw() {
 	for (size_t i = 0; i < bodyPartTransforms_.size(); ++i) {
 		model_->Draw(bodyPartTransforms_[i], *camera_, textureHandle_);
 	}
+
+	 for (const auto& wallTransform : wallTransforms_) {
+		model_->Draw(wallTransform, *camera_, textureHandle_);
+	}
 }
 
 // Player.cpp
@@ -207,7 +211,13 @@ void Player::Grow() {
 }
 
 void Player::RemoveLastPart() {
-	if (bodyParts_.size() > 1) { // 頭だけは残す
+	if (bodyParts_.size() > 1) {
+		// emplace_backで直接dequeに追加し、参照で初期化
+		wallTransforms_.emplace_back();
+		wallTransforms_.back().Initialize();
+		wallTransforms_.back().translation_ = bodyParts_.back();
+		// 必要に応じてスケールや回転も設定
+
 		bodyParts_.pop_back();
 		bodyPartTransforms_.pop_back();
 	}

@@ -24,7 +24,10 @@ void GameScene::Initialize() {
 
 	model_ = Model::Create();
 	textureHandle_ = TextureManager::Load("uvChecker.png");
+
+#ifdef _DEBUG
 	assert(textureHandle_);
+#endif
 	camera_.Initialize();
 
 	  Apple* apple1 = new Apple();
@@ -81,6 +84,10 @@ void GameScene::Update() {
 			player_->Grow();
 		}
 	}
+
+	#ifdef NDEBUG
+	const auto& bodyParts = player_->GetBodyParts();
+	#endif
 
 	//Playerの頭と体がぶつかった時の判定
 	const Vector3& headPos = player_->GetPosition();
