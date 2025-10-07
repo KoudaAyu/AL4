@@ -54,6 +54,26 @@ void Player::Update() {
 		velocity_.x *= (1.0f - kAttenuation);
 	}
 
+	if (Input::GetInstance()->PushKey(DIK_UP) || Input::GetInstance()->PushKey(DIK_DOWN)) {
+		Vector3 acceleration = {};
+		if (Input::GetInstance()->PushKey(DIK_UP)) {
+			if (velocity_.y < 0.0f) {
+				velocity_.y *= (1.0f - kAttenuation);
+			}
+			acceleration.y += kAcceleration;
+		} else if (Input::GetInstance()->PushKey(DIK_DOWN)) {
+			if (velocity_.y > 0.0f) {
+				velocity_.y *= (1.0f - kAttenuation);
+			}
+			acceleration.y -= kAcceleration;
+		}
+		velocity_ += acceleration;
+		// 速度制限
+		velocity_.y = std::clamp(velocity_.y, -kLimitSpeed, kLimitSpeed);
+	} else {
+		velocity_.y *= (1.0f - kAttenuation);
+	}
+
 	worldTransform_.translation_ += velocity_;
 
 	if (turnTimer_ > 0.0f) {
