@@ -19,6 +19,9 @@ public:
 	 // 体を伸ばす
 	void Grow();
 
+	// 体を1つ減らす
+	void RemoveLastPart();
+
 	const KamataEngine::Vector3& GetPosition() const { return worldTransform_.translation_; }
 
 	const std::vector<KamataEngine::Vector3>& GetBodyParts() const { return bodyParts_; }
@@ -62,7 +65,7 @@ private:
 
 	//体の増加部分
 	std::vector < KamataEngine::Vector3 > bodyParts_;
-	std::deque<KamataEngine::WorldTransform> bodyPartTransforms_;
+	std::deque<KamataEngine::WorldTransform> bodyPartTransforms_;	
 
 	// 追従遅延フレーム数
 	static constexpr size_t kFollowDelay = 60; // 例: 5フレーム遅れ

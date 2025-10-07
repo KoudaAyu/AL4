@@ -38,6 +38,11 @@ void Player::Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera
 
 void Player::Update() {
 
+	  // スペースキーで最後のパーツを削除
+	if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+		RemoveLastPart();
+	}
+
 	if (Input::GetInstance()->PushKey(DIK_RIGHT) || Input::GetInstance()->PushKey(DIK_LEFT)) {
 		Vector3 acceleration = {};
 		if (Input::GetInstance()->PushKey(DIK_RIGHT)) {
@@ -199,4 +204,11 @@ void Player::Grow() {
 	bodyPartTransforms_.back().scale_ = worldTransform_.scale_;
 	bodyPartTransforms_.back().rotation_ = worldTransform_.rotation_;
 	bodyPartTransforms_.back().translation_ = bodyParts_.back();
+}
+
+void Player::RemoveLastPart() {
+	if (bodyParts_.size() > 1) { // 頭だけは残す
+		bodyParts_.pop_back();
+		bodyPartTransforms_.pop_back();
+	}
 }

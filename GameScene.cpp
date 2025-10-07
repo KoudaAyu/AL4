@@ -27,9 +27,14 @@ void GameScene::Initialize() {
 	assert(textureHandle_);
 	camera_.Initialize();
 
-	Apple* apple = new Apple();
-	apple->Initialize(model_, &camera_, {3, 5, 0});
-	apples_.push_back(apple);
+	  Apple* apple1 = new Apple();
+	apple1->Initialize(model_, &camera_, {3, 5, 0});
+	apples_.push_back(apple1);
+
+	// 2つ目のりんごを追加
+	Apple* apple2 = new Apple();
+	apple2->Initialize(model_, &camera_, {-4, -2, 0}); // 好きな座標に
+	apples_.push_back(apple2);
 
 	player_ = new Player();
 	Vector3 playerPosition = {0.0f, 0.0f, 0.0f};
@@ -74,6 +79,15 @@ void GameScene::Update() {
 		if (apple->IsActive() && CheckCollision(player_->GetPosition(), apple->GetPosition(), 1.0f)) {
 			apple->SetActive(false);
 			player_->Grow();
+		}
+	}
+
+	//Playerの頭と体がぶつかった時の判定
+	const Vector3& headPos = player_->GetPosition();
+	for (size_t i = 1; i < bodyParts.size(); ++i) { // 0は頭なので1から
+		if (CheckCollision(headPos, bodyParts[i], 1.0f)) {
+			// ここに当たり判定時の処理を書く
+			break;
 		}
 	}
 }
