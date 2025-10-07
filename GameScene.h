@@ -2,6 +2,8 @@
 
 #include "KamataEngine.h"
 
+
+#include"Apple.h"
 #include"Player.h"
 
 class GameScene {
@@ -17,6 +19,8 @@ public:
 	int32_t GetWindowWidth() const { return kWindowWidth; }
 	int32_t GetWindowHeight() const { return kWindowHeight; }
 
+	bool CheckCollision(const KamataEngine::Vector3& a, const KamataEngine::Vector3& b, float radius);
+
 private:
 	const int32_t kWindowWidth = 1280;
 	const int32_t kWindowHeight = 720;
@@ -30,4 +34,5 @@ private:
 	KamataEngine::DebugCamera* debugCamera_ = nullptr;
 
 	Player* player_ = nullptr;
+	std::vector<Apple*> apples_;
 };
