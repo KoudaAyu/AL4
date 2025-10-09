@@ -56,7 +56,7 @@ void Player::Update() {
 		wallAABB.max = wallTransform.translation_ + KamataEngine::Vector3{0.5f, 0.5f, 0.5f};
 
 		if (IsCollisionAABBAABB(playerAABB, wallAABB)) {
-			__debugbreak(); // デバッグ時のみ
+			/*__debugbreak()*/; // デバッグ時のみ
 		}
 	}
 
@@ -241,12 +241,23 @@ void Player::RemoveLastPart() {
 }
 
 void Player::EatBomb() {
+	if (bombActive_)
+		return; // すでに爆弾進行中なら何もしない
+
+	if (bodyParts_.size() <= 1) {
+		// 頭だけの場合は即死
+		isAlive_ = false;
+		return;
+	}
+
+	// 体がある場合は爆弾進行開始
 	bombActive_ = true;
-	bombProgress_ = 0;
-	bombStartIndex_ = 0; // 尻尾側から赤くなるため
+	bombProgress_ = 1; // ←ここを1にする
+	bombStartIndex_ = static_cast<int>(bodyParts_.size()) - 1;
 	bombTimer_ = 0.0f;
-	isAlive_ = false;
 }
+
+
 
 void Player::UpdateBomb() {
 	if (!bombActive_)
@@ -267,9 +278,9 @@ void Player::DetachBombParts() {
 		return;
 
 	// bombProgress_分だけ体を切り離し、壁に追加
-	for (int i = 0; i < bombProgress_ && !bodyParts_.empty(); ++i) {
-		// 体の先頭（尻尾側）を壁に
-		KamataEngine::Vector3 removedPartPos = bodyParts_.front();
+	for (int i = 0; i < bombProgress_ && bodyParts_.size() > 1; ++i) {
+		// 体の最後（尻尾側）を壁に
+		KamataEngine::Vector3 removedPartPos = bodyParts_.back();
 
 		wallTransforms_.emplace_back();
 		wallTransforms_.back().Initialize();
@@ -279,8 +290,8 @@ void Player::DetachBombParts() {
 		wallTransforms_.back().matWorld_ = MakeAffineMatrix(wallTransforms_.back().scale_, wallTransforms_.back().rotation_, wallTransforms_.back().translation_);
 		wallTransforms_.back().TransferMatrix();
 
-		bodyParts_.erase(bodyParts_.begin());
-		bodyPartTransforms_.pop_front();
+		bodyParts_.pop_back();
+		bodyPartTransforms_.pop_back();
 	}
 
 	// 爆弾状態リセット
