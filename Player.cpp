@@ -38,94 +38,99 @@ void Player::Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera
 
 void Player::Update() {
 
-	  // スペースキーで最後のパーツを削除
+	// スペースキーで最後のパーツを削除
 	if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
 		RemoveLastPart();
 	}
 
-	if (Input::GetInstance()->PushKey(DIK_RIGHT) || Input::GetInstance()->PushKey(DIK_LEFT)) {
-		Vector3 acceleration = {};
-		if (Input::GetInstance()->PushKey(DIK_RIGHT)) {
-			if (velocity_.x < 0.0f) {
-				velocity_.x *= (1.0f - kAttenuation);
-			}
-			acceleration.x += kAcceleration;
-			if (lrDirection_ != LRDirection::Right) {
-				lrDirection_ = LRDirection::Right;
-				lrKnown_ = true;
-				udKnown_ = false;
-				turnFirstRotationY_ = worldTransform_.rotation_.y;
-				turnTimer_ = kTimeTurn;
-			}
+	playerAABB.min = worldTransform_.translation_ - KamataEngine::Vector3{0.5f, 0.5f, 0.5f};
+	playerAABB.max = worldTransform_.translation_ + KamataEngine::Vector3{0.5f, 0.5f, 0.5f};
 
-		} else if (Input::GetInstance()->PushKey(DIK_LEFT)) {
-			if (velocity_.x > 0.0f) {
-				velocity_.x *= (1.0f - kAttenuation);
-			}
-			acceleration.x -= kAcceleration;
-			if (lrDirection_ != LRDirection::Left) {
-				lrDirection_ = LRDirection::Left;
-				lrKnown_ = true;
-				udKnown_ = false;
-				turnFirstRotationY_ = worldTransform_.rotation_.y;
-				turnTimer_ = kTimeTurn;
-			}
+	for (const auto& wallTransform : wallTransforms_) {
+		AABB wallAABB;
+		wallAABB.min = wallTransform.translation_ - KamataEngine::Vector3{0.5f, 0.5f, 0.5f};
+		wallAABB.max = wallTransform.translation_ + KamataEngine::Vector3{0.5f, 0.5f, 0.5f};
+
+		if (IsCollisionAABBAABB(playerAABB, wallAABB)) {
+			__debugbreak(); // デバッグ時のみ
 		}
-		velocity_ += acceleration;
-		// 速度制限
-		velocity_.x = std::clamp(velocity_.x, -kLimitSpeed, kLimitSpeed);
-	} else {
-		velocity_.x *= (1.0f - kAttenuation);
 	}
 
-	if (Input::GetInstance()->PushKey(DIK_UP) || Input::GetInstance()->PushKey(DIK_DOWN)) {
-		Vector3 acceleration = {};
-		if (Input::GetInstance()->PushKey(DIK_UP)) {
-			if (velocity_.y < 0.0f) {
-				velocity_.y *= (1.0f - kAttenuation);
-			}
-			acceleration.y += kAcceleration;
-			if (udDirection_ != UDDirection::Up) {
-				udDirection_ = UDDirection::Up;
-				udKnown_ = true;
-				lrKnown_ = false;
-			}
-		} else if (Input::GetInstance()->PushKey(DIK_DOWN)) {
-			if (velocity_.y > 0.0f) {
-				velocity_.y *= (1.0f - kAttenuation);
-			}
-			acceleration.y -= kAcceleration;
-			if (udDirection_ != UDDirection::Down) {
-				udDirection_ = UDDirection::Down;
-				udKnown_ = true;
-				lrKnown_ = false;
-			}
-		}
-		velocity_ += acceleration;
-		// 速度制限
-		velocity_.y = std::clamp(velocity_.y, -kLimitSpeed, kLimitSpeed);
-	} else {
-		velocity_.y *= (1.0f - kAttenuation);
+
+	// 左右キー入力処理
+	if (Input::GetInstance()->TriggerKey(DIK_LEFT) && lrDirection_ != LRDirection::Right) {
+		lrDirection_ = LRDirection::Left;
+		lrKnown_ = true;
+		udKnown_ = false;
+		udDirection_ = UDDirection::Unknown;
+		turnFirstRotationY_ = worldTransform_.rotation_.y;
+		turnTimer_ = kTimeTurn;
+	}
+
+	if (Input::GetInstance()->TriggerKey(DIK_RIGHT) && lrDirection_ != LRDirection::Left) {
+		lrDirection_ = LRDirection::Right;
+		lrKnown_ = true;
+		udKnown_ = false;
+		udDirection_ = UDDirection::Unknown;
+		turnFirstRotationY_ = worldTransform_.rotation_.y;
+		turnTimer_ = kTimeTurn;
+	}
+
+	// 上下キー入力処理
+	if (Input::GetInstance()->TriggerKey(DIK_UP) && udDirection_ != UDDirection::Down) {
+		udDirection_ = UDDirection::Up;
+		udKnown_ = true;
+		lrKnown_ = false;
+		lrDirection_ = LRDirection::Unknown;
+
+	
+	}
+
+	if (Input::GetInstance()->TriggerKey(DIK_DOWN) && udDirection_ != UDDirection::Up) {
+		udDirection_ = UDDirection::Down;
+		udKnown_ = true;
+		lrKnown_ = false;
+
+		lrDirection_ = LRDirection::Unknown;
+
+		
+	}
+
+	// 進行方向に自動で移動
+	velocity_ = {0.0f, 0.0f, 0.0f};
+	float speed = kLimitSpeed;
+
+	if (lrKnown_) {
+		velocity_.x = (lrDirection_ == LRDirection::Right) ? speed : -speed;
+		velocity_.y = 0.0f;
+	} else if (udKnown_) {
+		velocity_.y = (udDirection_ == UDDirection::Up) ? speed : -speed;
+		velocity_.x = 0.0f;
 	}
 
 	worldTransform_.translation_ += velocity_;
 
-	if (turnTimer_ > 0.0f) {
-		turnTimer_ -= 1.0f / 60.0f;
-		turnTimer_ = std::max(turnTimer_, 0.0f);
+	if (lrKnown_) { // ←★ 左右方向のときだけ回転処理を行う
+		if (turnTimer_ > 0.0f) {
+			turnTimer_ -= 1.0f / 60.0f;
+			turnTimer_ = std::max(turnTimer_, 0.0f);
 
-		float t = 1.0f - (turnTimer_ / kTimeTurn);
-		float easeT = 1.0f - powf(1.0f - t, 3.0f);
+			float t = 1.0f - (turnTimer_ / kTimeTurn);
+			float easeT = 1.0f - powf(1.0f - t, 3.0f);
 
-		float destinationRotationYTable[] = {
-		    std::numbers::pi_v<float> / 2.0f,       // Right
-		    std::numbers::pi_v<float> * 3.0f / 2.0f // Left
-		};
-		float destination = destinationRotationYTable[static_cast<uint32_t>(lrDirection_)];
-		worldTransform_.rotation_.y = turnFirstRotationY_ + (destination - turnFirstRotationY_) * easeT;
-	} else {
-		float destinationRotationYTable[] = {std::numbers::pi_v<float> / 2.0f, std::numbers::pi_v<float> * 3.0f / 2.0f};
-		worldTransform_.rotation_.y = destinationRotationYTable[static_cast<uint32_t>(lrDirection_)];
+			float destinationRotationYTable[] = {
+			    std::numbers::pi_v<float> / 2.0f,       // Right
+			    std::numbers::pi_v<float> * 3.0f / 2.0f // Left
+			};
+			float destination = destinationRotationYTable[static_cast<uint32_t>(lrDirection_)];
+			worldTransform_.rotation_.y = turnFirstRotationY_ + (destination - turnFirstRotationY_) * easeT;
+		} else {
+			float destinationRotationYTable[] = {
+			    std::numbers::pi_v<float> / 2.0f,       // Right
+			    std::numbers::pi_v<float> * 3.0f / 2.0f // Left
+			};
+			worldTransform_.rotation_.y = destinationRotationYTable[static_cast<uint32_t>(lrDirection_)];
+		}
 	}
 
 	// 頭の現在位置を履歴に追加
@@ -140,10 +145,10 @@ void Player::Update() {
 	// 各パーツを遅延追従させる
 	for (size_t i = 0; i < bodyParts_.size(); ++i) {
 		if (i == 0) {
-			bodyParts_[0] = worldTransform_.translation_; // 頭は現在位置
+			bodyParts_[0] = worldTransform_.translation_;
 		} else {
 			size_t historyIndex = headHistory_.size() - 1 - i * kFollowDelay;
-			bodyParts_[i] = headHistory_[historyIndex]; // 体は過去の座標
+			bodyParts_[i] = headHistory_[historyIndex];
 		}
 	}
 
@@ -158,6 +163,7 @@ void Player::Update() {
 	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
 	worldTransform_.TransferMatrix();
 }
+
 
 void Player::Draw() {
 	// 頭（プレイヤー本体）は今まで通り
@@ -212,11 +218,17 @@ void Player::Grow() {
 
 void Player::RemoveLastPart() {
 	if (bodyParts_.size() > 1) {
-		// emplace_backで直接dequeに追加し、参照で初期化
+		// 削除する直前のパーツの座標を保存
+		KamataEngine::Vector3 removedPartPos = bodyParts_.back();
+
+		// 壁のTransformを追加し、座標を設定
 		wallTransforms_.emplace_back();
 		wallTransforms_.back().Initialize();
-		wallTransforms_.back().translation_ = bodyParts_.back();
-		// 必要に応じてスケールや回転も設定
+		wallTransforms_.back().translation_ = removedPartPos;
+		wallTransforms_.back().scale_ = worldTransform_.scale_;       // 必要ならスケールもコピー
+		wallTransforms_.back().rotation_ = worldTransform_.rotation_; // 必要なら回転もコピー
+		wallTransforms_.back().matWorld_ = MakeAffineMatrix(wallTransforms_.back().scale_, wallTransforms_.back().rotation_, wallTransforms_.back().translation_);
+		wallTransforms_.back().TransferMatrix();
 
 		bodyParts_.pop_back();
 		bodyPartTransforms_.pop_back();

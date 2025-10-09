@@ -30,7 +30,7 @@ void GameScene::Initialize() {
 #endif
 	camera_.Initialize();
 
-	  Apple* apple1 = new Apple();
+	Apple* apple1 = new Apple();
 	apple1->Initialize(model_, &camera_, {3, 5, 0});
 	apples_.push_back(apple1);
 
@@ -71,6 +71,7 @@ void GameScene::Update() {
 	AxisIndicator::GetInstance()->SetVisible(true);
 	AxisIndicator::GetInstance()->SetTargetCamera(&debugCamera_->GetCamera());
 
+
 #endif //  _DEBUG
 
 	player_->Update();
@@ -85,11 +86,11 @@ void GameScene::Update() {
 		}
 	}
 
-	#ifdef NDEBUG
+#ifdef NDEBUG
 	const auto& bodyParts = player_->GetBodyParts();
-	#endif
+#endif
 
-	//Playerの頭と体がぶつかった時の判定
+	// Playerの頭と体がぶつかった時の判定
 	const Vector3& headPos = player_->GetPosition();
 	for (size_t i = 1; i < bodyParts.size(); ++i) { // 0は頭なので1から
 		if (CheckCollision(headPos, bodyParts[i], 1.0f)) {

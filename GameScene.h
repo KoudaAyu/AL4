@@ -5,6 +5,7 @@
 
 #include"Apple.h"
 #include"Player.h"
+#include"MathUtl.h"
 
 class GameScene {
 public:

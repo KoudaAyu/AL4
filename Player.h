@@ -1,22 +1,20 @@
 #pragma once
 #define NOMINMAX
+#include "AABB.h"
+#include "KamataEngine.h"
 #include <Windows.h>
 #include <deque>
-#include"KamataEngine.h"
 
-enum class LRDirection
-{ Left, Right };
-enum class UDDirection 
-{ Up, Down };
+enum class LRDirection { Left, Right, Unknown };
+enum class UDDirection { Up, Down, Unknown };
 
-class Player
-{
+class Player {
 public:
 	void Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera, const KamataEngine::Vector3 position);
 	void Update();
 	void Draw();
 
-	 // 体を伸ばす
+	// 体を伸ばす
 	void Grow();
 
 	// 体を1つ減らす
@@ -26,8 +24,9 @@ public:
 
 	const std::vector<KamataEngine::Vector3>& GetBodyParts() const { return bodyParts_; }
 
-private:
+	const std::deque<KamataEngine::WorldTransform>& GetWallTransforms() const { return wallTransforms_; }
 
+private:
 	KamataEngine::WorldTransform worldTransform_;
 
 	KamataEngine::Model* model_ = nullptr;
@@ -39,38 +38,37 @@ private:
 	KamataEngine::Vector3 velocity_ = {};
 
 	// 向き
-	LRDirection lrDirection_ = LRDirection::Right;
-	UDDirection udDirection_ = UDDirection::Up; 
+	LRDirection lrDirection_ = LRDirection::Unknown;
+	UDDirection udDirection_ = UDDirection::Unknown;
 
 	bool lrKnown_ = false;
 	bool udKnown_ = false;
 
-	//慣性移動
+	// 慣性移動
 	static inline const float kAcceleration = 0.05f;
 
-	//速度減少率
+	// 速度減少率
 	static inline const float kAttenuation = 0.1f;
 
-	//速度制限
-	static inline const float kLimitSpeed = 2.0f;
+	// 速度制限
+	static inline const float kLimitSpeed = 0.05f;
 
-	//旋回開始時の角度
+	// 旋回開始時の角度
 	float turnFirstRotationY_ = 0.0f;
 
-	//旋回タイマー
+	// 旋回タイマー
 	float turnTimer_ = 0.0f;
 
-	//旋回にかかる時間<秒>
+	// 旋回にかかる時間<秒>
 	static inline const float kTimeTurn = 0.3f;
 
-	//体の増加部分
-	std::vector < KamataEngine::Vector3 > bodyParts_;
-	std::deque<KamataEngine::WorldTransform> bodyPartTransforms_;	
+	// 体の増加部分
+	std::vector<KamataEngine::Vector3> bodyParts_;
+	std::deque<KamataEngine::WorldTransform> bodyPartTransforms_;
 
-	//Playerの切り捨てた部分を壁にする
+	// Playerの切り捨てた部分を壁にする
 	std::vector<KamataEngine::Vector3> wallPositions_;
 	std::deque<KamataEngine::WorldTransform> wallTransforms_; // ←追加
-
 
 	// 追従遅延フレーム数
 	static constexpr size_t kFollowDelay = 60; // 例: 5フレーム遅れ
@@ -79,5 +77,6 @@ private:
 	std::deque<KamataEngine::Vector3> headHistory_;
 
 	static constexpr float unitLength = 1.0f;
-};
 
+	AABB playerAABB;
+};
