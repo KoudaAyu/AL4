@@ -9,6 +9,12 @@ GameScene::~GameScene() {
 	delete debugCamera_;
 #endif //  _DEBUG
 
+	for (auto* apple : apples_) {
+		delete apple;
+	}
+	for (auto* bomb : bombs_) {
+		delete bomb;
+	}
 	delete model_;
 	delete player_;
 }
@@ -30,6 +36,7 @@ void GameScene::Initialize() {
 #endif
 	camera_.Initialize();
 
+	// りんごを追加
 	Apple* apple1 = new Apple();
 	apple1->Initialize(model_, &camera_, {3, 5, 0});
 	apples_.push_back(apple1);
@@ -38,6 +45,16 @@ void GameScene::Initialize() {
 	Apple* apple2 = new Apple();
 	apple2->Initialize(model_, &camera_, {-4, -2, 0}); // 好きな座標に
 	apples_.push_back(apple2);
+
+	// 爆弾を追加
+	Bomb* bomb1 = new Bomb();
+	bomb1->Initialize(model_, &camera_, {0, 3, 0});
+	bombs_.push_back(bomb1);
+
+	Bomb* bomb2 = new Bomb();
+	bomb2->Initialize(model_, &camera_, {5, -3, 0});
+	bombs_.push_back(bomb2);
+
 
 	player_ = new Player();
 	Vector3 playerPosition = {0.0f, 0.0f, 0.0f};
@@ -86,6 +103,23 @@ void GameScene::Update() {
 		}
 	}
 
+	for (auto it = bombs_.begin(); it != bombs_.end();) {
+		Bomb* bomb = *it;
+		if (!bomb) {
+			++it;
+			continue;
+		}
+		bomb->Update();
+		if (CheckCollision(player_->GetPosition(), bomb->GetPosition(), 1.0f)) {
+			// 爆弾を消す
+			player_->EatBomb();
+			delete bomb;
+			it = bombs_.erase(it);
+		} else {
+			++it;
+		}
+	}
+
 #ifdef NDEBUG
 	const auto& bodyParts = player_->GetBodyParts();
 #endif
@@ -109,6 +143,11 @@ void GameScene::Draw() {
 	for (auto* apple : apples_) {
 		if (apple)
 			apple->Draw();
+	}
+
+	for (auto* bomb : bombs_) {
+		if (bomb)
+			bomb->Draw();
 	}
 
 	Model::PostDraw();

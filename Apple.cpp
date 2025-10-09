@@ -8,6 +8,8 @@ void Apple::Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera,
 	camera_ = camera;
 	worldTransform_.Initialize();
 	worldTransform_.translation_ = position;
+
+	textureHandle_ = TextureManager::Load("Red.png");
 }
 
 void Apple::Update() {
@@ -18,6 +20,6 @@ void Apple::Update() {
 
 void Apple::Draw() {
 	if (isActive_ && model_) {
-		model_->Draw(worldTransform_, *camera_);
+		model_->Draw(worldTransform_, *camera_,textureHandle_);
 	}
 }

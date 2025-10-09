@@ -4,6 +4,7 @@
 
 
 #include"Apple.h"
+#include"bomb.h"
 #include"Player.h"
 #include"MathUtl.h"
 
@@ -36,4 +37,5 @@ private:
 
 	Player* player_ = nullptr;
 	std::vector<Apple*> apples_;
+	std::vector<Bomb*> bombs_;
 };

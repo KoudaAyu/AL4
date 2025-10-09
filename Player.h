@@ -10,32 +10,37 @@ enum class UDDirection { Up, Down, Unknown };
 
 class Player {
 public:
+
+
 	void Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera, const KamataEngine::Vector3 position);
 	void Update();
 	void Draw();
 
-	// 体を伸ばす
-	void Grow();
 
-	// 体を1つ減らす
-	void RemoveLastPart();
+	void Grow(); // 体を伸ばす
+	void RemoveLastPart(); // 体を1つ減らす
+
+	//爆弾関係
+	void EatBomb();// 爆弾を食べた時の処理
+	void UpdateBomb();// 爆弾進行の更新
+	void DetachBombParts();// 切り離し処理
 
 	const KamataEngine::Vector3& GetPosition() const { return worldTransform_.translation_; }
-
 	const std::vector<KamataEngine::Vector3>& GetBodyParts() const { return bodyParts_; }
-
 	const std::deque<KamataEngine::WorldTransform>& GetWallTransforms() const { return wallTransforms_; }
+
+	bool IsBombActive() const { return bombActive_; } // 爆弾状態取得
+
 
 private:
 	KamataEngine::WorldTransform worldTransform_;
-
 	KamataEngine::Model* model_ = nullptr;
-
 	KamataEngine::Camera* camera_ = nullptr;
-
 	uint32_t textureHandle_ = 0u;
 
 	KamataEngine::Vector3 velocity_ = {};
+
+	bool isAlive_ = true;
 
 	// 向き
 	LRDirection lrDirection_ = LRDirection::Unknown;
@@ -46,7 +51,6 @@ private:
 
 	// 慣性移動
 	static inline const float kAcceleration = 0.05f;
-
 	// 速度減少率
 	static inline const float kAttenuation = 0.1f;
 
@@ -79,4 +83,13 @@ private:
 	static constexpr float unitLength = 1.0f;
 
 	AABB playerAABB;
+
+	// 爆弾関連
+	bool bombActive_ = false;                    // 爆弾を飲み込んでいるか
+	int bombProgress_ = 0;                       // 爆弾進行度（何個分赤くなったか）
+	int bombStartIndex_ = -1;                    // 爆弾が始まる体のインデックス
+	float bombTimer_ = 0.0f;                     // 爆弾進行用タイマー
+	static constexpr float kBombStepTime = 0.5f; // 1マス赤くなるまでの時間
+
+	float deltaTime_ = 1.0f / 60.0f;
 };

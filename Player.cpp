@@ -40,7 +40,11 @@ void Player::Update() {
 
 	// スペースキーで最後のパーツを削除
 	if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
-		RemoveLastPart();
+		if (bombActive_) {
+			DetachBombParts();
+		} else {
+			RemoveLastPart();
+		}
 	}
 
 	playerAABB.min = worldTransform_.translation_ - KamataEngine::Vector3{0.5f, 0.5f, 0.5f};
@@ -92,8 +96,6 @@ void Player::Update() {
 		lrKnown_ = false;
 
 		lrDirection_ = LRDirection::Unknown;
-
-		
 	}
 
 	// 進行方向に自動で移動
@@ -166,16 +168,19 @@ void Player::Update() {
 
 
 void Player::Draw() {
-	// 頭（プレイヤー本体）は今まで通り
-	model_->Draw(worldTransform_, *camera_, textureHandle_);
 
-	// 体（1以降）を描画
-	for (size_t i = 0; i < bodyPartTransforms_.size(); ++i) {
-		model_->Draw(bodyPartTransforms_[i], *camera_, textureHandle_);
-	}
+	if (isAlive_) {
+		// 頭（プレイヤー本体）は今まで通り
+		model_->Draw(worldTransform_, *camera_, textureHandle_);
 
-	 for (const auto& wallTransform : wallTransforms_) {
-		model_->Draw(wallTransform, *camera_, textureHandle_);
+		// 体（1以降）を描画
+		for (size_t i = 0; i < bodyPartTransforms_.size(); ++i) {
+			model_->Draw(bodyPartTransforms_[i], *camera_, textureHandle_);
+		}
+
+		for (const auto& wallTransform : wallTransforms_) {
+			model_->Draw(wallTransform, *camera_, textureHandle_);
+		}
 	}
 }
 
@@ -233,4 +238,52 @@ void Player::RemoveLastPart() {
 		bodyParts_.pop_back();
 		bodyPartTransforms_.pop_back();
 	}
+}
+
+void Player::EatBomb() {
+	bombActive_ = true;
+	bombProgress_ = 0;
+	bombStartIndex_ = 0; // 尻尾側から赤くなるため
+	bombTimer_ = 0.0f;
+	isAlive_ = false;
+}
+
+void Player::UpdateBomb() {
+	if (!bombActive_)
+		return;
+	bombTimer_ += deltaTime_;
+	if (bombTimer_ >= kBombStepTime) {
+		bombTimer_ = 0.0f;
+		bombProgress_++;
+		if (bombProgress_ >= bodyParts_.size()) {
+			// ゲームオーバー
+			isAlive_ = false;
+		}
+	}
+}
+
+void Player::DetachBombParts() {
+	if (!bombActive_ || bombProgress_ == 0)
+		return;
+
+	// bombProgress_分だけ体を切り離し、壁に追加
+	for (int i = 0; i < bombProgress_ && !bodyParts_.empty(); ++i) {
+		// 体の先頭（尻尾側）を壁に
+		KamataEngine::Vector3 removedPartPos = bodyParts_.front();
+
+		wallTransforms_.emplace_back();
+		wallTransforms_.back().Initialize();
+		wallTransforms_.back().translation_ = removedPartPos;
+		wallTransforms_.back().scale_ = worldTransform_.scale_;
+		wallTransforms_.back().rotation_ = worldTransform_.rotation_;
+		wallTransforms_.back().matWorld_ = MakeAffineMatrix(wallTransforms_.back().scale_, wallTransforms_.back().rotation_, wallTransforms_.back().translation_);
+		wallTransforms_.back().TransferMatrix();
+
+		bodyParts_.erase(bodyParts_.begin());
+		bodyPartTransforms_.pop_front();
+	}
+
+	// 爆弾状態リセット
+	bombActive_ = false;
+	bombProgress_ = 0;
 }
