@@ -43,55 +43,41 @@ void GameScene::Initialize() {
 #endif
 	camera_.Initialize();
 
-	// りんごを追加
-	Apple* apple1 = new Apple();
-	apple1->Initialize(model_, &camera_, {3, 5, 0});
-	apples_.push_back(apple1);
-
-	// 2つ目のりんごを追加
-	Apple* apple2 = new Apple();
-	apple2->Initialize(model_, &camera_, {-4, -2, 0}); // 好きな座標に
-	apples_.push_back(apple2);
-
-	// 爆弾を追加
-	Bomb* bomb1 = new Bomb();
-	bomb1->Initialize(model_, &camera_, {0, 3, 0});
-	bombs_.push_back(bomb1);
-
-	Bomb* bomb2 = new Bomb();
-	bomb2->Initialize(model_, &camera_, {5, -3, 0});
-	bombs_.push_back(bomb2);
-
-	player_ = new Player();
-	Vector3 playerPosition = {0.0f, 0.0f, 0.0f};
-	player_->Initialize(model_, &camera_, playerPosition);
-
-	//// 要素数
-	//const uint32_t kNumBlockVirtical = 10;
-	//const uint32_t kNumBlockHorizontal = 20;
-	//// ブロック一個分の横幅
-	//const float kBlockWidth = 2.0f;
-	//const float kBlockHeight = 2.0f;
-	//// 要素数を変更する
-	//WorldTransformWalls_.resize(kNumBlockHorizontal);
-	//for (uint32_t i = 0; i < kNumBlockVirtical; ++i) {
-	//	WorldTransformWalls_[i].resize(kNumBlockHorizontal);
-	//}
-	//// 壁の生成
-	//for (uint32_t i = 0; i < kNumBlockVirtical; ++i) {
-	//	for (uint32_t j = 0; j < kNumBlockHorizontal; ++j) {
-
-	//		WorldTransformWalls_[i][j] = new WorldTransform();
-	//		WorldTransformWalls_[i][j]->Initialize();
-	//		WorldTransformWalls_[i][j]->translation_.x = kBlockWidth * j;
-	//		WorldTransformWalls_[i][j]->translation_.y = kBlockHeight * i;
-	//	}
-	//}
+	
+	
+	
 
 	mapChipField_ = new MapChipField();
 	mapChipField_->Initialize();
 	mapChipField_->LoadmapChipCsv("Resources/Block.csv");
 	GenerateWalls();
+
+	player_ = new Player();
+	bool playerSpawned = false;
+
+	for (uint32_t y = 0; y < mapChipField_->GetNumBlockVirtical(); ++y) {
+		for (uint32_t x = 0; x < mapChipField_->GetNumBlockHorizontal(); ++x) {
+			MapChipType type = mapChipField_->GetMapChipTypeByIndex(x, y);
+			KamataEngine::Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
+
+			if (type == MapChipType::kPlayerSpawn) {
+				player_->Initialize(model_, &camera_, pos);
+				playerSpawned = true;
+			} else if (type == MapChipType::kAppleSpawn) {
+				Apple* apple = new Apple();
+				apple->Initialize(model_, &camera_, pos);
+				apples_.push_back(apple);
+			} else if (type == MapChipType::kBombSpawn) {
+				Bomb* bomb = new Bomb();
+				bomb->Initialize(model_, &camera_, pos);
+				bombs_.push_back(bomb);
+			}
+		}
+	}
+	assert(playerSpawned && "マップにkPlayerSpawnがありません");
+
+
+	assert(playerSpawned && "マップにkPlayerSpawnがありません");
 }
 
 void GameScene::Update() {

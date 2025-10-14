@@ -9,6 +9,9 @@ namespace MapChipFieldData {
 std::map<std::string, MapChipType> mapChipTable = {
     {"0", MapChipType::kBlank},
     {"1", MapChipType::kWall },
+    {"2", MapChipType::kPlayerSpawn},
+    {"3", MapChipType::kAppleSpawn},
+    {"4", MapChipType::kBombSpawn  },
 };
 }
 

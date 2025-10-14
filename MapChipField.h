@@ -5,6 +5,9 @@
 enum class MapChipType {
 	kBlank,
 	kWall,
+	kPlayerSpawn, 
+	kAppleSpawn,
+	kBombSpawn,
 };
 
 struct MapChipData {
