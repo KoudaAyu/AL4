@@ -31,6 +31,9 @@ public:
 	const uint32_t GetNumBlockVirtical() const { return kNumBlockVirtical; }
 	const uint32_t GetNumBlockHorizontal() const { return kNumBlockHorizontal; }
 
+	const float GetBlockWidth() const { return kBlockWidth; }
+	const float GetBlockHeight() const { return kBlockHeight; }
+
 private:
 	static inline const float kBlockWidth = 2.0f;
 	static inline const float kBlockHeight = 2.0f;

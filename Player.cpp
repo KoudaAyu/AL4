@@ -168,6 +168,8 @@ void Player::Update() {
 		bodyPartTransforms_[i].TransferMatrix();
 	}
 
+	 UpdateAABB();
+
 	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
 	worldTransform_.TransferMatrix();
 }
@@ -255,6 +257,13 @@ void Player::RemoveLastPart() {
 		bodyParts_.pop_back();
 		bodyPartTransforms_.pop_back();
 	}
+}
+
+void Player::UpdateAABB() {
+	float half = unitLength / 2.0f;
+	const Vector3& pos = GetPosition();
+	playerAABB.min = {pos.x - half, pos.y - half, pos.z - half};
+	playerAABB.max = {pos.x + half, pos.y + half, pos.z + half};
 }
 
 void Player::EatBomb() {

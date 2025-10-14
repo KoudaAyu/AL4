@@ -20,6 +20,8 @@ public:
 	void Grow(); // 体を伸ばす
 	void RemoveLastPart(); // 体を1つ減らす
 
+	void UpdateAABB();
+
 	//爆弾関係
 	void EatBomb();// 爆弾を食べた時の処理
 	void UpdateBomb();// 爆弾進行の更新
@@ -30,6 +32,13 @@ public:
 	const std::deque<KamataEngine::WorldTransform>& GetWallTransforms() const { return wallTransforms_; }
 
 	bool IsBombActive() const { return bombActive_; } // 爆弾状態取得
+
+	const AABB& GetAABB() const { return playerAABB; }
+
+	void SetAlive(bool alive) {
+		isAlive_ = alive;
+	}
+	bool IsAlive() const { return isAlive_; }
 
 
 private:

@@ -1,4 +1,5 @@
 #include "GameScene.h"
+#include "AABB.h"
 
 using namespace KamataEngine;
 
@@ -42,10 +43,6 @@ void GameScene::Initialize() {
 	assert(textureHandle_);
 #endif
 	camera_.Initialize();
-
-	
-	
-	
 
 	mapChipField_ = new MapChipField();
 	mapChipField_->Initialize();
@@ -160,6 +157,31 @@ void GameScene::Update() {
 		if (CheckCollision(headPos, bodyParts[i], 1.0f)) {
 			// ここに当たり判定時の処理を書く
 			break;
+		}
+	}
+
+	
+
+	const AABB& playerAABB = player_->GetAABB(); // プレイヤーのAABB
+
+	for (uint32_t y = 0; y < mapChipField_->GetNumBlockVirtical(); ++y) {
+		for (uint32_t x = 0; x < mapChipField_->GetNumBlockHorizontal(); ++x) {
+			MapChipType type = mapChipField_->GetMapChipTypeByIndex(x, y);
+			if (static_cast<int>(type) == 1) { // マップチップ番号1
+				Vector3 chipPos = mapChipField_->GetMapChipPositionByIndex(x, y);
+
+				// マップチップのAABBを生成
+				float width = mapChipField_->GetBlockWidth();
+				float height = mapChipField_->GetBlockHeight();
+				AABB WallAABB;
+				WallAABB.min = {chipPos.x - width / 2.0f, chipPos.y - height / 2.0f, chipPos.z - width / 2.0f};
+				WallAABB.max = {chipPos.x + width / 2.0f, chipPos.y + height / 2.0f, chipPos.z + width / 2.0f};
+
+				// AABB同士の当たり判定
+				if (IsCollisionAABBAABB(playerAABB, WallAABB)) {
+					player_->SetAlive(false);
+				}
+			}
 		}
 	}
 }
