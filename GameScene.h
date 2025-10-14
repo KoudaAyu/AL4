@@ -7,6 +7,7 @@
 #include"bomb.h"
 #include"Player.h"
 #include"MathUtl.h"
+#include "MapChipField.h"
 
 class GameScene {
 public:
@@ -17,6 +18,7 @@ public:
 	void Initialize();
 	void Update();
 	void Draw();
+	void GenerateWalls();
 
 	int32_t GetWindowWidth() const { return kWindowWidth; }
 	int32_t GetWindowHeight() const { return kWindowHeight; }
@@ -43,5 +45,6 @@ private:
 	//3Dモデルデータ
 	std::vector<std::vector<KamataEngine::WorldTransform*>> WorldTransformWalls_;
 
+	MapChipField* mapChipField_;
 
 };
