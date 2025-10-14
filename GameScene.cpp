@@ -17,6 +17,12 @@ GameScene::~GameScene() {
 	}
 	delete model_;
 	delete player_;
+	for (auto& row : WorldTransformWalls_) {
+		for (auto* wt : row) {
+			delete wt;
+		}
+	}
+	WorldTransformWalls_.clear();
 }
 
 void GameScene::Initialize() {
@@ -55,10 +61,32 @@ void GameScene::Initialize() {
 	bomb2->Initialize(model_, &camera_, {5, -3, 0});
 	bombs_.push_back(bomb2);
 
-
 	player_ = new Player();
 	Vector3 playerPosition = {0.0f, 0.0f, 0.0f};
 	player_->Initialize(model_, &camera_, playerPosition);
+
+	// 要素数
+	const uint32_t kNumBlockVirtical = 10;
+	const uint32_t kNumBlockHorizontal = 20;
+	// ブロック一個分の横幅
+	const float kBlockWidth = 2.0f;
+	const float kBlockHeight = 2.0f;
+	//要素数を変更する
+	WorldTransformWalls_.resize(kNumBlockHorizontal);
+	for (uint32_t i = 0; i < kNumBlockVirtical; ++i)
+	{
+		WorldTransformWalls_[i].resize(kNumBlockHorizontal);
+	}
+	//壁の生成
+	for (uint32_t i = 0; i < kNumBlockVirtical; ++i) {
+		for (uint32_t j = 0; j < kNumBlockHorizontal; ++j) {
+
+			WorldTransformWalls_[i][j] = new WorldTransform();
+			WorldTransformWalls_[i][j]->Initialize();
+			WorldTransformWalls_[i][j]->translation_.x = kBlockWidth * j;
+			WorldTransformWalls_[i][j]->translation_.y = kBlockHeight * i;
+		}
+	}
 }
 
 void GameScene::Update() {
@@ -120,6 +148,14 @@ void GameScene::Update() {
 		}
 	}
 
+	//壁の更新
+	for (uint32_t i = 0; i < WorldTransformWalls_.size(); ++i) {
+		for (uint32_t j = 0; j < WorldTransformWalls_[i].size(); ++j) {
+			WorldTransformWalls_[i][j]->matWorld_ = MakeAffineMatrix(WorldTransformWalls_[i][j]->scale_, WorldTransformWalls_[i][j]->rotation_, WorldTransformWalls_[i][j]->translation_);
+			WorldTransformWalls_[i][j]->TransferMatrix();
+		}
+	}
+
 #ifdef NDEBUG
 	const auto& bodyParts = player_->GetBodyParts();
 #endif
@@ -138,6 +174,13 @@ void GameScene::Draw() {
 
 	Model::PreDraw();
 
+	// 壁の描画
+	for (uint32_t i = 0; i < WorldTransformWalls_.size(); ++i) {
+		for (uint32_t j = 0; j < WorldTransformWalls_[i].size(); ++j) {
+			model_->Draw(*WorldTransformWalls_[i][j], camera_);
+		}
+	}
+
 	player_->Draw();
 
 	for (auto* apple : apples_) {
@@ -149,6 +192,8 @@ void GameScene::Draw() {
 		if (bomb)
 			bomb->Draw();
 	}
+
+	
 
 	Model::PostDraw();
 }

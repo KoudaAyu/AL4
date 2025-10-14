@@ -1,7 +1,7 @@
 #pragma once
 
 #include "KamataEngine.h"
-
+#include <vector>
 
 #include"Apple.h"
 #include"bomb.h"
@@ -38,4 +38,10 @@ private:
 	Player* player_ = nullptr;
 	std::vector<Apple*> apples_;
 	std::vector<Bomb*> bombs_;
+
+	//壁について
+	//3Dモデルデータ
+	std::vector<std::vector<KamataEngine::WorldTransform*>> WorldTransformWalls_;
+
+
 };
