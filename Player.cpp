@@ -34,6 +34,12 @@ void Player::Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera
 
 	// 初期の向き
 	worldTransform_.rotation_.y = std::numbers::pi_v<float> / 2.0f;
+
+	
+	redColor.Initialize();
+
+	
+	normalColor.Initialize();
 }
 
 void Player::Update() {
@@ -46,7 +52,7 @@ void Player::Update() {
 			RemoveLastPart();
 		}
 	}
-
+	UpdateBomb();
 	playerAABB.min = worldTransform_.translation_ - KamataEngine::Vector3{0.5f, 0.5f, 0.5f};
 	playerAABB.max = worldTransform_.translation_ + KamataEngine::Vector3{0.5f, 0.5f, 0.5f};
 
@@ -168,21 +174,32 @@ void Player::Update() {
 
 
 void Player::Draw() {
-
 	if (isAlive_) {
-		// 頭（プレイヤー本体）は今まで通り
-		model_->Draw(worldTransform_, *camera_, textureHandle_);
+		redColor.SetColor({1.0f, 0.0f, 0.0f, 1.0f});
+		normalColor.SetColor({1.0f, 1.0f, 1.0f, 1.0f});
 
-		// 体（1以降）を描画
+		// 頭（プレイヤー本体）は常に通常色
+		model_->Draw(worldTransform_, *camera_, textureHandle_, &normalColor);
+
+		// 体パーツ
 		for (size_t i = 0; i < bodyPartTransforms_.size(); ++i) {
-			model_->Draw(bodyPartTransforms_[i], *camera_, textureHandle_);
+			const ObjectColor* colorToUse = &normalColor;
+			if (bombActive_ && i != 0) { // 頭は常に白
+				if (i >= bodyPartTransforms_.size() - bombProgress_) {
+					colorToUse = &redColor;
+				}
+			}
+			model_->Draw(bodyPartTransforms_[i], *camera_, textureHandle_, colorToUse);
 		}
 
+		// 壁も同じ色で描画（必要なら）
 		for (const auto& wallTransform : wallTransforms_) {
-			model_->Draw(wallTransform, *camera_, textureHandle_);
+			model_->Draw(wallTransform, *camera_, textureHandle_, &normalColor);
 		}
 	}
 }
+
+
 
 // Player.cpp
 void Player::Grow() {

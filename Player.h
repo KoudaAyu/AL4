@@ -92,4 +92,8 @@ private:
 	static constexpr float kBombStepTime = 0.5f; // 1マス赤くなるまでの時間
 
 	float deltaTime_ = 1.0f / 60.0f;
+
+	KamataEngine::ObjectColor redColor;
+
+	KamataEngine::ObjectColor normalColor;
 };
