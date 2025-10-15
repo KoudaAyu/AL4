@@ -28,3 +28,17 @@ KamataEngine::Vector2 KeyInput::GetLStick() const {
 
 	return result;
 }
+
+bool KeyInput::TriggerPadButton(int button) const {
+	static XINPUT_STATE prevState{};
+	XINPUT_STATE state{};
+
+	// コントローラーの状態取得
+	if (XInputGetState(0, &state) == ERROR_SUCCESS) {
+		// トリガー判定: 前フレームでOFF、今フレームでON
+		bool triggered = (!(prevState.Gamepad.wButtons & button)) && (state.Gamepad.wButtons & button);
+		prevState = state;
+		return triggered;
+	}
+	return false;
+}
