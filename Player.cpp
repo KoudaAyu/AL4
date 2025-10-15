@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <numbers>
-
+#include"KeyInput.h"
 #include "MathUtl.h"
 
 using namespace KamataEngine;
@@ -22,6 +22,15 @@ void Player::Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera
 }
 
 void Player::Update() {
+
+	// XBoxコントローラーの左スティック入力取得
+	Vector2 lStick = KeyInput::GetInstance()->GetLStick();
+
+	// スティックのデッドゾーン処理（必要に応じて）
+	if (fabs(lStick.x) > 0.1f) {
+		velocity_.x += lStick.x * kAcceleration;
+		velocity_.x = std::clamp(velocity_.x, -kLimitSpeed, kLimitSpeed);
+	}
 
 	if (Input::GetInstance()->PushKey(DIK_RIGHT) || Input::GetInstance()->PushKey(DIK_LEFT)) {
 		Vector3 acceleration = {};
