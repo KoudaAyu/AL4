@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <numbers>
-
+#include"KeyInput.h"
 #include "MathUtl.h"
 
 using namespace KamataEngine;
@@ -23,6 +23,22 @@ void Player::Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera
 
 void Player::Update() {
 
+	// XBoxコントローラーの左スティック入力取得
+	Vector2 lStick = KeyInput::GetInstance()->GetLStick();
+
+	// スティックのデッドゾーン処理（必要に応じて）
+	if (fabs(lStick.x) > 0.1f) {
+		velocity_.x += lStick.x * kAcceleration;
+		velocity_.x = std::clamp(velocity_.x, -kLimitSpeed, kLimitSpeed);
+	}
+
+	if (KeyInput::GetInstance()->TriggerPadButton(XINPUT_GAMEPAD_A) && jumpCount_ < kMaxJumpCount) {
+		isJump_ = true;
+		jumpVelocity_ = kJumpVelocity;
+		jumpCount_++;
+	}
+
+	// キー入力による移動
 	if (Input::GetInstance()->PushKey(DIK_RIGHT) || Input::GetInstance()->PushKey(DIK_LEFT)) {
 		Vector3 acceleration = {};
 		if (Input::GetInstance()->PushKey(DIK_RIGHT)) {
@@ -72,6 +88,26 @@ void Player::Update() {
 	} else {
 		float destinationRotationYTable[] = {std::numbers::pi_v<float> / 2.0f, std::numbers::pi_v<float> * 3.0f / 2.0f};
 		worldTransform_.rotation_.y = destinationRotationYTable[static_cast<uint32_t>(lrDirection_)];
+	}
+
+	if (Input::GetInstance()->TriggerKey(DIK_SPACE) && jumpCount_ < kMaxJumpCount) {
+		isJump_ = true;
+		jumpVelocity_ = kJumpVelocity;
+		jumpCount_++;
+	}
+	
+    // ジャンプ中の重力処理
+	if (isJump_) {
+		jumpVelocity_ -= kGravity;
+		worldTransform_.translation_.y += jumpVelocity_;
+
+		// 着地判定（y=0が地面）
+		if (worldTransform_.translation_.y <= 0.0f) {
+			worldTransform_.translation_.y = 0.0f;
+			isJump_ = false;
+			jumpVelocity_ = 0.0f;
+			jumpCount_ = 0;
+		}
 	}
 
 	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);

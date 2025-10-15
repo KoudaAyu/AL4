@@ -50,5 +50,15 @@ private:
 
 	//旋回にかかる時間<秒>
 	static inline const float kTimeTurn = 0.3f;
+
+	// ジャンプ
+	bool isJump_ = false;
+	float jumpVelocity_ = 0.0f;
+	static inline float kGravity = 0.2f;
+	static inline float kJumpVelocity = 2.0f;
+	// ジャンプ回数
+	int jumpCount_ = 0;
+	// 最大ジャンプ回数（二段ジャンプなら2）
+	static inline const int kMaxJumpCount = 2;
 };
 
