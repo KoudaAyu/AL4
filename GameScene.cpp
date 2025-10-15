@@ -160,8 +160,6 @@ void GameScene::Update() {
 		}
 	}
 
-	
-
 	const AABB& playerAABB = player_->GetAABB(); // プレイヤーのAABB
 
 	for (uint32_t y = 0; y < mapChipField_->GetNumBlockVirtical(); ++y) {

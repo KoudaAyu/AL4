@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <numbers>
-
+#include "MapChipField.h"
 #include "MathUtl.h"
 
 using namespace KamataEngine;
@@ -41,6 +41,9 @@ void Player::Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera
 	
 	normalColor.Initialize();
 }
+
+
+
 
 void Player::Update() {
 
@@ -284,11 +287,10 @@ void Player::EatBomb() {
 }
 
 
-
 void Player::UpdateBomb() {
 	if (!bombActive_)
 		return;
-	bombTimer_ += deltaTime_;
+	bombTimer_ += 1.0f / 60.0f;
 	if (bombTimer_ >= kBombStepTime) {
 		bombTimer_ = 0.0f;
 		bombProgress_++;
@@ -323,4 +325,30 @@ void Player::DetachBombParts() {
 	// 爆弾状態リセット
 	bombActive_ = false;
 	bombProgress_ = 0;
+}
+
+void Player::StartMove(int dx, int dy, MapChipField* mapChipField) {
+	if (isMoving_)
+		return; // 移動中は無視
+
+	int nextX = gridX_ + dx;
+	int nextY = gridY_ + dy;
+
+	// 範囲外チェック
+	if (nextX < 0 || nextY < 0 || nextX >= static_cast<int>(mapChipField->GetNumBlockHorizontal()) || nextY >= static_cast<int>(mapChipField->GetNumBlockVirtical())) {
+		return;
+	}
+
+	// 壁チェック（マップチップが壁かどうか）
+	if (mapChipField->GetMapChipTypeByIndex(nextX, nextY) == MapChipType::kWall) {
+		return;
+	}
+
+	targetGridX_ = nextX;
+	targetGridY_ = nextY;
+
+	startPos_ = mapChipField->GetMapChipPositionByIndex(gridX_, gridY_);
+	endPos_ = mapChipField->GetMapChipPositionByIndex(targetGridX_, targetGridY_);
+	moveTimer_ = 0.0f;
+	isMoving_ = true;
 }

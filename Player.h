@@ -7,25 +7,23 @@
 
 enum class LRDirection { Left, Right, Unknown };
 enum class UDDirection { Up, Down, Unknown };
-
+class MapChipField;
 class Player {
 public:
-
-
 	void Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera, const KamataEngine::Vector3 position);
 	void Update();
 	void Draw();
 
-
-	void Grow(); // 体を伸ばす
+	void Grow();           // 体を伸ばす
 	void RemoveLastPart(); // 体を1つ減らす
 
 	void UpdateAABB();
 
-	//爆弾関係
-	void EatBomb();// 爆弾を食べた時の処理
-	void UpdateBomb();// 爆弾進行の更新
-	void DetachBombParts();// 切り離し処理
+	// 爆弾関係
+	void EatBomb();         // 爆弾を食べた時の処理
+	void UpdateBomb();      // 爆弾進行の更新
+	void DetachBombParts(); // 切り離し処理
+	void StartMove(int dx, int dy, MapChipField* mapChipField);
 
 	const KamataEngine::Vector3& GetPosition() const { return worldTransform_.translation_; }
 	const std::vector<KamataEngine::Vector3>& GetBodyParts() const { return bodyParts_; }
@@ -35,11 +33,22 @@ public:
 
 	const AABB& GetAABB() const { return playerAABB; }
 
-	void SetAlive(bool alive) {
-		isAlive_ = alive;
-	}
+	void SetAlive(bool alive) { isAlive_ = alive; }
 	bool IsAlive() const { return isAlive_; }
 
+private:
+	int gridX_, gridY_;
+	int dirX_ = 1, dirY_ = 0; // 右向きで開始
+	int nextDirX_ = 1, nextDirY_ = 0;
+	bool isMoving_ = false;
+	float moveTimer_ = 0.0f;
+	float moveDuration_ = 0.15f;
+	KamataEngine::Vector3 startPos_;
+	KamataEngine::Vector3 endPos_;
+	MapChipField* mapChipField_ = nullptr;
+	int targetGridX_ = 0;
+	int targetGridY_ = 0;
+	bool waitForFirstInput_ = true;
 
 private:
 	KamataEngine::WorldTransform worldTransform_;
