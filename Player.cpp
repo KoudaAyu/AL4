@@ -355,15 +355,19 @@ void Player::Grow() {
 
 void Player::RemoveLastPart() {
 	if (bodyParts_.size() > 1) {
-		// 削除する直前のパーツの座標を保存
 		KamataEngine::Vector3 removedPartPos = bodyParts_.back();
 
-		// 壁のTransformを追加し、座標を設定
+		// --- グリッドスナップ処理 ---
+		int gridX = static_cast<int>(std::round(removedPartPos.x / unitLength));
+		int gridY = static_cast<int>(std::round(removedPartPos.y / unitLength));
+		KamataEngine::Vector3 snappedPos = {gridX * unitLength, gridY * unitLength, removedPartPos.z};
+
+		// 壁Transformを追加
 		wallTransforms_.emplace_back();
 		wallTransforms_.back().Initialize();
-		wallTransforms_.back().translation_ = removedPartPos;
-		wallTransforms_.back().scale_ = worldTransform_.scale_;       // 必要ならスケールもコピー
-		wallTransforms_.back().rotation_ = worldTransform_.rotation_; // 必要なら回転もコピー
+		wallTransforms_.back().translation_ = snappedPos;
+		wallTransforms_.back().scale_ = worldTransform_.scale_;
+		wallTransforms_.back().rotation_ = worldTransform_.rotation_;
 		wallTransforms_.back().matWorld_ = MakeAffineMatrix(wallTransforms_.back().scale_, wallTransforms_.back().rotation_, wallTransforms_.back().translation_);
 		wallTransforms_.back().TransferMatrix();
 
@@ -371,6 +375,7 @@ void Player::RemoveLastPart() {
 		bodyPartTransforms_.pop_back();
 	}
 }
+
 
 void Player::UpdateAABB() {
 	constexpr float scale = 0.5f; // ← ここで縮小率を調整
@@ -415,14 +420,25 @@ void Player::DetachBombParts() {
 	if (!bombActive_ || bombProgress_ == 0)
 		return;
 
-	// bombProgress_分だけ体を切り離し、壁に追加
 	for (int i = 0; i < bombProgress_ && bodyParts_.size() > 1; ++i) {
-		// 体の最後（尻尾側）を壁に
 		KamataEngine::Vector3 removedPartPos = bodyParts_.back();
+
+		// --- グリッドインデックスを取得 ---
+		int gridX = static_cast<int>(std::round(removedPartPos.x / unitLength));
+		int gridY = static_cast<int>(std::round(removedPartPos.y / unitLength));
+
+		KamataEngine::Vector3 wallPos = removedPartPos;
+		if (mapChipField_) {
+			// マップチップの中心座標にスナップ
+			wallPos = mapChipField_->GetMapChipPositionByIndex(gridX, gridY);
+		} else {
+			// フォールバック：単純なスナップ
+			wallPos = {gridX * unitLength, gridY * unitLength, removedPartPos.z};
+		}
 
 		wallTransforms_.emplace_back();
 		wallTransforms_.back().Initialize();
-		wallTransforms_.back().translation_ = removedPartPos;
+		wallTransforms_.back().translation_ = wallPos;
 		wallTransforms_.back().scale_ = worldTransform_.scale_;
 		wallTransforms_.back().rotation_ = worldTransform_.rotation_;
 		wallTransforms_.back().matWorld_ = MakeAffineMatrix(wallTransforms_.back().scale_, wallTransforms_.back().rotation_, wallTransforms_.back().translation_);
@@ -432,7 +448,6 @@ void Player::DetachBombParts() {
 		bodyPartTransforms_.pop_back();
 	}
 
-	// 爆弾状態リセット
 	bombActive_ = false;
 	bombProgress_ = 0;
 }
