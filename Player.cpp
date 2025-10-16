@@ -428,17 +428,17 @@ void Player::DetachBombParts() {
 	for (int i = 0; i < bombProgress_ && bodyParts_.size() > 1; ++i) {
 		KamataEngine::Vector3 removedPartPos = bodyParts_.back();
 
-		// --- グリッドインデックスを取得 ---
+		// --- グリッドインデックスを取得（-0.5f補正を追加） ---
 		int gridX = static_cast<int>(std::round(removedPartPos.x / unitLength - 0.5f));
 		int gridY = static_cast<int>(std::round(removedPartPos.y / unitLength - 0.5f));
-		KamataEngine::Vector3 wallPos = {(gridX + 0.5f) * unitLength, (gridY + 0.5f) * unitLength, removedPartPos.z};
 
+		KamataEngine::Vector3 wallPos = removedPartPos;
 		if (mapChipField_) {
 			// マップチップの中心座標にスナップ
 			wallPos = mapChipField_->GetMapChipPositionByIndex(gridX, gridY);
 		} else {
-			// フォールバック：単純なスナップ
-			wallPos = {gridX * unitLength, gridY * unitLength, removedPartPos.z};
+			// フォールバック：グリッドの中心にスナップ
+			wallPos = {(gridX + 0.5f) * unitLength, (gridY + 0.5f) * unitLength, removedPartPos.z};
 		}
 
 		wallTransforms_.emplace_back();
