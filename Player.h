@@ -51,7 +51,7 @@ private:
 	KamataEngine::Vector3 startPos_;
 	KamataEngine::Vector3 endPos_;
 
-	static constexpr float kMoveDuration = 1.0f;
+	static constexpr float kMoveDuration = 0.5f;
 
 private:
 	KamataEngine::WorldTransform worldTransform_;
@@ -96,7 +96,7 @@ private:
 	std::deque<KamataEngine::WorldTransform> wallTransforms_; // ←追加
 
 	// 追従遅延フレーム数
-	static constexpr size_t kFollowDelay = 60; // 例: 5フレーム遅れ
+	static constexpr size_t kFollowDelay = 30; // 例: 5フレーム遅れ
 
 	// 頭の座標履歴
 	std::deque<KamataEngine::Vector3> headHistory_;
@@ -118,4 +118,6 @@ private:
 	KamataEngine::ObjectColor redColor;
 
 	KamataEngine::ObjectColor normalColor;
+
+	bool justGrew_ = false;
 };

@@ -295,6 +295,9 @@ void Player::Update() {
 
 	UpdateBomb();
 	UpdateAABB();
+
+
+
 	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
 	worldTransform_.TransferMatrix();
 }
@@ -329,38 +332,26 @@ void Player::Draw() {
 void Player::Grow() {
 	KamataEngine::Vector3 newPartPos;
 	if (!bodyParts_.empty()) {
-		// 末尾のパーツの座標を取得
 		newPartPos = bodyParts_.back();
+
+		// 尻尾の位置から逆方向に1マス分ずらす
+		Vector3 dir = {-direction_.x, -direction_.y, 0.0f}; // 現在の進行方向の逆
+		newPartPos.x += dir.x * unitLength;
+		newPartPos.y += dir.y * unitLength;
+
 	} else {
-		// まだパーツが無い場合はヘッドの座標
 		newPartPos = worldTransform_.translation_;
 	}
 
-	// 進行方向の逆側にunitLength分ずらす
-	// 例: 右向きなら左へ、上向きなら下へ
-	if (lrDirection_ == LRDirection::Right) {
-		newPartPos.x -= unitLength;
-	} else if (lrDirection_ == LRDirection::Left) {
-		newPartPos.x += unitLength;
-	}
-	if (udDirection_ == UDDirection::Up) {
-		newPartPos.y -= unitLength;
-	} else if (udDirection_ == UDDirection::Down) {
-		newPartPos.y += unitLength;
-	}
-
 	bodyParts_.push_back(newPartPos);
-	for (size_t i = 0; i < kFollowDelay; ++i) {
-		headHistory_.push_front(bodyParts_.back());
-	}
-
-	// 体パーツ用のWorldTransformも追加・初期化
 	bodyPartTransforms_.emplace_back();
 	bodyPartTransforms_.back().Initialize();
 	bodyPartTransforms_.back().scale_ = worldTransform_.scale_;
 	bodyPartTransforms_.back().rotation_ = worldTransform_.rotation_;
 	bodyPartTransforms_.back().translation_ = bodyParts_.back();
 }
+
+
 
 void Player::RemoveLastPart() {
 	if (bodyParts_.size() > 1) {
@@ -382,7 +373,8 @@ void Player::RemoveLastPart() {
 }
 
 void Player::UpdateAABB() {
-	float half = unitLength / 2.0f;
+	constexpr float scale = 0.5f; // ← ここで縮小率を調整
+	float half = (unitLength * scale) / 2.0f;
 	const Vector3& pos = GetPosition();
 	playerAABB.min = {pos.x - half, pos.y - half, pos.z - half};
 	playerAABB.max = {pos.x + half, pos.y + half, pos.z + half};

@@ -166,6 +166,7 @@ void GameScene::Update() {
 	for (size_t i = 1; i < bodyParts.size(); ++i) { // 0は頭なので1から
 		if (CheckCollision(headPos, bodyParts[i], 1.0f)) {
 			// ここに当たり判定時の処理を書く
+			player_->SetAlive(false);
 			break;
 		}
 	}
