@@ -17,7 +17,18 @@ void Player::Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera
 	camera_ = camera;
 
 	worldTransform_.Initialize();
-	worldTransform_.translation_ = position;
+	gridPos_.x = std::round(position.x / unitLength);
+	gridPos_.y = std::round(position.y / unitLength);
+	targetGridPos_ = gridPos_;
+
+	// 方向も初期化（右向き）
+	direction_ = {1.0f, 0.0f};
+	nextDirection_ = direction_;
+
+	// worldTransform_もグリッドに合わせて再設定
+	worldTransform_.translation_.x = gridPos_.x * unitLength;
+	worldTransform_.translation_.y = gridPos_.y * unitLength;
+	worldTransform_.translation_.z = position.z; // Zはそのまま
 
 	bodyParts_.clear();
 	bodyParts_.push_back(worldTransform_.translation_);
@@ -41,9 +52,150 @@ void Player::Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera
 	normalColor.Initialize();
 }
 
-void Player::Update() {
+// void Player::Update() {
+//
+//	// スペースキーで最後のパーツを削除
+//	if (Input::GetInstance()->TriggerKey(DIK_SPACE) || KeyInput::GetInstance()->TriggerPadButton(XINPUT_GAMEPAD_A)) {
+//		if (bombActive_) {
+//			DetachBombParts();
+//		} else {
+//			RemoveLastPart();
+//		}
+//	}
+//
+//	UpdateBomb();
+//	playerAABB.min = worldTransform_.translation_ - KamataEngine::Vector3{0.5f, 0.5f, 0.5f};
+//	playerAABB.max = worldTransform_.translation_ + KamataEngine::Vector3{0.5f, 0.5f, 0.5f};
+//
+//	for (const auto& wallTransform : wallTransforms_) {
+//		AABB wallAABB;
+//		wallAABB.min = wallTransform.translation_ - KamataEngine::Vector3{0.5f, 0.5f, 0.5f};
+//		wallAABB.max = wallTransform.translation_ + KamataEngine::Vector3{0.5f, 0.5f, 0.5f};
+//
+//		if (IsCollisionAABBAABB(playerAABB, wallAABB)) {
+//			/*__debugbreak()*/; // デバッグ時のみ
+//		}
+//	}
+//
+//	KamataEngine::Vector2 lStick = KeyInput::GetInstance()->GetLStick();
+//	constexpr float stickThreshold = 0.5f;
+//
+//	// 左右キー入力処理
+//	if ((Input::GetInstance()->TriggerKey(DIK_LEFT) || lStick.x < -stickThreshold) && lrDirection_ != LRDirection::Right) {
+//		lrDirection_ = LRDirection::Left;
+//		lrKnown_ = true;
+//		udKnown_ = false;
+//		udDirection_ = UDDirection::Unknown;
+//		turnFirstRotationY_ = worldTransform_.rotation_.y;
+//		turnTimer_ = kTimeTurn;
+//	}
+//
+//	if ((Input::GetInstance()->TriggerKey(DIK_RIGHT) || lStick.x > stickThreshold) && lrDirection_ != LRDirection::Left) {
+//		lrDirection_ = LRDirection::Right;
+//		lrKnown_ = true;
+//		udKnown_ = false;
+//		udDirection_ = UDDirection::Unknown;
+//		turnFirstRotationY_ = worldTransform_.rotation_.y;
+//		turnTimer_ = kTimeTurn;
+//	}
+//
+//	// 上下キー入力処理
+//	if ((Input::GetInstance()->TriggerKey(DIK_UP) || lStick.y > stickThreshold) && udDirection_ != UDDirection::Down) {
+//		udDirection_ = UDDirection::Up;
+//		udKnown_ = true;
+//		lrKnown_ = false;
+//		lrDirection_ = LRDirection::Unknown;
+//	}
+//
+//	if ((Input::GetInstance()->TriggerKey(DIK_DOWN) || lStick.y < -stickThreshold) && udDirection_ != UDDirection::Up) {
+//		udDirection_ = UDDirection::Down;
+//		udKnown_ = true;
+//		lrKnown_ = false;
+//
+//		lrDirection_ = LRDirection::Unknown;
+//	}
+//
+//	// 進行方向に自動で移動
+//	velocity_ = {0.0f, 0.0f, 0.0f};
+//	float speed = kLimitSpeed;
+//
+//	if (lrKnown_) {
+//		velocity_.x = (lrDirection_ == LRDirection::Right) ? speed : -speed;
+//		velocity_.y = 0.0f;
+//	} else if (udKnown_) {
+//		velocity_.y = (udDirection_ == UDDirection::Up) ? speed : -speed;
+//		velocity_.x = 0.0f;
+//	}
+//
+//	worldTransform_.translation_ += velocity_;
+//
+//	if (lrKnown_) { // ←★ 左右方向のときだけ回転処理を行う
+//		if (turnTimer_ > 0.0f) {
+//			turnTimer_ -= 1.0f / 60.0f;
+//			turnTimer_ = std::max(turnTimer_, 0.0f);
+//
+//			float t = 1.0f - (turnTimer_ / kTimeTurn);
+//			float easeT = 1.0f - powf(1.0f - t, 3.0f);
+//
+//			float destinationRotationYTable[] = {
+//			    std::numbers::pi_v<float> / 2.0f,       // Right
+//			    std::numbers::pi_v<float> * 3.0f / 2.0f // Left
+//			};
+//			float destination = destinationRotationYTable[static_cast<uint32_t>(lrDirection_)];
+//			worldTransform_.rotation_.y = turnFirstRotationY_ + (destination - turnFirstRotationY_) * easeT;
+//		} else {
+//			float destinationRotationYTable[] = {
+//			    std::numbers::pi_v<float> / 2.0f,       // Right
+//			    std::numbers::pi_v<float> * 3.0f / 2.0f // Left
+//			};
+//			worldTransform_.rotation_.y = destinationRotationYTable[static_cast<uint32_t>(lrDirection_)];
+//		}
+//	}
+//
+//	// 頭の現在位置を履歴に追加
+//	headHistory_.push_back(worldTransform_.translation_);
+//
+//	// 履歴が長すぎる場合は古いものを削除
+//	size_t requiredHistory = kFollowDelay * bodyParts_.size();
+//	while (headHistory_.size() > requiredHistory) {
+//		headHistory_.pop_front();
+//	}
+//
+//	// 各パーツを遅延追従させる
+//	for (size_t i = 0; i < bodyParts_.size(); ++i) {
+//		if (i == 0) {
+//			bodyParts_[0] = worldTransform_.translation_;
+//		} else {
+//			size_t historyIndex = headHistory_.size() - 1 - i * kFollowDelay;
+//			bodyParts_[i] = headHistory_[historyIndex];
+//		}
+//	}
+//
+//	for (size_t i = 0; i < bodyParts_.size(); ++i) {
+//		bodyPartTransforms_[i].translation_ = bodyParts_[i];
+//		bodyPartTransforms_[i].scale_ = worldTransform_.scale_;
+//		bodyPartTransforms_[i].rotation_ = worldTransform_.rotation_;
+//		bodyPartTransforms_[i].matWorld_ = MakeAffineMatrix(bodyPartTransforms_[i].scale_, bodyPartTransforms_[i].rotation_, bodyPartTransforms_[i].translation_);
+//		bodyPartTransforms_[i].TransferMatrix();
+//	}
+//
+//	UpdateAABB();
+//
+//	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
+//	worldTransform_.TransferMatrix();
+// }
 
-	// スペースキーで最後のパーツを削除
+// Player.cpp
+
+void Player::Update() {
+	// 死亡時は何もしない
+	if (!isAlive_)
+		return;
+
+	// 入力取得
+	KamataEngine::Vector2 lStick = KeyInput::GetInstance()->GetLStick();
+	constexpr float stickThreshold = 0.5f;
+
 	if (Input::GetInstance()->TriggerKey(DIK_SPACE) || KeyInput::GetInstance()->TriggerPadButton(XINPUT_GAMEPAD_A)) {
 		if (bombActive_) {
 			DetachBombParts();
@@ -51,125 +203,98 @@ void Player::Update() {
 			RemoveLastPart();
 		}
 	}
+	// 入力受付（移動中でなければ方向予約）
+
+	if ((Input::GetInstance()->TriggerKey(DIK_LEFT) || lStick.x < -stickThreshold) && direction_.x != 1.0f) {
+		nextDirection_ = {-1.0f, 0.0f};
+	}
+	if ((Input::GetInstance()->TriggerKey(DIK_RIGHT) || lStick.x > stickThreshold) && direction_.x != -1.0f) {
+		nextDirection_ = {1.0f, 0.0f};
+	}
+	if ((Input::GetInstance()->TriggerKey(DIK_UP) || lStick.y > stickThreshold) && direction_.y != -1.0f) {
+		nextDirection_ = {0.0f, 1.0f};
+	}
+	if ((Input::GetInstance()->TriggerKey(DIK_DOWN) || lStick.y < -stickThreshold) && direction_.y != 1.0f) {
+		nextDirection_ = {0.0f, -1.0f};
+	}
+
+	// 移動開始判定
+	if (!isMoving_) {
+		KamataEngine::Vector2 nextGrid = {gridPos_.x + nextDirection_.x, gridPos_.y + nextDirection_.y};
+
+		bool canMove = true;
+		if (mapChipField_) {
+			canMove = mapChipField_->IsMovable(static_cast<int>(nextGrid.x), static_cast<int>(nextGrid.y));
+		}
+		// 体との衝突判定もここで追加可能
+
+		if (canMove) {
+			direction_ = nextDirection_;
+			targetGridPos_ = nextGrid;
+			isMoving_ = true;
+			moveTimer_ = 0.0f;
+			startPos_ = {gridPos_.x * unitLength, gridPos_.y * unitLength, 0.0f};
+			endPos_ = {targetGridPos_.x * unitLength, targetGridPos_.y * unitLength, 0.0f};
+		}
+	}
+
+	// 補間移動
+	if (isMoving_) {
+		moveTimer_ += deltaTime_;
+		float t = std::min(moveTimer_ / kMoveDuration, 1.0f);
+		KamataEngine::Vector3 interpPos = startPos_ * (1.0f - t) + endPos_ * t;
+		worldTransform_.translation_ = interpPos;
+
+		// 頭の履歴を随時追加
+		if (headHistory_.empty() || headHistory_.back() != worldTransform_.translation_) {
+			headHistory_.push_back(worldTransform_.translation_);
+		}
+
+		// 履歴が長すぎる場合は古いものを削除
+		size_t requiredHistory = kFollowDelay * bodyParts_.size();
+		while (headHistory_.size() > requiredHistory) {
+			headHistory_.pop_front();
+		}
+
+		// 各パーツを遅延追従させる
+		for (size_t i = 0; i < bodyParts_.size(); ++i) {
+			if (i == 0) {
+				bodyParts_[0] = worldTransform_.translation_;
+			} else {
+				size_t historyIndex = headHistory_.size() - 1 - i * kFollowDelay;
+				if (historyIndex < headHistory_.size()) {
+					bodyParts_[i] = headHistory_[historyIndex];
+				}
+			}
+		}
+
+		// 体パーツのTransform更新
+		for (size_t i = 0; i < bodyParts_.size(); ++i) {
+			bodyPartTransforms_[i].translation_ = bodyParts_[i];
+			bodyPartTransforms_[i].scale_ = worldTransform_.scale_;
+			bodyPartTransforms_[i].rotation_ = worldTransform_.rotation_;
+			bodyPartTransforms_[i].matWorld_ = MakeAffineMatrix(bodyPartTransforms_[i].scale_, bodyPartTransforms_[i].rotation_, bodyPartTransforms_[i].translation_);
+			bodyPartTransforms_[i].TransferMatrix();
+		}
+
+		if (t >= 1.0f) {
+			// 移動完了
+			gridPos_ = targetGridPos_;
+			isMoving_ = false;
+		}
+	} else {
+		// 静止時も体パーツのTransformを更新（消失防止）
+		for (size_t i = 0; i < bodyParts_.size(); ++i) {
+			bodyPartTransforms_[i].translation_ = bodyParts_[i];
+			bodyPartTransforms_[i].scale_ = worldTransform_.scale_;
+			bodyPartTransforms_[i].rotation_ = worldTransform_.rotation_;
+			bodyPartTransforms_[i].matWorld_ = MakeAffineMatrix(bodyPartTransforms_[i].scale_, bodyPartTransforms_[i].rotation_, bodyPartTransforms_[i].translation_);
+			bodyPartTransforms_[i].TransferMatrix();
+		}
+	}
 
 	UpdateBomb();
-	playerAABB.min = worldTransform_.translation_ - KamataEngine::Vector3{0.5f, 0.5f, 0.5f};
-	playerAABB.max = worldTransform_.translation_ + KamataEngine::Vector3{0.5f, 0.5f, 0.5f};
-
-	for (const auto& wallTransform : wallTransforms_) {
-		AABB wallAABB;
-		wallAABB.min = wallTransform.translation_ - KamataEngine::Vector3{0.5f, 0.5f, 0.5f};
-		wallAABB.max = wallTransform.translation_ + KamataEngine::Vector3{0.5f, 0.5f, 0.5f};
-
-		if (IsCollisionAABBAABB(playerAABB, wallAABB)) {
-			/*__debugbreak()*/; // デバッグ時のみ
-		}
-	}
-
-	KamataEngine::Vector2 lStick = KeyInput::GetInstance()->GetLStick();
-	constexpr float stickThreshold = 0.5f;
-
-	// 左右キー入力処理
-	if ((Input::GetInstance()->TriggerKey(DIK_LEFT) || lStick.x < -stickThreshold) && lrDirection_ != LRDirection::Right) {
-		lrDirection_ = LRDirection::Left;
-		lrKnown_ = true;
-		udKnown_ = false;
-		udDirection_ = UDDirection::Unknown;
-		turnFirstRotationY_ = worldTransform_.rotation_.y;
-		turnTimer_ = kTimeTurn;
-	}
-
-	if ((Input::GetInstance()->TriggerKey(DIK_RIGHT) || lStick.x > stickThreshold) && lrDirection_ != LRDirection::Left) {
-		lrDirection_ = LRDirection::Right;
-		lrKnown_ = true;
-		udKnown_ = false;
-		udDirection_ = UDDirection::Unknown;
-		turnFirstRotationY_ = worldTransform_.rotation_.y;
-		turnTimer_ = kTimeTurn;
-	}
-
-	// 上下キー入力処理
-	if ((Input::GetInstance()->TriggerKey(DIK_UP) || lStick.y > stickThreshold) && udDirection_ != UDDirection::Down) {
-		udDirection_ = UDDirection::Up;
-		udKnown_ = true;
-		lrKnown_ = false;
-		lrDirection_ = LRDirection::Unknown;
-	}
-
-	if ((Input::GetInstance()->TriggerKey(DIK_DOWN) || lStick.y < -stickThreshold) && udDirection_ != UDDirection::Up) {
-		udDirection_ = UDDirection::Down;
-		udKnown_ = true;
-		lrKnown_ = false;
-
-		lrDirection_ = LRDirection::Unknown;
-	}
-
-	// 進行方向に自動で移動
-	velocity_ = {0.0f, 0.0f, 0.0f};
-	float speed = kLimitSpeed;
-
-	if (lrKnown_) {
-		velocity_.x = (lrDirection_ == LRDirection::Right) ? speed : -speed;
-		velocity_.y = 0.0f;
-	} else if (udKnown_) {
-		velocity_.y = (udDirection_ == UDDirection::Up) ? speed : -speed;
-		velocity_.x = 0.0f;
-	}
-
-	worldTransform_.translation_ += velocity_;
-
-	if (lrKnown_) { // ←★ 左右方向のときだけ回転処理を行う
-		if (turnTimer_ > 0.0f) {
-			turnTimer_ -= 1.0f / 60.0f;
-			turnTimer_ = std::max(turnTimer_, 0.0f);
-
-			float t = 1.0f - (turnTimer_ / kTimeTurn);
-			float easeT = 1.0f - powf(1.0f - t, 3.0f);
-
-			float destinationRotationYTable[] = {
-			    std::numbers::pi_v<float> / 2.0f,       // Right
-			    std::numbers::pi_v<float> * 3.0f / 2.0f // Left
-			};
-			float destination = destinationRotationYTable[static_cast<uint32_t>(lrDirection_)];
-			worldTransform_.rotation_.y = turnFirstRotationY_ + (destination - turnFirstRotationY_) * easeT;
-		} else {
-			float destinationRotationYTable[] = {
-			    std::numbers::pi_v<float> / 2.0f,       // Right
-			    std::numbers::pi_v<float> * 3.0f / 2.0f // Left
-			};
-			worldTransform_.rotation_.y = destinationRotationYTable[static_cast<uint32_t>(lrDirection_)];
-		}
-	}
-
-	// 頭の現在位置を履歴に追加
-	headHistory_.push_back(worldTransform_.translation_);
-
-	// 履歴が長すぎる場合は古いものを削除
-	size_t requiredHistory = kFollowDelay * bodyParts_.size();
-	while (headHistory_.size() > requiredHistory) {
-		headHistory_.pop_front();
-	}
-
-	// 各パーツを遅延追従させる
-	for (size_t i = 0; i < bodyParts_.size(); ++i) {
-		if (i == 0) {
-			bodyParts_[0] = worldTransform_.translation_;
-		} else {
-			size_t historyIndex = headHistory_.size() - 1 - i * kFollowDelay;
-			bodyParts_[i] = headHistory_[historyIndex];
-		}
-	}
-
-	for (size_t i = 0; i < bodyParts_.size(); ++i) {
-		bodyPartTransforms_[i].translation_ = bodyParts_[i];
-		bodyPartTransforms_[i].scale_ = worldTransform_.scale_;
-		bodyPartTransforms_[i].rotation_ = worldTransform_.rotation_;
-		bodyPartTransforms_[i].matWorld_ = MakeAffineMatrix(bodyPartTransforms_[i].scale_, bodyPartTransforms_[i].rotation_, bodyPartTransforms_[i].translation_);
-		bodyPartTransforms_[i].TransferMatrix();
-	}
-
 	UpdateAABB();
-
 	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
 	worldTransform_.TransferMatrix();
 }
@@ -318,30 +443,4 @@ void Player::DetachBombParts() {
 	// 爆弾状態リセット
 	bombActive_ = false;
 	bombProgress_ = 0;
-}
-
-void Player::StartMove(int dx, int dy, MapChipField* mapChipField) {
-	if (isMoving_)
-		return; // 移動中は無視
-
-	int nextX = gridX_ + dx;
-	int nextY = gridY_ + dy;
-
-	// 範囲外チェック
-	if (nextX < 0 || nextY < 0 || nextX >= static_cast<int>(mapChipField->GetNumBlockHorizontal()) || nextY >= static_cast<int>(mapChipField->GetNumBlockVirtical())) {
-		return;
-	}
-
-	// 壁チェック（マップチップが壁かどうか）
-	if (mapChipField->GetMapChipTypeByIndex(nextX, nextY) == MapChipType::kWall) {
-		return;
-	}
-
-	targetGridX_ = nextX;
-	targetGridY_ = nextY;
-
-	startPos_ = mapChipField->GetMapChipPositionByIndex(gridX_, gridY_);
-	endPos_ = mapChipField->GetMapChipPositionByIndex(targetGridX_, targetGridY_);
-	moveTimer_ = 0.0f;
-	isMoving_ = true;
 }

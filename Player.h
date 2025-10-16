@@ -37,18 +37,21 @@ public:
 	bool IsAlive() const { return isAlive_; }
 
 private:
-	int gridX_, gridY_;
-	int dirX_ = 1, dirY_ = 0; // 右向きで開始
-	int nextDirX_ = 1, nextDirY_ = 0;
+	KamataEngine::Vector2 gridPos_ = {0.0f, 0.0f};
+	KamataEngine::Vector2 targetGridPos_ = {0.0f, 0.0f};
+
+	KamataEngine::Vector2 direction_ = {1.0f, 0.0f}; // 右向きで開始
+	KamataEngine::Vector2 nextDirection_ = {1.0f, 0.0f};
+
 	bool isMoving_ = false;
 	float moveTimer_ = 0.0f;
-	float moveDuration_ = 0.15f;
+
+	MapChipField* mapChipField_ = nullptr;
+
 	KamataEngine::Vector3 startPos_;
 	KamataEngine::Vector3 endPos_;
-	MapChipField* mapChipField_ = nullptr;
-	int targetGridX_ = 0;
-	int targetGridY_ = 0;
-	bool waitForFirstInput_ = true;
+
+	static constexpr float kMoveDuration = 1.0f;
 
 private:
 	KamataEngine::WorldTransform worldTransform_;
@@ -98,7 +101,8 @@ private:
 	// 頭の座標履歴
 	std::deque<KamataEngine::Vector3> headHistory_;
 
-	static constexpr float unitLength = 1.0f;
+	//まずのサイズと一致させる
+	static constexpr float unitLength = 2.0f;
 
 	AABB playerAABB;
 

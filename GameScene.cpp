@@ -43,6 +43,7 @@ void GameScene::Initialize() {
 	assert(textureHandle_);
 #endif
 	camera_.Initialize();
+	
 
 	mapChipField_ = new MapChipField();
 	mapChipField_->Initialize();
@@ -73,7 +74,6 @@ void GameScene::Initialize() {
 	}
 	assert(playerSpawned && "マップにkPlayerSpawnがありません");
 
-
 	assert(playerSpawned && "マップにkPlayerSpawnがありません");
 }
 
@@ -97,6 +97,14 @@ void GameScene::Update() {
 		const auto& v = bodyParts[i];
 		ImGui::Text("Part %zu: (%.2f, %.2f, %.2f)", i, v.x, v.y, v.z);
 	}
+	float camPos[3] = {camera_.translation_.x, camera_.translation_.y, camera_.translation_.z};
+	if (ImGui::DragFloat3("Camera Position", camPos, 0.1f)) {
+		camera_.translation_.x = camPos[0];
+		camera_.translation_.y = camPos[1];
+		camera_.translation_.z = camPos[2];
+		camera_.UpdateMatrix();
+		camera_.TransferMatrix();
+	}
 	ImGui::End();
 
 	debugCamera_->Update();
@@ -107,6 +115,10 @@ void GameScene::Update() {
 #endif //  _DEBUG
 
 	player_->Update();
+
+	camera_.translation_ = {10, 8, -50};
+	camera_.UpdateMatrix();
+	camera_.TransferMatrix();
 
 	for (auto* apple : apples_) {
 		if (!apple)
@@ -139,9 +151,7 @@ void GameScene::Update() {
 	for (uint32_t i = 0; i < WorldTransformWalls_.size(); ++i) {
 		for (uint32_t j = 0; j < WorldTransformWalls_[i].size(); ++j) {
 			if (WorldTransformWalls_[i][j]) { // nullチェック追加
-				WorldTransformWalls_[i][j]->matWorld_ = MakeAffineMatrix
-				(WorldTransformWalls_[i][j]->scale_, WorldTransformWalls_[i][j]->rotation_,
-					WorldTransformWalls_[i][j]->translation_);
+				WorldTransformWalls_[i][j]->matWorld_ = MakeAffineMatrix(WorldTransformWalls_[i][j]->scale_, WorldTransformWalls_[i][j]->rotation_, WorldTransformWalls_[i][j]->translation_);
 				WorldTransformWalls_[i][j]->TransferMatrix();
 			}
 		}
@@ -177,7 +187,7 @@ void GameScene::Update() {
 
 				// AABB同士の当たり判定
 				if (IsCollisionAABBAABB(playerAABB, WallAABB)) {
-					player_->SetAlive(false);
+					/*player_->SetAlive(false);*/
 				}
 			}
 		}

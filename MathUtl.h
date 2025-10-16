@@ -17,12 +17,18 @@ Matrix4x4 MakeRotateZMatrix(float radian);
 
 Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Vector3& translate);
 
+inline Vector2 operator+(const Vector2& lhs, const Vector2& rhs) { return {lhs.x + rhs.x, lhs.y + rhs.y}; }
+
+// 減算演算子も必要なら
+inline Vector2 operator-(const Vector2& lhs, const Vector2& rhs) { return {lhs.x - rhs.x, lhs.y - rhs.y}; }
+
 inline KamataEngine::Vector3& operator+=(KamataEngine::Vector3& lhs, const KamataEngine::Vector3& rhs) {
 	lhs.x += rhs.x;
 	lhs.y += rhs.y;
 	lhs.z += rhs.z;
 	return lhs;
 }
+
 
 inline Vector3 Normalize(const Vector3& v) {
 	float len = std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
@@ -49,3 +55,9 @@ inline KamataEngine::Vector3 operator*(float s, const KamataEngine::Vector3& v) 
 
 // 減算演算子
 inline KamataEngine::Vector3 operator-(const KamataEngine::Vector3& lhs, const KamataEngine::Vector3& rhs) { return KamataEngine::Vector3{lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z}; }
+
+// 等価演算子
+inline bool operator==(const Vector3& lhs, const Vector3& rhs) { return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z; }
+
+// 非等価演算子
+inline bool operator!=(const Vector3& lhs, const Vector3& rhs) { return !(lhs == rhs); }
