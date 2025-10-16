@@ -11,6 +11,8 @@ public:
 	bool IsActive() const { return isActive_; }
 	void SetActive(bool active) { isActive_ = active; }
 
+	void Respawn(const KamataEngine::Vector3 RespawnPosition);
+
 private:
 	KamataEngine::Model* model_ = nullptr;
 	KamataEngine::Camera* camera_ = nullptr;

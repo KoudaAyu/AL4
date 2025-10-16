@@ -27,8 +27,8 @@ void Player::Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera
     isMoving_ = false;
 
 	// worldTransform_もグリッドに合わせて再設定
-	worldTransform_.translation_.x = gridPos_.x * unitLength;
-	worldTransform_.translation_.y = gridPos_.y * unitLength;
+	worldTransform_.translation_.x = (gridPos_.x + 0.5f) * unitLength;
+	worldTransform_.translation_.y = (gridPos_.y + 0.5f) * unitLength;
 	worldTransform_.translation_.z = position.z; // Zはそのまま
 
 	bodyParts_.clear();
@@ -238,8 +238,9 @@ void Player::Update() {
 			targetGridPos_ = nextGrid;
 			isMoving_ = true;
 			moveTimer_ = 0.0f;
-			startPos_ = {gridPos_.x * unitLength, gridPos_.y * unitLength, 0.0f};
-			endPos_ = {targetGridPos_.x * unitLength, targetGridPos_.y * unitLength, 0.0f};
+			startPos_ = {(gridPos_.x + 0.5f) * unitLength, (gridPos_.y + 0.5f) * unitLength, 0.0f};
+			endPos_ = {(targetGridPos_.x + 0.5f) * unitLength, (targetGridPos_.y + 0.5f) * unitLength, 0.0f};
+
 		}
 	}
 
@@ -363,10 +364,9 @@ void Player::RemoveLastPart() {
 		KamataEngine::Vector3 removedPartPos = bodyParts_.back();
 
 		// --- グリッドスナップ処理 ---
-		int gridX = static_cast<int>(std::round(removedPartPos.x / unitLength));
-		int gridY = static_cast<int>(std::round(removedPartPos.y / unitLength));
-		KamataEngine::Vector3 snappedPos = {gridX * unitLength, gridY * unitLength, removedPartPos.z};
-
+		int gridX = static_cast<int>(std::round(removedPartPos.x / unitLength - 0.5f));
+		int gridY = static_cast<int>(std::round(removedPartPos.y / unitLength - 0.5f));
+		KamataEngine::Vector3 snappedPos = {(gridX + 0.5f) * unitLength, (gridY + 0.5f) * unitLength, removedPartPos.z};
 		// 壁Transformを追加
 		wallTransforms_.emplace_back();
 		wallTransforms_.back().Initialize();
@@ -429,10 +429,10 @@ void Player::DetachBombParts() {
 		KamataEngine::Vector3 removedPartPos = bodyParts_.back();
 
 		// --- グリッドインデックスを取得 ---
-		int gridX = static_cast<int>(std::round(removedPartPos.x / unitLength));
-		int gridY = static_cast<int>(std::round(removedPartPos.y / unitLength));
+		int gridX = static_cast<int>(std::round(removedPartPos.x / unitLength - 0.5f));
+		int gridY = static_cast<int>(std::round(removedPartPos.y / unitLength - 0.5f));
+		KamataEngine::Vector3 wallPos = {(gridX + 0.5f) * unitLength, (gridY + 0.5f) * unitLength, removedPartPos.z};
 
-		KamataEngine::Vector3 wallPos = removedPartPos;
 		if (mapChipField_) {
 			// マップチップの中心座標にスナップ
 			wallPos = mapChipField_->GetMapChipPositionByIndex(gridX, gridY);

@@ -23,3 +23,9 @@ void Apple::Draw() {
 		model_->Draw(worldTransform_, *camera_,textureHandle_);
 	}
 }
+
+void Apple::Respawn(const KamataEngine::Vector3 RespawnPosition) {
+
+	worldTransform_.translation_ = RespawnPosition;
+	isActive_ = true; 
+}

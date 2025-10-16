@@ -1,5 +1,7 @@
 #include "GameScene.h"
 #include "AABB.h"
+#include <algorithm>
+#include <random>
 
 using namespace KamataEngine;
 
@@ -43,7 +45,6 @@ void GameScene::Initialize() {
 	assert(textureHandle_);
 #endif
 	camera_.Initialize();
-	
 
 	mapChipField_ = new MapChipField();
 	mapChipField_->Initialize();
@@ -62,9 +63,9 @@ void GameScene::Initialize() {
 				player_->Initialize(model_, &camera_, pos);
 				playerSpawned = true;
 			} else if (type == MapChipType::kAppleSpawn) {
-				Apple* apple = new Apple();
+				/*Apple* apple = new Apple();
 				apple->Initialize(model_, &camera_, pos);
-				apples_.push_back(apple);
+				apples_.push_back(apple);*/
 			} else if (type == MapChipType::kBombSpawn) {
 				Bomb* bomb = new Bomb();
 				bomb->Initialize(model_, &camera_, pos);
@@ -72,9 +73,63 @@ void GameScene::Initialize() {
 			}
 		}
 	}
+
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	// カメラの位置をグリッドインデックスに変換
+	int camX = static_cast<int>(camera_.translation_.x / mapChipField_->GetBlockWidth());
+	int camY = static_cast<int>(camera_.translation_.y / mapChipField_->GetBlockHeight());
+
+	int minX = (std::max)(0, camX - 5);
+	int maxX = (std::min)(static_cast<int>(mapChipField_->GetNumBlockHorizontal()) - 1, camX + 6);
+	int minY = (std::max)(0, camY - 5);
+	int maxY = (std::min)(static_cast<int>(mapChipField_->GetNumBlockVirtical()) - 1, camY + 5);
+
+	std::uniform_int_distribution<int> distX(minX, maxX);
+	std::uniform_int_distribution<int> distY(minY, maxY);
+
+	for (int i = 0; i < 10; ++i) {
+		int xIndex, yIndex;
+		while (true) {
+			xIndex = distX(gen);
+			yIndex = distY(gen);
+			if (mapChipField_->GetMapChipTypeByIndex(xIndex, yIndex) != MapChipType::kWall) {
+				KamataEngine::Vector3 pos = mapChipField_->GetMapChipPositionByIndex(xIndex, yIndex);
+				// プレイヤーのスポーン位置と一致しないか判定
+				if (!(pos.x == player_->GetPosition().x && pos.y == player_->GetPosition().y && pos.z == player_->GetPosition().z)) {
+					// 既存のAppleと被らないか判定
+					bool overlap = false;
+					for (const auto* apple : apples_) {
+						const auto& aPos = apple->GetPosition();
+						if (aPos.x == pos.x && aPos.y == pos.y && aPos.z == pos.z) {
+							overlap = true;
+							break;
+						}
+					}
+					// 既存のBombとも被らないか判定
+					for (const auto* bomb : bombs_) {
+						const auto& bPos = bomb->GetPosition();
+						if (bPos.x == pos.x && bPos.y == pos.y && bPos.z == pos.z) {
+							overlap = true;
+							break;
+						}
+					}
+					if (!overlap) {
+						Apple* apple = new Apple();
+						apple->Initialize(model_, &camera_, pos);
+						apples_.push_back(apple);
+						break;
+					}
+				}
+			}
+		}
+	}
+
+#ifdef _DEBUG
 	assert(playerSpawned && "マップにkPlayerSpawnがありません");
 
 	assert(playerSpawned && "マップにkPlayerSpawnがありません");
+#endif
 }
 
 void GameScene::Update() {
@@ -126,6 +181,7 @@ void GameScene::Update() {
 		apple->Update();
 		if (apple->IsActive() && CheckCollision(player_->GetPosition(), apple->GetPosition(), 1.0f)) {
 			apple->SetActive(false);
+			RespawnAppleRandom(apple);
 			player_->Grow();
 		}
 	}
@@ -254,4 +310,65 @@ bool GameScene::CheckCollision(const Vector3& a, const Vector3& b, float radius)
 	float dz = a.z - b.z;
 	float distSq = dx * dx + dy * dy + dz * dz;
 	return distSq < (radius * radius);
+}
+
+void GameScene::RespawnAppleRandom(Apple* apple) {
+	std::random_device rd;
+	std::mt19937 gen(rd());
+
+	int numX = static_cast<int>(mapChipField_->GetNumBlockHorizontal());
+	int numY = static_cast<int>(mapChipField_->GetNumBlockVirtical());
+
+	std::uniform_int_distribution<int> distX(0, numX - 1);
+	std::uniform_int_distribution<int> distY(0, numY - 1);
+
+	while (true) {
+		int xIndex = distX(gen);
+		int yIndex = distY(gen);
+
+		// マップ範囲外防止（念のため）
+		if (xIndex < 0 || xIndex >= numX || yIndex < 0 || yIndex >= numY)
+			continue;
+
+		// 壁のマスはスキップ
+		MapChipType type = mapChipField_->GetMapChipTypeByIndex(xIndex, yIndex);
+		if (type == MapChipType::kWall) {
+			continue;
+		}
+
+		KamataEngine::Vector3 pos = mapChipField_->GetMapChipPositionByIndex(xIndex, yIndex);
+
+		// プレイヤーと重なりチェック
+		bool overlap = false;
+		const auto& pPos = player_->GetPosition();
+		if (pos.x == pPos.x && pos.y == pPos.y && pos.z == pPos.z) {
+			overlap = true;
+		}
+
+		// 他のAppleと重なりチェック
+		for (const auto* otherApple : apples_) {
+			if (otherApple != apple && otherApple->IsActive()) {
+				const auto& aPos = otherApple->GetPosition();
+				if (aPos.x == pos.x && aPos.y == pos.y && aPos.z == pos.z) {
+					overlap = true;
+					break;
+				}
+			}
+		}
+
+		// Bombと重なりチェック
+		for (const auto* bomb : bombs_) {
+			const auto& bPos = bomb->GetPosition();
+			if (bPos.x == pos.x && bPos.y == pos.y && bPos.z == pos.z) {
+				overlap = true;
+				break;
+			}
+		}
+
+		// どことも重なっていなければ採用
+		if (!overlap) {
+			apple->Respawn(pos);
+			break;
+		}
+	}
 }

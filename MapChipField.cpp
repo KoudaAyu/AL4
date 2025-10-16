@@ -7,10 +7,10 @@ using namespace KamataEngine;
 
 namespace MapChipFieldData {
 std::map<std::string, MapChipType> mapChipTable = {
-    {"0", MapChipType::kBlank},
-    {"1", MapChipType::kWall },
+    {"0", MapChipType::kBlank      },
+    {"1", MapChipType::kWall       },
     {"2", MapChipType::kPlayerSpawn},
-    {"3", MapChipType::kAppleSpawn},
+    {"3", MapChipType::kAppleSpawn },
     {"4", MapChipType::kBombSpawn  },
 };
 }
@@ -32,7 +32,11 @@ void MapChipField::LoadmapChipCsv(const std::string& filePath) {
 	//   ファイルを開く
 	std::ifstream file;
 	file.open(filePath);
+#ifdef _DEBUG
+
 	assert(file.is_open());
+
+#endif // !_DEBUG
 
 	// マップチップCSV
 	std::stringstream mapChipCsv;
@@ -71,6 +75,8 @@ MapChipType MapChipField::GetMapChipTypeByIndex(uint32_t xIndex, uint32_t yIndex
 	return mapChipData_.data[yIndex][xIndex];
 }
 
-Vector3 MapChipField::GetMapChipPositionByIndex(uint32_t xIndex, uint32_t yIndex) { 
-	return Vector3(kBlockWidth * xIndex, kBlockHeight * (kNumBlockVirtical - 1 - yIndex), 0);
+Vector3 MapChipField::GetMapChipPositionByIndex(uint32_t xIndex, uint32_t yIndex) {
+	float halfW = kBlockWidth * 0.5f;
+	float halfH = kBlockHeight * 0.5f;
+	return Vector3(kBlockWidth * xIndex + halfW, kBlockHeight * (kNumBlockVirtical - 1 - yIndex) + halfH, 0);
 }

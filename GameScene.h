@@ -1,6 +1,7 @@
 #pragma once
 
 #include "KamataEngine.h"
+
 #include <vector>
 
 #include"Apple.h"
@@ -24,6 +25,8 @@ public:
 	int32_t GetWindowHeight() const { return kWindowHeight; }
 
 	bool CheckCollision(const KamataEngine::Vector3& a, const KamataEngine::Vector3& b, float radius);
+
+	void RespawnAppleRandom(Apple* apple);
 
 private:
 	const int32_t kWindowWidth = 1280;
