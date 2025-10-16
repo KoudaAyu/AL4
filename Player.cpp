@@ -22,8 +22,9 @@ void Player::Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera
 	targetGridPos_ = gridPos_;
 
 	// 方向も初期化（右向き）
-	direction_ = {1.0f, 0.0f};
-	nextDirection_ = direction_;
+	direction_ = {0.0f, 0.0f};      // 初期値は右向きでもOK
+    nextDirection_ = {0.0f, 0.0f};  // 初期値は右向きでもOK
+    isMoving_ = false;
 
 	// worldTransform_もグリッドに合わせて再設定
 	worldTransform_.translation_.x = gridPos_.x * unitLength;
@@ -50,6 +51,8 @@ void Player::Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera
 	redColor.Initialize();
 
 	normalColor.Initialize();
+
+
 }
 
 // void Player::Update() {
@@ -188,6 +191,8 @@ void Player::Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera
 // Player.cpp
 
 void Player::Update() {
+
+
 	// 死亡時は何もしない
 	if (!isAlive_)
 		return;

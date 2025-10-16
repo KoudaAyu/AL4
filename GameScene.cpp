@@ -188,7 +188,7 @@ void GameScene::Update() {
 
 				// AABB同士の当たり判定
 				if (IsCollisionAABBAABB(playerAABB, WallAABB)) {
-					/*player_->SetAlive(false);*/
+					player_->SetAlive(false);
 				}
 			}
 		}
