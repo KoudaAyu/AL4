@@ -45,6 +45,6 @@ private:
 	//3Dモデルデータ
 	std::vector<std::vector<KamataEngine::WorldTransform*>> WorldTransformWalls_;
 
-	MapChipField* mapChipField_;
+	MapChipField* mapChipField_ = nullptr;
 
 };

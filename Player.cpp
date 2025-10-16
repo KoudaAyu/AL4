@@ -1,10 +1,11 @@
 #include "Player.h"
 
+#include "KeyInput.h"
+#include "MapChipField.h"
+#include "MathUtl.h"
 #include <algorithm>
 #include <cassert>
 #include <numbers>
-#include "MapChipField.h"
-#include "MathUtl.h"
 
 using namespace KamataEngine;
 
@@ -35,26 +36,22 @@ void Player::Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera
 	// 初期の向き
 	worldTransform_.rotation_.y = std::numbers::pi_v<float> / 2.0f;
 
-	
 	redColor.Initialize();
 
-	
 	normalColor.Initialize();
 }
-
-
-
 
 void Player::Update() {
 
 	// スペースキーで最後のパーツを削除
-	if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+	if (Input::GetInstance()->TriggerKey(DIK_SPACE) || KeyInput::GetInstance()->TriggerPadButton(XINPUT_GAMEPAD_A)) {
 		if (bombActive_) {
 			DetachBombParts();
 		} else {
 			RemoveLastPart();
 		}
 	}
+
 	UpdateBomb();
 	playerAABB.min = worldTransform_.translation_ - KamataEngine::Vector3{0.5f, 0.5f, 0.5f};
 	playerAABB.max = worldTransform_.translation_ + KamataEngine::Vector3{0.5f, 0.5f, 0.5f};
@@ -69,9 +66,11 @@ void Player::Update() {
 		}
 	}
 
+	KamataEngine::Vector2 lStick = KeyInput::GetInstance()->GetLStick();
+	constexpr float stickThreshold = 0.5f;
 
 	// 左右キー入力処理
-	if (Input::GetInstance()->TriggerKey(DIK_LEFT) && lrDirection_ != LRDirection::Right) {
+	if ((Input::GetInstance()->TriggerKey(DIK_LEFT) || lStick.x < -stickThreshold) && lrDirection_ != LRDirection::Right) {
 		lrDirection_ = LRDirection::Left;
 		lrKnown_ = true;
 		udKnown_ = false;
@@ -80,7 +79,7 @@ void Player::Update() {
 		turnTimer_ = kTimeTurn;
 	}
 
-	if (Input::GetInstance()->TriggerKey(DIK_RIGHT) && lrDirection_ != LRDirection::Left) {
+	if ((Input::GetInstance()->TriggerKey(DIK_RIGHT) || lStick.x > stickThreshold) && lrDirection_ != LRDirection::Left) {
 		lrDirection_ = LRDirection::Right;
 		lrKnown_ = true;
 		udKnown_ = false;
@@ -90,16 +89,14 @@ void Player::Update() {
 	}
 
 	// 上下キー入力処理
-	if (Input::GetInstance()->TriggerKey(DIK_UP) && udDirection_ != UDDirection::Down) {
+	if ((Input::GetInstance()->TriggerKey(DIK_UP) || lStick.y > stickThreshold) && udDirection_ != UDDirection::Down) {
 		udDirection_ = UDDirection::Up;
 		udKnown_ = true;
 		lrKnown_ = false;
 		lrDirection_ = LRDirection::Unknown;
-
-	
 	}
 
-	if (Input::GetInstance()->TriggerKey(DIK_DOWN) && udDirection_ != UDDirection::Up) {
+	if ((Input::GetInstance()->TriggerKey(DIK_DOWN) || lStick.y < -stickThreshold) && udDirection_ != UDDirection::Up) {
 		udDirection_ = UDDirection::Down;
 		udKnown_ = true;
 		lrKnown_ = false;
@@ -171,12 +168,11 @@ void Player::Update() {
 		bodyPartTransforms_[i].TransferMatrix();
 	}
 
-	 UpdateAABB();
+	UpdateAABB();
 
 	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
 	worldTransform_.TransferMatrix();
 }
-
 
 void Player::Draw() {
 	if (isAlive_) {
@@ -203,8 +199,6 @@ void Player::Draw() {
 		}
 	}
 }
-
-
 
 // Player.cpp
 void Player::Grow() {
@@ -285,7 +279,6 @@ void Player::EatBomb() {
 	bombStartIndex_ = static_cast<int>(bodyParts_.size()) - 1;
 	bombTimer_ = 0.0f;
 }
-
 
 void Player::UpdateBomb() {
 	if (!bombActive_)
