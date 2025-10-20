@@ -188,8 +188,6 @@ void Player::Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera
 //	worldTransform_.TransferMatrix();
 // }
 
-// Player.cpp
-
 void Player::Update() {
 
 
@@ -339,12 +337,9 @@ void Player::Grow() {
 	KamataEngine::Vector3 newPartPos;
 	if (!bodyParts_.empty()) {
 		newPartPos = bodyParts_.back();
-
-		// 尻尾の位置から逆方向に1マス分ずらす
-		Vector3 dir = {-direction_.x, -direction_.y, 0.0f}; // 現在の進行方向の逆
+		Vector3 dir = {-direction_.x, -direction_.y, 0.0f};
 		newPartPos.x += dir.x * unitLength;
 		newPartPos.y += dir.y * unitLength;
-
 	} else {
 		newPartPos = worldTransform_.translation_;
 	}
@@ -355,6 +350,9 @@ void Player::Grow() {
 	bodyPartTransforms_.back().scale_ = worldTransform_.scale_;
 	bodyPartTransforms_.back().rotation_ = worldTransform_.rotation_;
 	bodyPartTransforms_.back().translation_ = bodyParts_.back();
+	// 追加: matWorld_の更新と転送
+	bodyPartTransforms_.back().matWorld_ = MakeAffineMatrix(bodyPartTransforms_.back().scale_, bodyPartTransforms_.back().rotation_, bodyPartTransforms_.back().translation_);
+	bodyPartTransforms_.back().TransferMatrix();
 }
 
 
