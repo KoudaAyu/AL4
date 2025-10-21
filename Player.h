@@ -24,6 +24,8 @@ public:
 	void UpdateBomb();      // 爆弾進行の更新
 	void DetachBombParts(); // 切り離し処理
 
+	bool IsOccupyingGrid(int gridX, int gridY) const;
+
 
 	const KamataEngine::Vector3& GetPosition() const { return worldTransform_.translation_; }
 	const std::vector<KamataEngine::Vector3>& GetBodyParts() const { return bodyParts_; }

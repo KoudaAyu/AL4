@@ -2,6 +2,9 @@
 #include"KamataEngine.h"
  #include <memory>
 
+class MapChipField;
+class Player;
+
 class Apple {
 public:
 	void Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera, const KamataEngine::Vector3& position);
@@ -11,7 +14,7 @@ public:
 	bool IsActive() const { return isActive_; }
 	void SetActive(bool active) { isActive_ = active; }
 
-	void Respawn(const KamataEngine::Vector3 RespawnPosition);
+	void Respawn(MapChipField* map, const Player& player);
 
 private:
 	KamataEngine::Model* model_ = nullptr;
