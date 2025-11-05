@@ -9,6 +9,7 @@ GameScene::~GameScene() {
 	delete debugCamera_;
 #endif //  _DEBUG
 
+	delete cameraController_;
 	delete model_;
 	delete player_;
 }
@@ -27,11 +28,16 @@ void GameScene::Initialize() {
 	assert(textureHandle_);
 	camera_.Initialize();
 
-	
-
 	player_ = new Player();
 	Vector3 playerPosition = {0.0f, 00.0f, 0.0f};
-	player_->Initialize(model_,&camera_,playerPosition);
+	player_->Initialize(model_, &camera_, playerPosition);
+
+	cameraController_ = new CameraController();
+	cameraController_->Initialize(&camera_);
+	cameraController_->SetTarget(player_);
+	cameraController_->Reset();
+
+
 }
 
 void GameScene::Update() {
@@ -51,7 +57,11 @@ void GameScene::Update() {
 
 #endif //  _DEBUG
 
+
+
 	player_->Update();
+
+	cameraController_->Update();
 
 }
 
