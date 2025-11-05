@@ -2,6 +2,8 @@
 #include "MathUtl.h"
 #include "Player.h"
 
+#include <algorithm>
+
 using namespace KamataEngine;
 
 CameraController::CameraController() {}
@@ -15,9 +17,19 @@ void CameraController::Update() {
     if (!camera_ || !target_) { return; }
 
     const WorldTransform& targetWorldTransform = target_->GetWorldTransform();
-    camera_->translation_ = targetWorldTransform.translation_ + targetOffset_;
+	targetVelocity_ = target_->GetVelocity();
+    targetPosition_ = targetWorldTransform.translation_ + targetOffset_ + targetVelocity_ * kVelocityBias;
+    
+    camera_->translation_ = Lerp(camera_->translation_, targetPosition_, kInterpolationRate);
+
+    camera_->translation_.x = std::clamp(camera_->translation_.x, movableArea.left + Margin.left, movableArea.right - Margin.right);
+	camera_->translation_.y = std::clamp(camera_->translation_.y, movableArea.bottom + Margin.bottom, movableArea.top - Margin.top);
+
+    camera_->translation_.x = std::clamp(camera_->translation_.x, movableArea.left, movableArea.right);
+	camera_->translation_.y = std::clamp(camera_->translation_.y, movableArea.bottom, movableArea.top);
+
     camera_->UpdateMatrix();
-    camera_->TransferMatrix();
+  
 }
 
 void CameraController::Draw() {}
@@ -27,6 +39,4 @@ void CameraController::Reset() {
 
     const WorldTransform& targetWorldTransform = target_->GetWorldTransform();
     camera_->translation_ = targetWorldTransform.translation_ + targetOffset_;
-    camera_->UpdateMatrix();
-    camera_->TransferMatrix();
 }

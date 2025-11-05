@@ -33,6 +33,7 @@ void GameScene::Initialize() {
 	player_->Initialize(model_, &camera_, playerPosition);
 
 	cameraController_ = new CameraController();
+	cameraController_->SetMovableArea({-50.0f, 50.0f, 50.0f, -50.0f});
 	cameraController_->Initialize(&camera_);
 	cameraController_->SetTarget(player_);
 	cameraController_->Reset();
