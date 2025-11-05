@@ -1,4 +1,7 @@
 #pragma once
+#define NOMINMAX
+#include <Windows.h>
+
 #include"KamataEngine.h"
 
 enum class LRDirection
@@ -13,7 +16,11 @@ public:
 	void Update();
 	void Draw();
 
+public:
+
+	const KamataEngine::WorldTransform& GetWorldTransform() const { return worldTransform_; }
 	const KamataEngine::Vector3& GetPosition() const { return worldTransform_.translation_; }
+	const KamataEngine::Vector3& GetVelocity() const { return velocity_; }
 
 private:
 
@@ -27,9 +34,35 @@ private:
 
 	KamataEngine::Vector3 velocity_ = {};
 
+	// 向き
 	LRDirection lrDirection_ = LRDirection::Right;
 
 	//慣性移動
 	static inline const float kAcceleration = 0.05f;
+
+	//速度減少率
+	static inline const float kAttenuation = 0.1f;
+
+	//速度制限
+	static inline const float kLimitSpeed = 2.0f;
+
+	//旋回開始時の角度
+	float turnFirstRotationY_ = 0.0f;
+
+	//旋回タイマー
+	float turnTimer_ = 0.0f;
+
+	//旋回にかかる時間<秒>
+	static inline const float kTimeTurn = 0.3f;
+
+	// ジャンプ
+	bool isJump_ = false;
+	float jumpVelocity_ = 0.0f;
+	static inline float kGravity = 0.2f;
+	static inline float kJumpVelocity = 2.0f;
+	// ジャンプ回数
+	int jumpCount_ = 0;
+	// 最大ジャンプ回数（二段ジャンプなら2）
+	static inline const int kMaxJumpCount = 2;
 };
 

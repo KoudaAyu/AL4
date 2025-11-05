@@ -2,6 +2,7 @@
 
 #include "KamataEngine.h"
 
+#include "CameraController.h"
 #include"Player.h"
 
 class GameScene {
@@ -29,5 +30,6 @@ private:
 	//デバックカメラ
 	KamataEngine::DebugCamera* debugCamera_ = nullptr;
 
+	CameraController* cameraController_ = nullptr;
 	Player* player_ = nullptr;
 };
