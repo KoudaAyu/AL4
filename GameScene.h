@@ -15,8 +15,15 @@ public:
 	void Update();
 	void Draw();
 
+public:
+
 	int32_t GetWindowWidth() const { return kWindowWidth; }
 	int32_t GetWindowHeight() const { return kWindowHeight; }
+
+	bool IsFinished() { return finished_; }
+
+private:
+	bool finished_ = false;
 
 private:
 	const int32_t kWindowWidth = 1280;

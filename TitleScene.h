@@ -1,10 +1,15 @@
 #pragma once
-#include"KamataEngine.h"
+#include "KamataEngine.h"
 
-class TitleScene
-{
+class TitleScene {
 public:
 	void Initialize();
 	void Update();
 	void Draw();
+
+public:
+	bool IsFinished() { return finished_; }
+
+private:
+	bool finished_ = false;
 };
