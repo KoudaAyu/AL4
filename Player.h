@@ -16,6 +16,10 @@ public:
 	void Update();
 	void Draw();
 
+public:
+
+	const KamataEngine::WorldTransform& GetWorldTransform() const { return worldTransform_; }
+
 	const KamataEngine::Vector3& GetPosition() const { return worldTransform_.translation_; }
 
 private:

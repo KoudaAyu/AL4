@@ -1,5 +1,5 @@
 #pragma once
-#include"KamataEngine.h"
+#include "KamataEngine.h"
 
 using namespace KamataEngine;
 
@@ -17,9 +17,18 @@ Matrix4x4 MakeRotateZMatrix(float radian);
 
 Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Vector3& translate);
 
-inline KamataEngine::Vector3& operator+=(KamataEngine::Vector3& lhs, const KamataEngine::Vector3& rhs) {
-	lhs.x += rhs.x;
-	lhs.y += rhs.y;
-	lhs.z += rhs.z;
-	return lhs;
+
+
+// Vector3 同士の加算
+inline constexpr Vector3 operator+(const Vector3& lhs, const Vector3& rhs) noexcept {
+    return Vector3{lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z};
 }
+
+// 任意（あると便利）：複合代入
+inline constexpr Vector3& operator+=(Vector3& lhs, const Vector3& rhs) noexcept {
+    lhs.x += rhs.x;
+    lhs.y += rhs.y;
+    lhs.z += rhs.z;
+    return lhs;
+}
+
