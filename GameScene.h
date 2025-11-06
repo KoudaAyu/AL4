@@ -3,6 +3,7 @@
 #include "KamataEngine.h"
 
 #include "CameraController.h"
+#include"MapChipField.h"
 #include"Player.h"
 
 #include<vector>
@@ -16,6 +17,8 @@ public:
 	void Initialize();
 	void Update();
 	void Draw();
+
+	void GenerateBlocks();
 
 public:
 
@@ -49,6 +52,7 @@ private:
 	bool isDebugCameraActive_ = false;
 
 	CameraController* cameraController_ = nullptr;
+	MapChipField* mapChipField_ = nullptr;
 	Player* player_ = nullptr;
 
 	std::vector<std::vector<KamataEngine::WorldTransform*>> worldTransformBlocks_;

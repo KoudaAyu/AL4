@@ -11,6 +11,7 @@ GameScene::~GameScene() {
 
 	delete blockModel_;
 	delete cameraController_;
+	delete mapChipField_;
 	delete model_;
 	delete player_;
 
@@ -50,22 +51,11 @@ void GameScene::Initialize() {
 	cameraController_->SetTarget(player_);
 	cameraController_->Reset();
 
-	//ブロックの要素数の変更
-	worldTransformBlocks_.resize(kNumBlockVertical);
-	for (uint32_t i = 0; i < kNumBlockVertical; ++i)
-	{
-		worldTransformBlocks_[i].resize(kNumBlockHorizontal);
-		// キューブの生成
-		for (uint32_t j = 0; j < kNumBlockHorizontal; ++j) {
-			worldTransformBlocks_[i][j] = new WorldTransform();
-			worldTransformBlocks_[i][j]->Initialize();
-			worldTransformBlocks_[i][j]->translation_.x = kBlockWidth * i;
-			worldTransformBlocks_[i][j]->translation_.y = kBlockHeight * j;
-		}
-	}
+	mapChipField_ = new MapChipField();
+	mapChipField_->LoadMapChipCsv("Resources/Debug/Map/Block.csv");
 
-	
-	
+	// CSV に従ってブロック生成（全マス生成は行わない）
+	GenerateBlocks();
 }
 
 void GameScene::Update() {
@@ -116,6 +106,7 @@ void GameScene::Update() {
 
 	for (auto& row : worldTransformBlocks_) {
 		for (WorldTransform* wt : row) {
+			if (!wt) { continue; }
 			wt->matWorld_ = MakeAffineMatrix(wt->scale_, wt->rotation_, wt->translation_);
 			if (wt->parent_) {
 				wt->matWorld_ = Multiply(wt->parent_->matWorld_, wt->matWorld_);
@@ -123,8 +114,6 @@ void GameScene::Update() {
 			wt->TransferMatrix();
 		}
 	}
-
-
 }
 
 void GameScene::Draw() { 
@@ -135,10 +124,42 @@ void GameScene::Draw() {
 
 	for (auto& row : worldTransformBlocks_) {
 		for (WorldTransform* wt : row) {
+			if (!wt) { continue; }
 			blockModel_->Draw(*wt, camera_);
 		}
 	}
 
 
 	Model::PostDraw();
+}
+
+void GameScene::GenerateBlocks() {
+
+	uint32_t numBlockVirtical = mapChipField_->GetNumBlockVertical();
+	uint32_t numBlockHorizontal = mapChipField_->GetNumBlockHorizontal();
+
+	// 既存を破棄しクリア
+	for (auto& row : worldTransformBlocks_) {
+		for (WorldTransform* wt : row) {
+			delete wt;
+		}
+	}
+	worldTransformBlocks_.clear();
+
+	// 要素数を設定し、nullptr で初期化
+	worldTransformBlocks_.assign(numBlockVirtical, std::vector<WorldTransform*>(numBlockHorizontal, nullptr));
+
+	for (uint32_t i = 0; i < numBlockVirtical; ++i)
+	{
+		for (uint32_t j = 0; j < numBlockHorizontal; ++j)
+		{
+			if (mapChipField_->GetMapChipTypeByIndex(j,i) == MapChipType::kBlock)
+			{
+				WorldTransform* worldTransform = new WorldTransform();
+				worldTransform->Initialize();
+				worldTransform->translation_ = mapChipField_->GetMapChipPositionByIndex(j, i);
+				worldTransformBlocks_[i][j] = worldTransform;
+			}
+		}
+	}
 }
