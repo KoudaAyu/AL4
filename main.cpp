@@ -36,8 +36,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #ifdef _DEBUG
 	ImGuiManager* imguiManager = ImGuiManager::GetInstance();
 #endif //  _DEBUG
-
+#ifdef _DEBUG
+	scene = Scene::kGame;
+#else
 	scene = Scene::kTitle;
+#endif
+
 	titleScene = new TitleScene();
 	titleScene->Initialize();
 
@@ -54,9 +58,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		imguiManager->Begin();
 
 #endif //  _DEBUG
-
+#ifdef _DEBUG
+		gameScene->Update();
+#else
 		ChangeScene();
 		UpdateScene();
+#endif
 
 #ifdef _DEBUG
 		imguiManager->End();
@@ -64,7 +71,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		dxCommom->PreDraw();
 
+#ifdef _DEBUG
+		gameScene->Draw();
+#else
 		DrawScene();
+#endif
 
 #ifdef _DEBUG
 
