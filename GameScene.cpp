@@ -78,15 +78,41 @@ void GameScene::Update() {
 
 	ImGui::End();
 
-	debugCamera_->Update();
+	// トグル
+	if (Input::GetInstance()->TriggerKey(DIK_C)) {
+		isDebugCameraActive_ = !isDebugCameraActive_;
+	}
 
+	// 軸インジケータの表示と対象カメラ設定
 	AxisIndicator::GetInstance()->SetVisible(true);
-	AxisIndicator::GetInstance()->SetTargetCamera(&debugCamera_->GetCamera());
+	if (isDebugCameraActive_) {
+		AxisIndicator::GetInstance()->SetTargetCamera(&debugCamera_->GetCamera());
+	} else {
+		AxisIndicator::GetInstance()->SetTargetCamera(&camera_);
+	}
 
+	// デバッグカメラ有効時はデバッグカメラの行列をゲーム用カメラへコピー
+	if (isDebugCameraActive_)
+	{
+		debugCamera_->Update();
+		camera_.matView = debugCamera_->GetCamera().matView;
+		camera_.matProjection = debugCamera_->GetCamera().matProjection;
+		camera_.TransferMatrix();
+	}
+	else
+	{
+		// 通常時はカメラコントローラがカメラを更新
+		cameraController_->Update();
+		camera_.UpdateMatrix();
+	}
+
+#else
+	// リリースビルドでは常に通常カメラを更新
+	cameraController_->Update();
+	camera_.UpdateMatrix();
 #endif //  _DEBUG
 
 	player_->Update();
-	cameraController_->Update();
 
 	for (auto& row : worldTransformBlocks_) {
 		for (WorldTransform* wt : row) {
