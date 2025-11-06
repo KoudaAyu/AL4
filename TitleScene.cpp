@@ -2,15 +2,26 @@
 
 using namespace KamataEngine;
 
-void TitleScene::Initialize() {}
+TitleScene::~TitleScene() { delete fade_; }
+
+void TitleScene::Initialize() {
+
+	fade_ = new Fade();
+	fade_->Initialize();
+	fade_->Start(Fade::Status::FadeIn, 3.0f);
+}
 
 void TitleScene::Update() {
 
-	if (Input::GetInstance()->PushKey(DIK_SPACE))
-	{
+	if (Input::GetInstance()->PushKey(DIK_SPACE)) {
 		finished_ = true;
 	}
 
+	fade_->Update();
 }
 
-void TitleScene::Draw() {}
+void TitleScene::Draw() {
+
+	fade_->Draw();
+
+}

@@ -30,19 +30,18 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	DirectXCommon* dxCommom = DirectXCommon::GetInstance();
 
+	// 先にエンジンを初期化してからシーンを初期化する
+	KamataEngine::Initialize(L"LE2B_07_コウダ_アユ");
+
+#ifdef _DEBUG
+	ImGuiManager* imguiManager = ImGuiManager::GetInstance();
+#endif //  _DEBUG
+
 	scene = Scene::kTitle;
 	titleScene = new TitleScene();
 	titleScene->Initialize();
 
 	gameScene = new GameScene();
-
-#ifdef _DEBUG
-	ImGuiManager* imguiManager = ImGuiManager::GetInstance();
-
-#endif //  _DEBUG
-
-	KamataEngine::Initialize(L"LE2B_07_コウダ_アユ");
-
 	gameScene->Initialize();
 
 	while (true) {
