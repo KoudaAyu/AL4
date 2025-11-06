@@ -1,6 +1,6 @@
 #include "Fade.h"
 
-#include<algorithm>
+#include <algorithm>
 
 using namespace KamataEngine;
 
@@ -21,8 +21,7 @@ void Fade::Update() {
 	case Status::FadeIn:
 		counter_ += 1.0f / 60.0f;
 		// フェード継続時間に達したらフェード終了
-		if (counter_ >= duration_)
-		{
+		if (counter_ >= duration_) {
 			counter_ = duration_;
 		}
 		// フェード持続時間に近づくほどアルファ値を小さくする（1→0）
@@ -31,11 +30,10 @@ void Fade::Update() {
 	case Status::FadeOut:
 		counter_ += 1.0f / 60.0f;
 		// フェード継続時間に達したらフェード終了
-		if (counter_ >= duration_)
-		{
+		if (counter_ >= duration_) {
 			counter_ = duration_;
 		}
-		//フェード持続時間に近づくほどアルファ値を大きくする
+		// フェード持続時間に近づくほどアルファ値を大きくする
 		fadeSprite_->SetColor(Vector4(0, 0, 0, std::clamp(counter_ / duration_, 0.0f, 1.0f)));
 		break;
 	}
@@ -44,6 +42,9 @@ void Fade::Update() {
 void Fade::Draw() {
 
 	Sprite::PreDraw();
+	if (status_ == Status::None) {
+		return;
+	}
 	fadeSprite_->Draw();
 	Sprite::PostDraw();
 }
@@ -53,4 +54,20 @@ void Fade::Start(Status status, float duration) {
 	status_ = status;
 	duration_ = duration;
 	counter_ = 0.0f;
+}
+
+void Fade::Stop() { status_ = Status::None; }
+
+bool Fade::IsFinished() const {
+
+	switch (status_) {
+	case Status::FadeIn:
+	case Status::FadeOut:
+		if (counter_ >= duration_) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+	return true;
 }

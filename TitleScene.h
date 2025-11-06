@@ -4,6 +4,15 @@
 #include"Fade.h"
 
 class TitleScene {
+
+	public:
+		enum class Phase
+		{
+			kFadeIn,
+			kMain,
+			kFadeOut,
+	    };
+
 public:
 
 	TitleScene() = default;
@@ -22,5 +31,6 @@ private:
 	private:
 	Fade* fade_ = nullptr;
 
+	Phase phase_ = Phase::kFadeIn;
 
 };

@@ -13,9 +13,34 @@ void TitleScene::Initialize() {
 
 void TitleScene::Update() {
 
-	if (Input::GetInstance()->PushKey(DIK_SPACE)) {
-		finished_ = true;
+	switch (phase_)
+	{
+	case Phase::kFadeIn:
+		fade_->Update();
+
+		if (fade_->IsFinished()) {
+			phase_ = Phase::kMain;
+		}
+
+		break;
+
+		case Phase::kMain:
+		if (Input::GetInstance()->PushKey(DIK_SPACE)) {
+			phase_ = Phase::kFadeOut;
+			fade_->Start(Fade::Status::FadeOut, 3.0f);
+		}
+
+		break;
+
+		case Phase::kFadeOut:
+			if (fade_->IsFinished()) {
+			finished_ = true;
+		    }
+
+			break;
 	}
+
+	
 
 	fade_->Update();
 }

@@ -25,6 +25,11 @@ public:
 	/// <param name="duration">フェードの持続時間</param>
 	void Start(Status status,float duration);
 
+	void Stop();
+
+public:
+	bool IsFinished() const;
+
 private:
 	Status status_ = Status::None;
 
@@ -38,5 +43,7 @@ private:
 
 	KamataEngine::Sprite* fadeSprite_ = nullptr;
 	uint32_t fadeTextureHandle_ = 0u;
+
+	bool isFinished_ = false;
 
 };
