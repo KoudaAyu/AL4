@@ -46,6 +46,7 @@ private:
 
 	//デバックカメラ
 	KamataEngine::DebugCamera* debugCamera_ = nullptr;
+	bool isDebugCameraActive_ = false;
 
 	CameraController* cameraController_ = nullptr;
 	Player* player_ = nullptr;
