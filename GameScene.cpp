@@ -1,5 +1,5 @@
 #include "GameScene.h"
-
+#include "MathUtl.h"
 using namespace KamataEngine;
 
 GameScene::GameScene() {}
@@ -9,9 +9,17 @@ GameScene::~GameScene() {
 	delete debugCamera_;
 #endif //  _DEBUG
 
+	delete blockModel_;
 	delete cameraController_;
 	delete model_;
 	delete player_;
+
+	for (std::vector<WorldTransform*>& row : worldTransformBlocks_) {
+		for (WorldTransform* wt : row) {
+			delete wt;
+		}
+	}
+	worldTransformBlocks_.clear();
 }
 
 void GameScene::Initialize() {
@@ -25,7 +33,11 @@ void GameScene::Initialize() {
 
 	model_ = Model::Create();
 	textureHandle_ = TextureManager::Load("uvChecker.png");
+
+	blockModel_ = Model::Create();
+#ifdef _DEBUG
 	assert(textureHandle_);
+#endif 
 	camera_.Initialize();
 
 	player_ = new Player();
@@ -38,7 +50,22 @@ void GameScene::Initialize() {
 	cameraController_->SetTarget(player_);
 	cameraController_->Reset();
 
+	//ブロックの要素数の変更
+	worldTransformBlocks_.resize(kNumBlockVertical);
+	for (uint32_t i = 0; i < kNumBlockVertical; ++i)
+	{
+		worldTransformBlocks_[i].resize(kNumBlockHorizontal);
+		// キューブの生成
+		for (uint32_t j = 0; j < kNumBlockHorizontal; ++j) {
+			worldTransformBlocks_[i][j] = new WorldTransform();
+			worldTransformBlocks_[i][j]->Initialize();
+			worldTransformBlocks_[i][j]->translation_.x = kBlockWidth * i;
+			worldTransformBlocks_[i][j]->translation_.y = kBlockHeight * j;
+		}
+	}
 
+	
+	
 }
 
 void GameScene::Update() {
@@ -58,11 +85,19 @@ void GameScene::Update() {
 
 #endif //  _DEBUG
 
-
-
 	player_->Update();
-
 	cameraController_->Update();
+
+	for (auto& row : worldTransformBlocks_) {
+		for (WorldTransform* wt : row) {
+			wt->matWorld_ = MakeAffineMatrix(wt->scale_, wt->rotation_, wt->translation_);
+			if (wt->parent_) {
+				wt->matWorld_ = Multiply(wt->parent_->matWorld_, wt->matWorld_);
+			}
+			wt->TransferMatrix();
+		}
+	}
+
 
 }
 
@@ -71,6 +106,13 @@ void GameScene::Draw() {
 	Model::PreDraw();
 	
 	player_->Draw(); 
+
+	for (auto& row : worldTransformBlocks_) {
+		for (WorldTransform* wt : row) {
+			blockModel_->Draw(*wt, camera_);
+		}
+	}
+
 
 	Model::PostDraw();
 }
