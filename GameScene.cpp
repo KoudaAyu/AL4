@@ -21,6 +21,8 @@ GameScene::~GameScene() {
 		}
 	}
 	worldTransformBlocks_.clear();
+
+	delete skydome_;
 }
 
 void GameScene::Initialize() {
@@ -56,6 +58,11 @@ void GameScene::Initialize() {
 
 	// CSV に従ってブロック生成（全マス生成は行わない）
 	GenerateBlocks();
+
+	// Skydome の生成と初期化
+	skydome_ = new Skydome();
+	skydome_->Initialize();
+	skydome_->SetCamera(&camera_);
 }
 
 void GameScene::Update() {
@@ -119,6 +126,9 @@ void GameScene::Update() {
 void GameScene::Draw() { 
 	
 	Model::PreDraw();
+
+	// 先にスカイドームを描画
+	if (skydome_) { skydome_->Draw(); }
 	
 	player_->Draw(); 
 
