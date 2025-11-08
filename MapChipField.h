@@ -1,5 +1,6 @@
 #pragma once
 
+#include"CameraController.h"
 #include "KamataEngine.h"
 
 enum class MapChipType {
@@ -14,6 +15,13 @@ struct MapChipData {
 class MapChipField {
 
 public:
+	struct IndexSet {
+		uint32_t xIndex;
+		uint32_t yIndex;
+	};
+
+public:
+
 	void Initialize();
 	void Update();
 	void Draw();
@@ -45,9 +53,18 @@ public:
 	/// <returns>マップチップのワールド座標を取得する関数</returns>
 	KamataEngine::Vector3 GetMapChipPositionByIndex(uint32_t Index, uint32_t yIndex);
 
+	/// <summary>
+	/// 座標からマップチップ番号を計算
+	/// </summary>
+	/// <param name="position">座標指定</param>
+	/// <returns></returns>
+	IndexSet GetMapChipIndexByPosition(const KamataEngine::Vector3& position);
+
+	Rect GetRectByIndex(uint32_t xIndex, uint32_t yIndex);
+
 public:
 	uint32_t GetNumBlockHorizontal() const { return kNumBlockHorizontal; }
-	uint32_t GetNumBlockVertical() const { return kNumBlockVertical; }
+	uint32_t GetNumBlockVertical() const { return kNumBlockVirtical; }
 
 	void SetNumBlockHorizontal(uint32_t count) {
 		if (count == 0) {
@@ -60,7 +77,7 @@ public:
 		if (count == 0) {
 			count = 1;
 		}
-		kNumBlockVertical = count;
+		kNumBlockVirtical = count;
 	}
 
 private:
@@ -69,7 +86,7 @@ private:
 	static inline const float kBlockHeight = 2.0f;
 
 	static inline uint32_t kNumBlockHorizontal = 20;
-	static inline uint32_t kNumBlockVertical = 10;
+	static inline uint32_t kNumBlockVirtical = 10;
 
 	MapChipData mapChipData_;
 };

@@ -1,5 +1,6 @@
 #include "GameScene.h"
 #include "MathUtl.h"
+#include"MapChipField.h"
 using namespace KamataEngine;
 
 GameScene::GameScene() {}
@@ -43,9 +44,13 @@ void GameScene::Initialize() {
 #endif 
 	camera_.Initialize();
 
+	mapChipField_ = new MapChipField();
+	mapChipField_->LoadMapChipCsv("Resources/Debug/Map/Block.csv");
+
 	player_ = new Player();
 	Vector3 playerPosition = {0.0f, 00.0f, 0.0f};
 	player_->Initialize(model_, &camera_, playerPosition);
+	player_->SetMapChipField(mapChipField_);
 
 	cameraController_ = new CameraController();
 	cameraController_->SetMovableArea({-50.0f, 50.0f, 50.0f, -50.0f});
@@ -53,8 +58,7 @@ void GameScene::Initialize() {
 	cameraController_->SetTarget(player_);
 	cameraController_->Reset();
 
-	mapChipField_ = new MapChipField();
-	mapChipField_->LoadMapChipCsv("Resources/Debug/Map/Block.csv");
+	
 
 	// CSV に従ってブロック生成（全マス生成は行わない）
 	GenerateBlocks();
