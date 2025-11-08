@@ -3,19 +3,17 @@
 
 class Player;
 
+/// <summary>
+/// 左、右、上、下の順に値をいれる
+/// </summary>
+struct Rect {
+	float left = 0.0f;
+	float right = 1.0f;
+	float top = 1.0f;
+	float bottom = 0.0f;
+};
+
 class CameraController {
-public:
-
-	/// <summary>
-	/// 左、右、上、下の順に値をいれる
-	/// </summary>
-	struct Rect {
-		float left = 0.0f;
-		float right = 1.0f;
-		float top = 1.0f;
-		float bottom = 0.0f;
-	};
-
 public:
 
 	CameraController();

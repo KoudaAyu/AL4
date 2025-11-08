@@ -3,11 +3,12 @@
 #include "KamataEngine.h"
 
 #include "CameraController.h"
-#include"MapChipField.h"
 #include"Player.h"
 #include"Skydome.h"
 
 #include<vector>
+
+class MapChipField_;
 
 class GameScene {
 public:
@@ -27,6 +28,8 @@ public:
 	int32_t GetWindowHeight() const { return kWindowHeight; }
 
 	bool IsFinished() { return finished_; }
+
+
 
 private:
 	bool finished_ = false;
