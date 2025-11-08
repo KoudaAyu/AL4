@@ -5,6 +5,7 @@
 #include "CameraController.h"
 #include"MapChipField.h"
 #include"Player.h"
+#include"Skydome.h"
 
 #include<vector>
 
@@ -41,8 +42,9 @@ private:
 	const int32_t kWindowWidth = 1280;
 	const int32_t kWindowHeight = 720;
 
-	KamataEngine::Model* model_ = nullptr;
-	KamataEngine::Model* blockModel_ = nullptr;
+	KamataEngine::Model* model_ = nullptr;//デバック用
+	KamataEngine::Model* blockModel_ = nullptr; //ブロック用
+	Skydome* skydome_ = nullptr; // スカイドームクラス
 	KamataEngine::Camera camera_;
 
 	uint32_t textureHandle_ = 0u;
