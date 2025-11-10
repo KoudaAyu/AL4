@@ -86,6 +86,7 @@ private:
 	// 追加: マップチップ参照
 	MapChipField* mapChipField_ = nullptr;
 	
-	static inline const float kBlank = 1.0f;
+	static inline const float kBlank = 1.0f; // ceiling separation
+	static inline const float kGroundBlankDown = 0.05f; // floor浮き量調整用
 };
 

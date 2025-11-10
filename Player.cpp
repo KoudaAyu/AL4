@@ -196,7 +196,54 @@ void Player::CollisionMapUp(CollisionMapInfo& collisionMapInfo) {
 	}
 }
 
-void Player::CollisionMapDown(CollisionMapInfo& collisionMapInfo) { (void(collisionMapInfo)); }
+void Player::CollisionMapDown(CollisionMapInfo& collisionMapInfo) {
+    if (!mapChipField_) {
+        return;
+    }
+
+    std::array<Vector3, kNumCorners> cornerPositions{};
+    for (uint32_t i = 0; i < cornerPositions.size(); ++i) {
+        cornerPositions[i] = CornerPisition(worldTransform_.translation_, static_cast<Corner>(i));
+    }
+
+    constexpr float kProbeEps = 0.02f;
+    Vector3 leftProbe = cornerPositions[kLeftBottom];
+    Vector3 rightProbe = cornerPositions[kRightBottom];
+    leftProbe.y -= kProbeEps;
+    rightProbe.y -= kProbeEps;
+
+    bool leftSupport = false;
+    bool rightSupport = false;
+    MapChipField::IndexSet leftIndex = mapChipField_->GetMapChipIndexByPosition(leftProbe);
+    MapChipType leftType = mapChipField_->GetMapChipTypeByIndex(leftIndex.xIndex, leftIndex.yIndex);
+    if (leftType == MapChipType::kBlock) { leftSupport = true; }
+    MapChipField::IndexSet rightIndex = mapChipField_->GetMapChipIndexByPosition(rightProbe);
+    MapChipType rightType = mapChipField_->GetMapChipTypeByIndex(rightIndex.xIndex, rightIndex.yIndex);
+    if (rightType == MapChipType::kBlock) { rightSupport = true; }
+
+    bool hasSupport = leftSupport || rightSupport;
+
+    if (!isJump_ && !hasSupport) {
+        isJump_ = true;
+        if (jumpVelocity_ >= 0.0f) { jumpVelocity_ = -0.001f; }
+    }
+
+    if (hasSupport) {
+        float floorTop = 0.0f; bool initialized = false;
+        if (leftSupport) { Rect r = mapChipField_->GetRectByIndex(leftIndex.xIndex, leftIndex.yIndex); floorTop = r.top; initialized = true; }
+        if (rightSupport) { Rect r = mapChipField_->GetRectByIndex(rightIndex.xIndex, rightIndex.yIndex); floorTop = initialized ? std::max(floorTop, r.top) : r.top; initialized = true; }
+
+        float bottomY = worldTransform_.translation_.y - (kHeight * 0.5f);
+        float desiredY = floorTop + (kHeight * 0.6f) + kGroundBlankDown;
+        if (bottomY <= floorTop + kGroundBlankDown) {
+            worldTransform_.translation_.y = desiredY;
+            jumpVelocity_ = 0.0f;
+            isJump_ = false;
+            jumpCount_ = 0;
+            collisionMapInfo.IsLanding = true;
+        }
+    }
+}
 
 void Player::CollisionMapLeft(CollisionMapInfo& collisionMapInfo) { (void(collisionMapInfo)); }
 
