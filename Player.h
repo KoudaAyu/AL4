@@ -88,5 +88,7 @@ private:
 	
 	static inline const float kBlank = 1.0f; // ceiling separation
 	static inline const float kGroundBlankDown = 0.05f; // floor浮き量調整用
+	static inline const float kWallBlank = 0.05f; // 壁との最小距離
+	static inline const float kGroundProbeEps = 0.02f; // 床検出のための微小サンプル距離
 };
 
