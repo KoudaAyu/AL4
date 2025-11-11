@@ -227,16 +227,19 @@ void Player::CollisionMapDown(CollisionMapInfo& collisionMapInfo) {
         if (jumpVelocity_ >= 0.0f) { jumpVelocity_ = -0.001f; }
     }
 
-    // 垂直補正は落下中かつ床を跨いだ時のみ
-    if ((isJump_ || jumpVelocity_ < 0.0f) && hasSupport) {
+    // プレイヤー下端
+    float bottomY = worldTransform_.translation_.y - (kHeight * 0.5f);
+
+    // 補正条件: 支えがあり, 下端が床トップより下（侵入） or 十分近い
+    if (hasSupport) {
         float floorTop = 0.0f; bool initialized = false;
         if (leftSupport) { Rect r = mapChipField_->GetRectByIndex(leftIndex.xIndex, leftIndex.yIndex); floorTop = r.top; initialized = true; }
         if (rightSupport) { Rect r = mapChipField_->GetRectByIndex(rightIndex.xIndex, rightIndex.yIndex); floorTop = initialized ? std::max(floorTop, r.top) : r.top; initialized = true; }
 
-        float bottomY = worldTransform_.translation_.y - (kHeight * 0.5f);
         if (bottomY <= floorTop + kGroundBlankDown) {
             float desiredY = floorTop + (kHeight * 0.5f) + kGroundBlankDown;
             worldTransform_.translation_.y = desiredY;
+            // 垂直速度停止
             jumpVelocity_ = 0.0f;
             isJump_ = false;
             jumpCount_ = 0;
