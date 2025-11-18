@@ -100,9 +100,9 @@ void Player::Update() {
 	// 5. 壁に接触している場合の処理 (現在のコードには明示的な壁との接触判定がないため、必要に応じて追加してください)
 	HitWallCollision(collisionInfo); // 例：壁との衝突を処理する関数
 
-	// 空中での処理 (接地判定に影響するため、移動後に処理)
-
-	// 接地状態の切り替え (onGround_ の更新は空中処理で行っているため、ここでは特に行いません)
+	// 6. 壁滑り・壁ジャンプ処理（次フレームの速度に反映される）
+	UpdateWallSlide(collisionInfo);
+	HandleWallJump(collisionInfo);
 
 	// 7. 旋回制御
 	if (turnTimer_ > 0.0f) {
@@ -394,9 +394,12 @@ void Player::HandleMapCollisionLeft(CollisionMapInfo& info) {
 			// めり込み先ブロックの範囲矩形
 			Rects rects = mapChipField_->GetRectByIndex(indexSet.xIndex, indexSet.yIndex);
 
-			info.movement_.x = std::min(0.0f, rects.right - (worldTransform_.translation_.x - kWidth * 0.5f) + kBlank);
+			// 左壁：これ以上左に入らないように許容移動量でクランプ
+			float dxAllowed = rects.right - (worldTransform_.translation_.x - kWidth * 0.5f) + kBlank;
+			info.movement_.x = std::max(info.movement_.x, dxAllowed);
 
 			info.isWallContact_ = true;
+			info.wallSide_ = WallSide::kLeft;
 		}
 	}
 }
@@ -439,15 +442,72 @@ void Player::HandleMapCollisionRight(CollisionMapInfo& info) {
 		indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kRightTop]);
 
 		IndexSet indexSetNow;
-		indexSetNow = mapChipField_->GetMapChipIndexSetByPosition({worldTransform_.translation_.x, (worldTransform_.translation_.y), worldTransform_.translation_.z});
+		// 現在位置の一つ左側のインデックスと比較して、右壁への遷移を検出（左と対称に）
+		indexSetNow = mapChipField_->GetMapChipIndexSetByPosition({worldTransform_.translation_.x - kWidth, (worldTransform_.translation_.y), worldTransform_.translation_.z});
 		if (indexSetNow.xIndex != indexSet.xIndex) {
 			// めり込み先ブロックの範囲矩形
 			Rects rects = mapChipField_->GetRectByIndex(indexSet.xIndex, indexSet.yIndex);
 
-			info.movement_.x = std::min(0.0f, rects.left - worldTransform_.translation_.x + (kWidth * 0.5f + kBlank));
+			// 右壁：これ以上右に入らないように許容移動量でクランプ
+			float dxAllowed = rects.left - (worldTransform_.translation_.x + kWidth * 0.5f) - kBlank;
+			info.movement_.x = std::min(info.movement_.x, dxAllowed);
 
 			info.isWallContact_ = true;
+			info.wallSide_ = WallSide::kRight;
 		}
+	}
+}
+
+void Player::UpdateWallSlide(const CollisionMapInfo& info) {
+	// クールダウン更新
+	if (wallJumpCooldown_ > 0.0f) {
+		wallJumpCooldown_ -= 1.0f / 60.0f;
+		if (wallJumpCooldown_ < 0.0f) { wallJumpCooldown_ = 0.0f; }
+	}
+
+	isWallSliding_ = false;
+	if (onGround_) { return; }
+
+	if (info.isWallContact_ && velocity_.y < 0.0f) {
+		bool pressingTowardWall = false;
+		switch (info.wallSide_) {
+		case WallSide::kLeft: pressingTowardWall = Input::GetInstance()->PushKey(DIK_LEFT); break;
+		case WallSide::kRight: pressingTowardWall = Input::GetInstance()->PushKey(DIK_RIGHT); break;
+		default: break;
+		}
+		if (pressingTowardWall) {
+			isWallSliding_ = true;
+			// 落下速度を制限
+			velocity_.y = std::max(velocity_.y, -kWallSlideMaxFallSpeed);
+		}
+	}
+}
+
+void Player::HandleWallJump(const CollisionMapInfo& info) {
+	if (onGround_) { return; }
+
+	bool canWallJump = (isWallSliding_ || info.isWallContact_);
+	if (!canWallJump) { return; }
+
+	bool jumpPressed = Input::GetInstance()->PushKey(DIK_UP);
+	if (jumpPressed && wallJumpCooldown_ <= 0.0f) {
+		// 反対方向へ跳ねる
+		if (info.wallSide_ == WallSide::kLeft) {
+			velocity_.x = +kWallJumpHorizontalSpeed;
+			lrDirection_ = LRDirection::kRight;
+		} else if (info.wallSide_ == WallSide::kRight) {
+			velocity_.x = -kWallJumpHorizontalSpeed;
+			lrDirection_ = LRDirection::kLeft;
+		}
+		velocity_.y = kWallJumpVerticalSpeed;
+		isWallSliding_ = false;
+
+		// 旋回演出
+		turnFirstRotationY_ = worldTransform_.rotation_.y;
+		turnTimer_ = kTimeTurn;
+
+		// 連続発動防止
+		wallJumpCooldown_ = kWallJumpCooldownTime;
 	}
 }
 

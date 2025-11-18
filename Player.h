@@ -11,11 +11,18 @@
 
 using namespace KamataEngine;
 
+enum class WallSide {
+	kNone,
+	kLeft,
+	kRight,
+};
+
 struct CollisionMapInfo {
 	bool isCeilingCollision_ = false; // 天井衝突
 	bool isLanding_ = false;          // 着地
 	bool isWallContact_ = false;      // 壁接触
 	Vector3 movement_;
+	WallSide wallSide_ = WallSide::kNone; // どちらの壁に接触しているか
 };
 
 class MapChipField;
@@ -100,6 +107,10 @@ public:
 
 	void HandleMapCollisionRight(CollisionMapInfo& info);
 
+	// 壁滑り・壁ジャンプ
+	void UpdateWallSlide(const CollisionMapInfo& info);
+	void HandleWallJump(const CollisionMapInfo& info);
+
 	public:
 	KamataEngine::WorldTransform& GetWorldTransform() { return worldTransform_; }
 	KamataEngine::Vector3 GetPosition() const { return worldTransform_.translation_; }
@@ -155,4 +166,12 @@ private:
 
 	// 着地時の速度減衰率
 	static inline const float kAttenuationWall = 0.1f;
+
+	// --- 壁けり関連 ---
+	bool isWallSliding_ = false;
+	float wallJumpCooldown_ = 0.0f; // 同一入力で連続発動しないためのクールダウン
+	static inline const float kWallJumpHorizontalSpeed = 1.2f; // 壁から離れるX速度
+	static inline const float kWallJumpVerticalSpeed = 2.5f;   // 壁けり時のY速度
+	static inline const float kWallSlideMaxFallSpeed = 3.0f;   // 壁滑り中の最大落下速度
+	static inline const float kWallJumpCooldownTime = 0.2f;    // クールダウン時間(秒)
 };
