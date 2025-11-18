@@ -74,8 +74,7 @@ void GameScene::Update() {
 #ifdef _DEBUG
 
 	ImGui::Begin("Window");
-	const Vector3& pos = player_->GetPosition();
-	ImGui::Text("Player Position: X=%.2f, Y=%.2f, Z=%.2f", pos.x, pos.y, pos.z);
+	
 
 	ImGui::End();
 
