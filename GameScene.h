@@ -23,6 +23,11 @@ public:
 
 	void GenerateBlocks();
 
+	/// <summary>
+	/// マップチップ以外の当たり判定をすべてチェックする
+	/// </summary>
+	void CheckAllCollisions();
+
 public:
 
 	int32_t GetWindowWidth() const { return kWindowWidth; }

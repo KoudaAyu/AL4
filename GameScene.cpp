@@ -1,4 +1,5 @@
 #include "GameScene.h"
+#include"AABB.h"
 #include "MathUtl.h"
 #include"MapChipField.h"
 using namespace KamataEngine;
@@ -121,6 +122,8 @@ void GameScene::Update() {
 
 	player_->Update();
 
+	CheckAllCollisions();
+
 	for (auto& row : worldTransformBlocks_) {
 		for (WorldTransform* wt : row) {
 			if (!wt) { continue; }
@@ -184,4 +187,18 @@ void GameScene::GenerateBlocks() {
 			}
 		}
 	}
+}
+
+void GameScene::CheckAllCollisions() {
+#pragma region プレイヤーと敵の当たり判定
+	
+	if (IsCollisionAABBAABB(player_->GetAABB(), enemy_->GetAABB()))
+	{
+		enemy_->OnCollision(player_);
+		player_->OnCollision(enemy_);
+	}
+
+#pragma endregion
+
+
 }

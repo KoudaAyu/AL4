@@ -73,6 +73,8 @@ void Player::Initialize(Model* model, Camera* camera, const Vector3& position) {
 	worldTransform_.Initialize();
 	worldTransform_.translation_ = position;
 	worldTransform_.rotation_.y = std::numbers::pi_v<float> / 2.0f;
+
+	UpdateAABB();
 }
 
 // 移動処理
@@ -171,6 +173,8 @@ void Player::Update() {
 		float destinationRotationYTable[] = {std::numbers::pi_v<float> / 2.0f, std::numbers::pi_v<float> * 3.0f / 2.0f};
 		worldTransform_.rotation_.y = destinationRotationYTable[static_cast<uint32_t>(lrDirection_)];
 	}
+
+	UpdateAABB();
 
 	// 8. 行列計算
 	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
@@ -558,6 +562,21 @@ void Player::HandleWallJump(const CollisionMapInfo& info) {
 		// 連続発動防止
 		wallJumpCooldown_ = kWallJumpCooldownTime;
 	}
+}
+
+void Player::OnCollision(Enemy* enemy) { (void)enemy; }
+
+void Player::UpdateAABB() {
+	// プレイヤーと同等サイズの簡易AABB（必要なら調整）
+
+	static constexpr float kDepth = 0.8f * 2.0f;
+
+	Vector3 center = worldTransform_.translation_;
+	Vector3 half = {kWidth * 0.5f, kHeight * 0.5f, kDepth * 0.5f};
+
+	// 回転は無視して軸整列AABBを更新（必要ならメッシュ頂点から算出実装へ拡張）
+	aabb_.min = {center.x - half.x, center.y - half.y, center.z - half.z};
+	aabb_.max = {center.x + half.x, center.y + half.y, center.z + half.z};
 }
 
 

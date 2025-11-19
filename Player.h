@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <numbers>
 
+#include"AABB.h"
 #include"MathUtl.h"
 
 using namespace KamataEngine;
@@ -26,6 +27,7 @@ struct CollisionMapInfo {
 };
 
 class MapChipField;
+class Enemy;
 
 class Player {
 public:
@@ -111,9 +113,15 @@ public:
 	void UpdateWallSlide(const CollisionMapInfo& info);
 	void HandleWallJump(const CollisionMapInfo& info);
 
+	void OnCollision(Enemy* enemy);
+
+	void UpdateAABB();
+
 	public:
 	KamataEngine::WorldTransform& GetWorldTransform() { return worldTransform_; }
 	KamataEngine::Vector3 GetPosition() const { return worldTransform_.translation_; }
+
+	AABB& GetAABB() { return aabb_; }
 
 private:
 	// ワールド変換データ
@@ -125,6 +133,10 @@ private:
 
 	// マップチップフィールド
 	MapChipField* mapChipField_ = nullptr;
+
+	AABB aabb_;
+	
+private:
 
 	uint32_t textureHandle_ = 0u;
 
