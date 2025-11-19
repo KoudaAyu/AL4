@@ -117,11 +117,13 @@ public:
 
 	void UpdateAABB();
 
-	public:
+public:
 	KamataEngine::WorldTransform& GetWorldTransform() { return worldTransform_; }
 	KamataEngine::Vector3 GetPosition() const { return worldTransform_.translation_; }
 
 	AABB& GetAABB() { return aabb_; }
+
+	bool isAlive() const { return isAlive_; }
 
 private:
 	// ワールド変換データ
@@ -186,4 +188,6 @@ private:
 	static inline const float kWallJumpVerticalSpeed = 2.5f;   // 壁けり時のY速度
 	static inline const float kWallSlideMaxFallSpeed = 3.0f;   // 壁滑り中の最大落下速度
 	static inline const float kWallJumpCooldownTime = 0.2f;    // クールダウン時間(秒)
+
+	bool isAlive_ = true;	
 };

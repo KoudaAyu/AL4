@@ -125,9 +125,18 @@ void Player::HandleMovementInput() {
 }
 
 void Player::Update() {
+
+	if (!isAlive_) {
+		return;
+	}
+
+#ifdef _DEBUG
 	ImGui::Begin("Debug");
 	ImGui::SliderFloat3("velocity", &velocity_.x, -10.0f, 10.0f);
 	ImGui::End();
+#endif //  _Debug
+
+	
 
 	// 1. 移動入力
 	HandleMovementInput();
@@ -564,7 +573,10 @@ void Player::HandleWallJump(const CollisionMapInfo& info) {
 	}
 }
 
-void Player::OnCollision(Enemy* enemy) { (void)enemy; }
+void Player::OnCollision(Enemy* enemy) { 
+	(void)enemy;
+	isAlive_ = false;
+}
 
 void Player::UpdateAABB() {
 	// プレイヤーと同等サイズの簡易AABB（必要なら調整）
