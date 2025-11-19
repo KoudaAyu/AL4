@@ -50,11 +50,10 @@ void UpdateRumble(DWORD userIndex = 0) {
 }
 } // namespace
 
-void Player::Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera, const KamataEngine::Vector3 position) {
-
 Player::Player() {}
 
 Player::~Player() {}
+
 
 void Player::Initialize(Model* model, Camera* camera, const Vector3& position) {
 
