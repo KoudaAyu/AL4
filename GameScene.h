@@ -3,6 +3,7 @@
 #include "KamataEngine.h"
 
 #include "CameraController.h"
+#include"Enemy.h"
 #include"Player.h"
 #include"Skydome.h"
 
@@ -58,6 +59,8 @@ private:
 
 	CameraController* cameraController_ = nullptr;
 	MapChipField* mapChipField_ = nullptr;
+
+	Enemy* enemy_ = nullptr;
 	Player* player_ = nullptr;
 
 	std::vector<std::vector<KamataEngine::WorldTransform*>> worldTransformBlocks_;

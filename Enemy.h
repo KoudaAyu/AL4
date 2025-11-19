@@ -6,7 +6,7 @@ class Enemy {
 public:
 	Enemy() = default;
 	~Enemy();
-	void Initialize();
+	void Initialize(KamataEngine::Model* model,KamataEngine::Camera* camera, const KamataEngine::Vector3& pos);
 	void Update();
 	void Draw();
 

@@ -14,6 +14,7 @@ GameScene::~GameScene() {
 	delete cameraController_;
 	delete mapChipField_;
 	delete model_;
+	delete enemy_;
 	delete player_;
 
 	for (std::vector<WorldTransform*>& row : worldTransformBlocks_) {
@@ -51,6 +52,10 @@ void GameScene::Initialize() {
 	Vector3 playerPosition = {4.0f, 4.0f, 0.0f};
 	player_->Initialize(model_, &camera_, playerPosition);
 	player_->SetMapChipField(mapChipField_);
+
+	enemy_ = new Enemy();
+	enemy_->Initialize(model_, &camera_, Vector3{12.0f, 2.0f, 0.0f});
+
 
 	cameraController_ = new CameraController();
 	cameraController_->SetMovableArea({-50.0f, 50.0f, 50.0f, -50.0f});
@@ -112,6 +117,8 @@ void GameScene::Update() {
 	camera_.UpdateMatrix();
 #endif //  _DEBUG
 
+	enemy_->Update();
+
 	player_->Update();
 
 	for (auto& row : worldTransformBlocks_) {
@@ -132,6 +139,8 @@ void GameScene::Draw() {
 
 	// 先にスカイドームを描画
 	if (skydome_) { skydome_->Draw(); }
+
+	enemy_->Draw();
 	
 	player_->Draw(); 
 
