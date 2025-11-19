@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <numbers>
 
+#include"AABB.h"
 #include"MathUtl.h"
 
 using namespace KamataEngine;
@@ -26,6 +27,7 @@ struct CollisionMapInfo {
 };
 
 class MapChipField;
+class Enemy;
 
 class Player {
 public:
@@ -111,9 +113,17 @@ public:
 	void UpdateWallSlide(const CollisionMapInfo& info);
 	void HandleWallJump(const CollisionMapInfo& info);
 
-	public:
+	void OnCollision(Enemy* enemy);
+
+	void UpdateAABB();
+
+public:
 	KamataEngine::WorldTransform& GetWorldTransform() { return worldTransform_; }
 	KamataEngine::Vector3 GetPosition() const { return worldTransform_.translation_; }
+
+	AABB& GetAABB() { return aabb_; }
+
+	bool isAlive() const { return isAlive_; }
 
 private:
 	// ワールド変換データ
@@ -125,6 +135,10 @@ private:
 
 	// マップチップフィールド
 	MapChipField* mapChipField_ = nullptr;
+
+	AABB aabb_;
+	
+private:
 
 	uint32_t textureHandle_ = 0u;
 
@@ -174,4 +188,6 @@ private:
 	static inline const float kWallJumpVerticalSpeed = 2.5f;   // 壁けり時のY速度
 	static inline const float kWallSlideMaxFallSpeed = 3.0f;   // 壁滑り中の最大落下速度
 	static inline const float kWallJumpCooldownTime = 0.2f;    // クールダウン時間(秒)
+
+	bool isAlive_ = true;	
 };
