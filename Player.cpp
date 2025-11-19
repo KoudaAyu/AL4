@@ -3,6 +3,55 @@
 #include "Enemy.h"
 #include "MapChipField.h"
 
+
+#include <Xinput.h>
+#pragma comment(lib, "xinput.lib")
+
+using namespace KamataEngine;
+
+
+
+namespace {
+// Simple rumble controller for player 1 (index 0)
+struct RumbleState {
+	bool active = false;
+	ULONGLONG endTick = 0; // GetTickCount64 based end time
+};
+
+RumbleState g_rumble;
+
+WORD ToMotor(float v) {
+	v = std::clamp(v, 0.0f, 1.0f);
+	return static_cast<WORD>(v * 65535.0f);
+}
+
+void StartRumble(float left, float right, int durationMs, DWORD userIndex = 0) {
+	XINPUT_VIBRATION vib{};
+	vib.wLeftMotorSpeed = ToMotor(left);
+	vib.wRightMotorSpeed = ToMotor(right);
+	XInputSetState(userIndex, &vib);
+	g_rumble.active = true;
+	g_rumble.endTick = GetTickCount64() + static_cast<ULONGLONG>(std::max(durationMs, 0));
+}
+
+void StopRumble(DWORD userIndex = 0) {
+	XINPUT_VIBRATION vib{}; // zeros stop the motors
+	XInputSetState(userIndex, &vib);
+	g_rumble.active = false;
+}
+
+void UpdateRumble(DWORD userIndex = 0) {
+	if (g_rumble.active) {
+		ULONGLONG now = GetTickCount64();
+		if (now >= g_rumble.endTick) {
+			StopRumble(userIndex);
+		}
+	}
+}
+} // namespace
+
+void Player::Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera, const KamataEngine::Vector3 position) {
+
 Player::Player() {}
 
 Player::~Player() {}
@@ -10,6 +59,7 @@ Player::~Player() {}
 void Player::Initialize(Model* model, Camera* camera, const Vector3& position) {
 
 	textureHandle_ = TextureManager::Load("uvChecker.png");
+
 
 	assert(model);
 
