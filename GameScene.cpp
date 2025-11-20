@@ -144,6 +144,11 @@ void GameScene::Update() {
 
 		CheckAllCollisions();
 
+		/*if (!enemy_->isAlive())
+		{
+			delete enemy_;
+		}*/
+
 		// フェーズ切り替えをチェック
 		ChangePhase();
 		break;
@@ -272,9 +277,17 @@ void GameScene::GenerateBlocks() {
 void GameScene::CheckAllCollisions() {
 #pragma region プレイヤーと敵の当たり判定
 
+	// 敵またはプレイヤーが死亡している場合は衝突判定をスキップ
+	//敵を複数追加したら消す
+	if (!player_ || !enemy_ || !player_->isAlive() || !enemy_->isAlive()) {
+		return;
+	}
+
 	if (IsCollisionAABBAABB(player_->GetAABB(), enemy_->GetAABB())) {
-		enemy_->OnCollision(player_);
+
 		player_->OnCollision(enemy_);
+		enemy_->OnCollision(player_);
+	
 	}
 
 #pragma endregion

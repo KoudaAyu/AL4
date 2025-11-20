@@ -26,6 +26,11 @@ void Enemy::Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera,
 
 void Enemy::Update() {
 
+	if (!isAlive_)
+	{
+		return;
+	}
+
 	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
 	worldTransform_.TransferMatrix();
 	// 毎フレームAABB更新
@@ -33,8 +38,12 @@ void Enemy::Update() {
 }
 
 void Enemy::Draw() {
-
-	model_->Draw(worldTransform_, *camera_); }
+	if (!isAlive_)
+	{
+		return;
+	}
+	model_->Draw(worldTransform_, *camera_);
+}
 
 void Enemy::UpdateAABB() {
 	// プレイヤーと同等サイズの簡易AABB（必要なら調整）
@@ -50,4 +59,7 @@ void Enemy::UpdateAABB() {
 	aabb_.max = {center.x + half.x, center.y + half.y, center.z + half.z};
 }
 
-void Enemy::OnCollision(Player* player) { (void)player; }
+void Enemy::OnCollision(Player* player) {
+	(void)player;
+	isAlive_ = false;
+}

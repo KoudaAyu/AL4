@@ -218,6 +218,6 @@ private:
 	//攻撃ギミックの経過時間
 	uint32_t attackParameter_ = 0;
 
-	float static inline const kAttackDuration = 300; // 攻撃動作の継続時間(フレーム)
+	float static inline const kAttackDuration = 10; // 攻撃動作の継続時間(フレーム)
 
 };

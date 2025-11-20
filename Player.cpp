@@ -623,6 +623,11 @@ void Player::HandleWallJump(const CollisionMapInfo& info) {
 }
 
 void Player::OnCollision(Enemy* enemy) {
+
+	if (behavior_ == Behavior::kAttack) {
+		return;
+	}
+
 	(void)enemy;
 	isAlive_ = false;
 }
@@ -658,6 +663,6 @@ void Player::BehaviorAttackUpdate() {
 		behaviorRequest_ = Behavior::kRoot;
 	}
 
-	worldTransform_.rotation_.x += 0.4f;
+	worldTransform_.translation_.x += 3.0f * ((lrDirection_ == LRDirection::kRight) ? 1.0f : -1.0f);
 
 }

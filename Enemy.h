@@ -20,10 +20,14 @@ public:
 public:
 	AABB& GetAABB() { return aabb_; }
 
+	bool isAlive() const { return isAlive_; }
+
 private:
 	KamataEngine::WorldTransform worldTransform_;
 	KamataEngine::Model* model_ = nullptr;
 	KamataEngine::Camera* camera_ = nullptr;
 
 	AABB aabb_;
+
+	bool isAlive_ = true;
 };
