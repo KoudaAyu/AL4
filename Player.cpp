@@ -583,7 +583,7 @@ void Player::UpdateWallSlide(const CollisionMapInfo& info) {
 			break;
 		}
 		if (pressingTowardWall) {
-			isWallSliding_ = true;
+			isWallSliding_ = true; 
 			// 落下速度を制限
 			velocity_.y = std::max(velocity_.y, -kWallSlideMaxFallSpeed);
 		}
@@ -656,13 +656,16 @@ void Player::BehaviorRootUpdate() {}
 
 void Player::BehaviorAttackUpdate() {
 
-	// 攻撃動作
-	attackParameter_++;
+    // 攻撃動作時間経過
+    attackParameter_++;
 
-	if (attackParameter_ > kAttackDuration) {
-		behaviorRequest_ = Behavior::kRoot;
-	}
+    if (attackParameter_ > kAttackDuration) {
+        behaviorRequest_ = Behavior::kRoot;
+    }
 
-	worldTransform_.translation_.x += 3.0f * ((lrDirection_ == LRDirection::kRight) ? 1.0f : -1.0f);
-
+    // 直接座標を動かすと衝突判定を迂回して壁を貫通するため、
+    // 攻撃による水平移動は速度へ反映し既存の判定(mapChipCollisionCheck)に処理させる。
+    constexpr float kAttackSpeed = 1.0f; // 1フレーム当たりの攻撃ダッシュ速度（必要なら調整）
+    velocity_.x = kAttackSpeed * ((lrDirection_ == LRDirection::kRight) ? 1.0f : -1.0f);
+    // 縦方向は通常の物理挙動に任せる。
 }
