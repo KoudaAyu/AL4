@@ -46,6 +46,12 @@ public:
 		kNumCorners, // 要素数
 	};
 
+	enum class Behavior {
+		kUnknown,
+		kRoot,   // 通常
+		kAttack, // 攻撃
+	};
+
 	// コンストラクタ
 	Player();
 
@@ -117,6 +123,20 @@ public:
 
 	void UpdateAABB();
 
+	//攻撃
+
+	// 行動初期化
+	void BehaviorRootInitialize();
+
+	// 攻撃行動初期化
+	void BehaviorAttackInitialize();
+
+	//通常行動更新
+	void BehaviorRootUpdate();
+
+	//攻撃行動更新
+	void BehaviorAttackUpdate();
+
 public:
 	KamataEngine::WorldTransform& GetWorldTransform() { return worldTransform_; }
 	KamataEngine::Vector3 GetPosition() const { return worldTransform_.translation_; }
@@ -137,6 +157,10 @@ private:
 	MapChipField* mapChipField_ = nullptr;
 
 	AABB aabb_;
+
+	// 現在の行動状態
+	Behavior behavior_ = Behavior::kRoot;
+	Behavior behaviorRequest_ = Behavior::kUnknown;
 	
 private:
 
@@ -190,4 +214,10 @@ private:
 	static inline const float kWallJumpCooldownTime = 0.2f;    // クールダウン時間(秒)
 
 	bool isAlive_ = true;	
+
+	//攻撃ギミックの経過時間
+	uint32_t attackParameter_ = 0;
+
+	float static inline const kAttackDuration = 10; // 攻撃動作の継続時間(フレーム)
+
 };
