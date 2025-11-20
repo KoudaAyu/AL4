@@ -3,13 +3,10 @@
 #include "Enemy.h"
 #include "MapChipField.h"
 
-
 #include <Xinput.h>
 #pragma comment(lib, "xinput.lib")
 
 using namespace KamataEngine;
-
-
 
 namespace {
 // Simple rumble controller for player 1 (index 0)
@@ -54,11 +51,9 @@ Player::Player() {}
 
 Player::~Player() {}
 
-
 void Player::Initialize(Model* model, Camera* camera, const Vector3& position) {
 
 	textureHandle_ = TextureManager::Load("uvChecker.png");
-
 
 	assert(model);
 
@@ -136,10 +131,38 @@ void Player::Update() {
 	ImGui::End();
 #endif //  _Debug
 
-	
+	if (behaviorRequest_ != Behavior::kUnknown) {
+		// 振る舞いを変更
+		behavior_ = behaviorRequest_;
+		// 各振る舞い開始時の初期化処理
+		switch (behavior_) {
+		case Behavior::kRoot:
+		default:
+			BehaviorRootInitialize();
+			break;
+		case Behavior::kAttack:
+			BehaviorAttackInitialize();
+			break;
+		}
+		behaviorRequest_ = Behavior::kUnknown;
+	}
+
+	switch (behavior_) {
+	case Behavior::kRoot:
+	default:
+		BehaviorRootUpdate();
+		break;
+	case Behavior::kAttack:
+		BehaviorAttackUpdate();
+		break;
+	}
 
 	// 1. 移動入力
 	HandleMovementInput();
+
+	if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+		behaviorRequest_ = Behavior::kAttack;
+	}
 
 	// 衝突情報を初期化
 	CollisionMapInfo collisionInfo;
@@ -208,8 +231,6 @@ Vector3 Player::CornerPosition(const Vector3& center, Corner corner) {
 	return center + offsetTable[static_cast<uint32_t>(corner)];
 }
 
-
-
 void Player::mapChipCollisionCheck(CollisionMapInfo& info) {
 
 	// 軸分離解決: まずXのみ、次にXを反映した一時座標でYを解決
@@ -265,8 +286,7 @@ void Player::HitWallCollision(CollisionMapInfo& info) {
 
 	// 空中時のみ、壁に向かう速度成分を殺す（壁ジャンプ着地直後の再侵入を防止）
 	if (!onGround_) {
-		if ((info.wallSide_ == WallSide::kLeft && velocity_.x < 0.0f) ||
-			(info.wallSide_ == WallSide::kRight && velocity_.x > 0.0f)) {
+		if ((info.wallSide_ == WallSide::kLeft && velocity_.x < 0.0f) || (info.wallSide_ == WallSide::kRight && velocity_.x > 0.0f)) {
 			velocity_.x = 0.0f;
 		}
 	}
@@ -540,18 +560,27 @@ void Player::UpdateWallSlide(const CollisionMapInfo& info) {
 	// クールダウン更新
 	if (wallJumpCooldown_ > 0.0f) {
 		wallJumpCooldown_ -= 1.0f / 60.0f;
-		if (wallJumpCooldown_ < 0.0f) { wallJumpCooldown_ = 0.0f; }
+		if (wallJumpCooldown_ < 0.0f) {
+			wallJumpCooldown_ = 0.0f;
+		}
 	}
 
 	isWallSliding_ = false;
-	if (onGround_) { return; }
+	if (onGround_) {
+		return;
+	}
 
 	if (info.isWallContact_ && velocity_.y < 0.0f) {
 		bool pressingTowardWall = false;
 		switch (info.wallSide_) {
-		case WallSide::kLeft: pressingTowardWall = Input::GetInstance()->PushKey(DIK_LEFT); break;
-		case WallSide::kRight: pressingTowardWall = Input::GetInstance()->PushKey(DIK_RIGHT); break;
-		default: break;
+		case WallSide::kLeft:
+			pressingTowardWall = Input::GetInstance()->PushKey(DIK_LEFT);
+			break;
+		case WallSide::kRight:
+			pressingTowardWall = Input::GetInstance()->PushKey(DIK_RIGHT);
+			break;
+		default:
+			break;
 		}
 		if (pressingTowardWall) {
 			isWallSliding_ = true;
@@ -562,10 +591,14 @@ void Player::UpdateWallSlide(const CollisionMapInfo& info) {
 }
 
 void Player::HandleWallJump(const CollisionMapInfo& info) {
-	if (onGround_) { return; }
+	if (onGround_) {
+		return;
+	}
 
 	bool canWallJump = (isWallSliding_ || info.isWallContact_);
-	if (!canWallJump) { return; }
+	if (!canWallJump) {
+		return;
+	}
 
 	bool jumpPressed = Input::GetInstance()->PushKey(DIK_UP);
 	if (jumpPressed && wallJumpCooldown_ <= 0.0f) {
@@ -589,7 +622,7 @@ void Player::HandleWallJump(const CollisionMapInfo& info) {
 	}
 }
 
-void Player::OnCollision(Enemy* enemy) { 
+void Player::OnCollision(Enemy* enemy) {
 	(void)enemy;
 	isAlive_ = false;
 }
@@ -607,4 +640,24 @@ void Player::UpdateAABB() {
 	aabb_.max = {center.x + half.x, center.y + half.y, center.z + half.z};
 }
 
+void Player::BehaviorRootInitialize() {}
 
+void Player::BehaviorAttackInitialize() {
+//カウンターの初期化
+	attackParameter_ = 0;
+}
+
+void Player::BehaviorRootUpdate() {}
+
+void Player::BehaviorAttackUpdate() {
+
+	// 攻撃動作
+	attackParameter_++;
+
+	if (attackParameter_ > kAttackDuration) {
+		behaviorRequest_ = Behavior::kRoot;
+	}
+
+	worldTransform_.rotation_.x += 0.4f;
+
+}
