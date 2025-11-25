@@ -1,6 +1,7 @@
 #include "GameScene.h"
+#include "AABB.h"
+#include "MapChipField.h"
 #include "MathUtl.h"
-#include"MapChipField.h"
 using namespace KamataEngine;
 
 GameScene::GameScene() {}
@@ -14,7 +15,10 @@ GameScene::~GameScene() {
 	delete cameraController_;
 	delete mapChipField_;
 	delete model_;
+	delete enemy_;
 	delete player_;
+
+	delete deathParticle_;
 
 	for (std::vector<WorldTransform*>& row : worldTransformBlocks_) {
 		for (WorldTransform* wt : row) {
@@ -32,7 +36,7 @@ void GameScene::Initialize() {
 
 	// デバックカメラの生成
 	debugCamera_ = new KamataEngine::DebugCamera(kWindowWidth, kWindowHeight);
-	
+
 #endif //  _DEBUG
 
 	model_ = Model::Create();
@@ -41,7 +45,7 @@ void GameScene::Initialize() {
 	blockModel_ = Model::Create();
 #ifdef _DEBUG
 	assert(textureHandle_);
-#endif 
+#endif
 	camera_.Initialize();
 
 	mapChipField_ = new MapChipField();
@@ -52,13 +56,18 @@ void GameScene::Initialize() {
 	player_->Initialize(model_, &camera_, playerPosition);
 	player_->SetMapChipField(mapChipField_);
 
+	enemy_ = new Enemy();
+	enemy_->Initialize(model_, &camera_, Vector3{12.0f, 2.0f, 0.0f});
+
 	cameraController_ = new CameraController();
 	cameraController_->SetMovableArea({-50.0f, 50.0f, 50.0f, -50.0f});
 	cameraController_->Initialize(&camera_);
 	cameraController_->SetTarget(player_);
+	// プレイヤーにカメラコントローラ参照を渡す（初回割当て）
+	if (player_) {
+		player_->SetCameraController(cameraController_);
+	}
 	cameraController_->Reset();
-
-	
 
 	// CSV に従ってブロック生成（全マス生成は行わない）
 	GenerateBlocks();
@@ -67,82 +76,187 @@ void GameScene::Initialize() {
 	skydome_ = new Skydome();
 	skydome_->Initialize();
 	skydome_->SetCamera(&camera_);
+
+	// Particle関係
+	deathParticle_ = new DeathParticle();
+	deathParticle_->Initialize(model_, &camera_, playerPosition);
 }
 
 void GameScene::Update() {
 
-#ifdef _DEBUG
-
-	ImGui::Begin("Window");
-	const Vector3& pos = player_->GetPosition();
-	ImGui::Text("Player Position: X=%.2f, Y=%.2f, Z=%.2f", pos.x, pos.y, pos.z);
-
-	ImGui::End();
-
-	// トグル
-	if (Input::GetInstance()->TriggerKey(DIK_C)) {
-		isDebugCameraActive_ = !isDebugCameraActive_;
+	// リセットキーでシーンをリセット
+	if (Input::GetInstance()->TriggerKey(DIK_R)) {
+		Reset();
+		// Reset() may delete deathParticle_ and other objects; stop further Update this frame to avoid using freed memory
+		return;
 	}
 
-	// 軸インジケータの表示と対象カメラ設定
-	AxisIndicator::GetInstance()->SetVisible(true);
-	if (isDebugCameraActive_) {
-		AxisIndicator::GetInstance()->SetTargetCamera(&debugCamera_->GetCamera());
-	} else {
-		AxisIndicator::GetInstance()->SetTargetCamera(&camera_);
-	}
 
-	// デバッグカメラ有効時はデバッグカメラの行列をゲーム用カメラへコピー
-	if (isDebugCameraActive_)
-	{
-		debugCamera_->Update();
-		camera_.matView = debugCamera_->GetCamera().matView;
-		camera_.matProjection = debugCamera_->GetCamera().matProjection;
-		camera_.TransferMatrix();
-	}
-	else
-	{
-		// 通常時はカメラコントローラがカメラを更新
-		cameraController_->Update();
-		camera_.UpdateMatrix();
-	}
 
-#else
-	// リリースビルドでは常に通常カメラを更新
-	cameraController_->Update();
-	camera_.UpdateMatrix();
+	switch (phase_) {
+	case Phase::kPlay:
+
+		#ifdef _DEBUG
+
+		ImGui::Begin("Window");
+
+		ImGui::End();
+
+		// トグル
+		if (Input::GetInstance()->TriggerKey(DIK_C)) {
+			isDebugCameraActive_ = !isDebugCameraActive_;
+		}
+
+		// 軸インジケータの表示と対象カメラ設定
+		AxisIndicator::GetInstance()->SetVisible(true);
+		if (isDebugCameraActive_) {
+			AxisIndicator::GetInstance()->SetTargetCamera(&debugCamera_->GetCamera());
+		} else {
+			AxisIndicator::GetInstance()->SetTargetCamera(&camera_);
+		}
+
+		// デバッグカメラ有効時はデバッグカメラの行列をゲーム用カメラへコピー
+		if (isDebugCameraActive_) {
+			debugCamera_->Update();
+			camera_.matView = debugCamera_->GetCamera().matView;
+			camera_.matProjection = debugCamera_->GetCamera().matProjection;
+			camera_.TransferMatrix();
+		} else {
+			// 通常時はカメラコントローラがカメラを更新
+			cameraController_->Update();
+			camera_.UpdateMatrix();
+		}
+
 #endif //  _DEBUG
 
-	player_->Update();
+		skydome_->Update();
 
-	for (auto& row : worldTransformBlocks_) {
-		for (WorldTransform* wt : row) {
-			if (!wt) { continue; }
-			wt->matWorld_ = MakeAffineMatrix(wt->scale_, wt->rotation_, wt->translation_);
-			if (wt->parent_) {
-				wt->matWorld_ = Multiply(wt->parent_->matWorld_, wt->matWorld_);
+		enemy_->Update();
+
+		player_->Update();
+
+		for (auto& row : worldTransformBlocks_) {
+			for (WorldTransform* wt : row) {
+				if (!wt) {
+					continue;
+				}
+				wt->matWorld_ = MakeAffineMatrix(wt->scale_, wt->rotation_, wt->translation_);
+				if (wt->parent_) {
+					wt->matWorld_ = Multiply(wt->parent_->matWorld_, wt->matWorld_);
+				}
+				wt->TransferMatrix();
 			}
-			wt->TransferMatrix();
 		}
+
+#ifndef _DEBUG
+		cameraController_->Update();
+		camera_.UpdateMatrix();
+#endif //  _DEBUG
+
+		CheckAllCollisions();
+
+		/*if (!enemy_->isAlive())
+		{
+			delete enemy_;
+		}*/
+
+		// フェーズ切り替えをチェック
+		ChangePhase();
+		break;
+	case Phase::kDeath:
+
+		#ifdef _DEBUG
+
+		ImGui::Begin("Window");
+
+		ImGui::End();
+
+		// トグル
+		if (Input::GetInstance()->TriggerKey(DIK_C)) {
+			isDebugCameraActive_ = !isDebugCameraActive_;
+		}
+
+		// 軸インジケータの表示と対象カメラ設定
+		AxisIndicator::GetInstance()->SetVisible(true);
+		if (isDebugCameraActive_) {
+			AxisIndicator::GetInstance()->SetTargetCamera(&debugCamera_->GetCamera());
+		} else {
+			AxisIndicator::GetInstance()->SetTargetCamera(&camera_);
+		}
+
+		// デバッグカメラ有効時はデバッグカメラの行列をゲーム用カメラへコピー
+		if (isDebugCameraActive_) {
+			debugCamera_->Update();
+			camera_.matView = debugCamera_->GetCamera().matView;
+			camera_.matProjection = debugCamera_->GetCamera().matProjection;
+			camera_.TransferMatrix();
+		} else {
+			// 通常時はカメラコントローラがカメラを更新
+			cameraController_->Update();
+			camera_.UpdateMatrix();
+		}
+
+#endif //  _DEBUG
+
+		skydome_->Update();
+		enemy_->Update();
+
+		// Particle関係
+		if (deathParticle_) {
+			deathParticle_->Update();
+		}
+
+#ifndef _DEBUG
+		cameraController_->Update();
+		camera_.UpdateMatrix();
+#endif //  _DEBUG
+
+		for (auto& row : worldTransformBlocks_) {
+			for (WorldTransform* wt : row) {
+				if (!wt) {
+					continue;
+				}
+				wt->matWorld_ = MakeAffineMatrix(wt->scale_, wt->rotation_, wt->translation_);
+				if (wt->parent_) {
+					wt->matWorld_ = Multiply(wt->parent_->matWorld_, wt->matWorld_);
+				}
+				wt->TransferMatrix();
+			}
+		}
+
+		break;
 	}
 }
 
-void GameScene::Draw() { 
-	
+void GameScene::Draw() {
+
 	Model::PreDraw();
 
 	// 先にスカイドームを描画
-	if (skydome_) { skydome_->Draw(); }
-	
-	player_->Draw(); 
+	if (skydome_) {
+		skydome_->Draw();
+	}
+
+	enemy_->Draw();
+
+	// デス中はプレイヤーの描画を抑制してエフェクトを見やすくする
+	if (phase_ != Phase::kDeath) {
+		player_->Draw();
+	}
 
 	for (auto& row : worldTransformBlocks_) {
 		for (WorldTransform* wt : row) {
-			if (!wt) { continue; }
+			if (!wt) {
+				continue;
+			}
 			blockModel_->Draw(*wt, camera_);
 		}
 	}
 
+	// Particle関係
+	if (deathParticle_) {
+		deathParticle_->Draw();
+	}
 
 	Model::PostDraw();
 }
@@ -163,12 +277,9 @@ void GameScene::GenerateBlocks() {
 	// 要素数を設定し、nullptr で初期化
 	worldTransformBlocks_.assign(numBlockVirtical, std::vector<WorldTransform*>(numBlockHorizontal, nullptr));
 
-	for (uint32_t i = 0; i < numBlockVirtical; ++i)
-	{
-		for (uint32_t j = 0; j < numBlockHorizontal; ++j)
-		{
-			if (mapChipField_->GetMapChipTypeByIndex(j,i) == MapChipType::kBlock)
-			{
+	for (uint32_t i = 0; i < numBlockVirtical; ++i) {
+		for (uint32_t j = 0; j < numBlockHorizontal; ++j) {
+			if (mapChipField_->GetMapChipTypeByIndex(j, i) == MapChipType::kBlock) {
 				WorldTransform* worldTransform = new WorldTransform();
 				worldTransform->Initialize();
 				worldTransform->translation_ = mapChipField_->GetMapChipPositionByIndex(j, i);
@@ -176,4 +287,93 @@ void GameScene::GenerateBlocks() {
 			}
 		}
 	}
+}
+
+void GameScene::CheckAllCollisions() {
+#pragma region プレイヤーと敵の当たり判定
+
+	// 敵またはプレイヤーが死亡している場合は衝突判定をスキップ
+	//敵を複数追加したら消す
+	if (!player_ || !enemy_ || !player_->isAlive() || !enemy_->isAlive()) {
+		return;
+	}
+
+	if (IsCollisionAABBAABB(player_->GetAABB(), enemy_->GetAABB())) {
+
+		player_->OnCollision(enemy_);
+		enemy_->OnCollision(player_);
+	
+	}
+
+#pragma endregion
+}
+
+void GameScene::ChangePhase() {
+
+	switch (phase_) {
+	case Phase::kPlay:
+
+		if (!player_->isAlive())
+		{
+			phase_ = Phase::kDeath;
+			const Vector3& deathPos = player_->GetPosition();
+
+			if (deathParticle_)
+			{
+				delete deathParticle_;
+				deathParticle_ = nullptr;
+			}
+
+			deathParticle_ = new DeathParticle();
+			deathParticle_->Initialize(model_, &camera_, deathPos);
+		}
+
+		break;
+	case Phase::kDeath:
+
+		break;
+	}
+}
+
+// リセット処理
+void GameScene::Reset() {
+	// Delete existing player and recreate
+	if (player_) {
+		delete player_;
+		player_ = nullptr;
+	}
+	Vector3 playerPosition = {4.0f, 4.0f, 0.0f};
+	player_ = new Player();
+	player_->Initialize(model_, &camera_, playerPosition);
+	player_->SetMapChipField(mapChipField_);
+	// 再生成したプレイヤーにもカメラコントローラを渡す
+	if (cameraController_) {
+		player_->SetCameraController(cameraController_);
+	}
+
+	// Delete existing enemy and recreate
+	if (enemy_) {
+		delete enemy_;
+		enemy_ = nullptr;
+	}
+	enemy_ = new Enemy();
+	enemy_->Initialize(model_, &camera_, Vector3{12.0f, 2.0f, 0.0f});
+
+	// If a death particle exists (e.g. resetting during death effect), remove it
+	if (deathParticle_) {
+		delete deathParticle_;
+		deathParticle_ = nullptr;
+	}
+
+	// Regenerate blocks from map
+	GenerateBlocks();
+
+	// Reset camera controller target and state
+	if (cameraController_) {
+		cameraController_->SetTarget(player_);
+		cameraController_->Reset();
+	}
+
+	// Set phase back to play
+	phase_ = Phase::kPlay;
 }

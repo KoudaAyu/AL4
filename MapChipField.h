@@ -12,13 +12,22 @@ struct MapChipData {
 	std::vector<std::vector<MapChipType>> data;
 };
 
+struct IndexSet {
+	uint32_t xIndex;
+	uint32_t yIndex;
+};
+
+struct Rects {
+	float left;   // 左端
+	float right;  // 右端
+	float top;    // 下端
+	float bottom; // 上端
+};
+
 class MapChipField {
 
 public:
-	struct IndexSet {
-		uint32_t xIndex;
-		uint32_t yIndex;
-	};
+	
 
 public:
 
@@ -58,9 +67,9 @@ public:
 	/// </summary>
 	/// <param name="position">座標指定</param>
 	/// <returns></returns>
-	IndexSet GetMapChipIndexByPosition(const KamataEngine::Vector3& position);
+	IndexSet GetMapChipIndexSetByPosition(const KamataEngine::Vector3& position);
 
-	Rect GetRectByIndex(uint32_t xIndex, uint32_t yIndex);
+	Rects GetRectByIndex(uint32_t xIndex, uint32_t yIndex);
 
 public:
 	uint32_t GetNumBlockHorizontal() const { return kNumBlockHorizontal; }
