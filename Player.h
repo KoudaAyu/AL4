@@ -28,6 +28,7 @@ struct CollisionMapInfo {
 
 class MapChipField;
 class Enemy;
+class CameraController; // forward declaration
 
 class Player {
 public:
@@ -145,6 +146,9 @@ public:
 
 	bool isAlive() const { return isAlive_; }
 
+	// カメラコントローラの参照を渡す（カメラシェイクを呼ぶため）
+	void SetCameraController(CameraController* controller) { cameraController_ = controller; }
+
 private:
 	// ワールド変換データ
 	WorldTransform worldTransform_;
@@ -213,11 +217,14 @@ private:
 	static inline const float kWallSlideMaxFallSpeed = 3.0f;   // 壁滑り中の最大落下速度
 	static inline const float kWallJumpCooldownTime = 0.2f;    // クールダウン時間(秒)
 
-	bool isAlive_ = true;	
+	bool isAlive_ = true; 	
 
 	//攻撃ギミックの経過時間
 	uint32_t attackParameter_ = 0;
 
 	float static inline const kAttackDuration = 10; // 攻撃動作の継続時間(フレーム)
+
+	// カメラコントローラ参照（シェイク呼び出し用）
+	CameraController* cameraController_ = nullptr;
 
 };

@@ -63,6 +63,10 @@ void GameScene::Initialize() {
 	cameraController_->SetMovableArea({-50.0f, 50.0f, 50.0f, -50.0f});
 	cameraController_->Initialize(&camera_);
 	cameraController_->SetTarget(player_);
+	// プレイヤーにカメラコントローラ参照を渡す（初回割当て）
+	if (player_) {
+		player_->SetCameraController(cameraController_);
+	}
 	cameraController_->Reset();
 
 	// CSV に従ってブロック生成（全マス生成は行わない）
@@ -342,6 +346,10 @@ void GameScene::Reset() {
 	player_ = new Player();
 	player_->Initialize(model_, &camera_, playerPosition);
 	player_->SetMapChipField(mapChipField_);
+	// 再生成したプレイヤーにもカメラコントローラを渡す
+	if (cameraController_) {
+		player_->SetCameraController(cameraController_);
+	}
 
 	// Delete existing enemy and recreate
 	if (enemy_) {

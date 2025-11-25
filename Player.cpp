@@ -2,6 +2,7 @@
 
 #include "Enemy.h"
 #include "MapChipField.h"
+#include "CameraController.h"
 
 #include <Xinput.h>
 #pragma comment(lib, "xinput.lib")
@@ -630,6 +631,13 @@ void Player::OnCollision(Enemy* enemy) {
 
 	(void)enemy;
 	isAlive_ = false;
+
+	if (cameraController_) {
+		// 揺れ幅: 2.0f, 継続: 0.5秒（必要なら調整）
+		cameraController_->StartShake(2.0f, 0.5f);
+	} else {
+		DebugText::GetInstance()->ConsolePrintf("cameraController_ is null\n");
+	}
 }
 
 void Player::UpdateAABB() {
