@@ -39,6 +39,9 @@ public:
 	/// </summary>
 	void ChangePhase();
 
+	// リセット
+	void Reset();
+
 public:
 	int32_t GetWindowWidth() const { return kWindowWidth; }
 	int32_t GetWindowHeight() const { return kWindowHeight; }

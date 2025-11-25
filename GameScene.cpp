@@ -80,6 +80,13 @@ void GameScene::Initialize() {
 
 void GameScene::Update() {
 
+	// リセットキーでシーンをリセット
+	if (Input::GetInstance()->TriggerKey(DIK_R)) {
+		Reset();
+		// Reset() may delete deathParticle_ and other objects; stop further Update this frame to avoid using freed memory
+		return;
+	}
+
 
 
 	switch (phase_) {
@@ -191,7 +198,9 @@ void GameScene::Update() {
 		enemy_->Update();
 
 		// Particle関係
-		deathParticle_->Update();
+		if (deathParticle_) {
+			deathParticle_->Update();
+		}
 
 #ifndef _DEBUG
 		cameraController_->Update();
@@ -241,7 +250,9 @@ void GameScene::Draw() {
 	}
 
 	// Particle関係
-	deathParticle_->Draw();
+	if (deathParticle_) {
+		deathParticle_->Draw();
+	}
 
 	Model::PostDraw();
 }
@@ -318,4 +329,43 @@ void GameScene::ChangePhase() {
 
 		break;
 	}
+}
+
+// リセット処理
+void GameScene::Reset() {
+	// Delete existing player and recreate
+	if (player_) {
+		delete player_;
+		player_ = nullptr;
+	}
+	Vector3 playerPosition = {4.0f, 4.0f, 0.0f};
+	player_ = new Player();
+	player_->Initialize(model_, &camera_, playerPosition);
+	player_->SetMapChipField(mapChipField_);
+
+	// Delete existing enemy and recreate
+	if (enemy_) {
+		delete enemy_;
+		enemy_ = nullptr;
+	}
+	enemy_ = new Enemy();
+	enemy_->Initialize(model_, &camera_, Vector3{12.0f, 2.0f, 0.0f});
+
+	// If a death particle exists (e.g. resetting during death effect), remove it
+	if (deathParticle_) {
+		delete deathParticle_;
+		deathParticle_ = nullptr;
+	}
+
+	// Regenerate blocks from map
+	GenerateBlocks();
+
+	// Reset camera controller target and state
+	if (cameraController_) {
+		cameraController_->SetTarget(player_);
+		cameraController_->Reset();
+	}
+
+	// Set phase back to play
+	phase_ = Phase::kPlay;
 }
