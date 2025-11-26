@@ -53,11 +53,27 @@ void GameScene::Initialize() {
 
 	player_ = new Player();
 	Vector3 playerPosition = {4.0f, 4.0f, 0.0f};
-	player_->Initialize(model_, &camera_, playerPosition);
+	player_->Initialize(&camera_, playerPosition);
 	player_->SetMapChipField(mapChipField_);
 
+	Vector3 enemyPosition = {12.0f, 2.0f, 0.0f};
+	if (mapChipField_) {
+		bool found = false;
+		uint32_t vh = mapChipField_->GetNumBlockVertical();
+		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
+		for (uint32_t y = 0; y < vh && !found; ++y) {
+			for (uint32_t x = 0; x < wh; ++x) {
+				if (mapChipField_->GetMapChipTypeByIndex(x, y) == MapChipType::kEnemySpawn) {
+					enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					found = true;
+					break;
+				}
+			}
+		}
+	}
+
 	enemy_ = new Enemy();
-	enemy_->Initialize(model_, &camera_, Vector3{12.0f, 2.0f, 0.0f});
+	enemy_->Initialize(model_, &camera_, enemyPosition);
 
 	cameraController_ = new CameraController();
 	// Set movable area based on loaded map CSV instead of hardcoded values
@@ -95,6 +111,7 @@ void GameScene::Update() {
 		// Reset() may delete deathParticle_ and other objects; stop further Update this frame to avoid using freed memory
 		return;
 	}
+
 
 
 
@@ -163,7 +180,8 @@ void GameScene::Update() {
 		/*if (!enemy_->isAlive())
 		{
 			delete enemy_;
-		}*/
+		}
+		*/
 
 		// フェーズ切り替えをチェック
 		ChangePhase();
@@ -349,7 +367,7 @@ void GameScene::Reset() {
 	}
 	Vector3 playerPosition = {4.0f, 4.0f, 0.0f};
 	player_ = new Player();
-	player_->Initialize(model_, &camera_, playerPosition);
+	player_->Initialize(&camera_, playerPosition);
 	player_->SetMapChipField(mapChipField_);
 	// 再生成したプレイヤーにもカメラコントローラを渡す
 	if (cameraController_) {
@@ -361,24 +379,35 @@ void GameScene::Reset() {
 		delete enemy_;
 		enemy_ = nullptr;
 	}
+	Vector3 enemyPosition = {12.0f, 2.0f, 0.0f};
+	if (mapChipField_) {
+		bool found = false;
+		uint32_t vh = mapChipField_->GetNumBlockVertical();
+		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
+		for (uint32_t y = 0; y < vh && !found; ++y) {
+			for (uint32_t x = 0; x < wh; ++x) {
+				if (mapChipField_->GetMapChipTypeByIndex(x, y) == MapChipType::kEnemySpawn) {
+					enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					found = true;
+					break;
+				}
+			}
+		}
+	}
 	enemy_ = new Enemy();
-	enemy_->Initialize(model_, &camera_, Vector3{12.0f, 2.0f, 0.0f});
+	enemy_->Initialize(model_, &camera_, enemyPosition);
 
-	// If a death particle exists (e.g. resetting during death effect), remove it
 	if (deathParticle_) {
 		delete deathParticle_;
 		deathParticle_ = nullptr;
 	}
 
-	// Regenerate blocks from map
 	GenerateBlocks();
 
-	// Reset camera controller target and state
 	if (cameraController_) {
 		cameraController_->SetTarget(player_);
 		cameraController_->Reset();
 	}
 
-	// Set phase back to play
 	phase_ = Phase::kPlay;
 }
