@@ -50,18 +50,24 @@ void UpdateRumble(DWORD userIndex = 0) {
 
 Player::Player() {}
 
-Player::~Player() {}
+Player::~Player() {
+	// If Player created its own model during Initialize, delete it
+	if (ownsModel_ && model_) {
+		delete model_;
+		model_ = nullptr;
+	}
+}
 
-void Player::Initialize(Model* model, Camera* camera, const Vector3& position) {
+// Updated signature: no Model* parameter
+void Player::Initialize(Camera* camera, const Vector3& position) {
 
 	textureHandle_ = TextureManager::Load("uvChecker.png");
 
-	assert(model);
+	// Always create player's model from OBJ
+	model_ = Model::CreateFromOBJ("Player", true);
+	ownsModel_ = true;
 
-	// 引数として受け取ったデータをメンバ関数に記録
-	model_ = model;
-
-	/*textureHandle_ = textureHandle;*/
+	assert(model_);
 
 	camera_ = camera;
 
@@ -217,7 +223,9 @@ void Player::Update() {
 void Player::Draw() {
 
 	// ここに3Dモデルインスタンスの描画処理を記述する
-	model_->Draw(worldTransform_, *camera_, textureHandle_);
+	if (model_) {
+		model_->Draw(worldTransform_, *camera_, textureHandle_);
+	}
 }
 
 Vector3 Player::CornerPosition(const Vector3& center, Corner corner) {
@@ -478,7 +486,7 @@ void Player::HandleMapCollisionLeft(CollisionMapInfo& info) {
 	}
 
 	// 左下点の座標
-	indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kLeftBottom]);
+indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kLeftBottom]);
 	mapChipType = mapChipField_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
 	if (mapChipType == MapChipType::kBlock) {
 		hit = true;

@@ -60,7 +60,7 @@ public:
 	~Player();
 
 	// 初期化
-	void Initialize(Model* model, Camera* camera, const Vector3& position);
+	void Initialize(Camera* camera, const Vector3& position);
 
 	void HandleMovementInput();
 
@@ -154,6 +154,8 @@ private:
 	WorldTransform worldTransform_;
 
 	Model* model_ = nullptr;
+	// Player が自身で生成した Model を所有しているか
+	bool ownsModel_ = false;
 
 	Camera* camera_ = nullptr;
 

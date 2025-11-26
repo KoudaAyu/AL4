@@ -6,6 +6,8 @@
 enum class MapChipType {
 	kBlank, // 0
 	kBlock, // 1
+	kReserved2, // 2: reserved / kept open
+	kEnemySpawn, // 3: enemy spawn marker
 };
 
 struct MapChipData {
