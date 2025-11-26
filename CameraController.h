@@ -35,6 +35,11 @@ public:
 public:
 	void SetTarget(Player* target) { target_ = target; }
 
+	// カメラシェイクを開始する
+	// amplitude: 揺れ幅（ワールド座標単位）
+	// duration: 継続時間（秒）
+	void StartShake(float amplitude, float duration);
+
 private:
 	KamataEngine::Vector3 targetOffset_ = {0.0f, 0.0f, -15.0f};
 	KamataEngine::Vector3 targetVelocity_ = {};
@@ -52,4 +57,10 @@ private:
 
 	//速度掛け率
 	static inline const float kVelocityBias = 0.1f;
+
+	// --- カメラシェイク用 ---
+	float shakeAmplitude_ = 0.0f;    // 初期振幅
+	float shakeDuration_ = 0.0f;     // 総継続時間
+	float shakeRemaining_ = 0.0f;    // 残り時間
+	bool isShaking_ = false;
 };

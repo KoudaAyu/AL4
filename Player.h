@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <numbers>
 
+#include"AABB.h"
 #include"MathUtl.h"
 
 using namespace KamataEngine;
@@ -26,6 +27,8 @@ struct CollisionMapInfo {
 };
 
 class MapChipField;
+class Enemy;
+class CameraController; // forward declaration
 
 class Player {
 public:
@@ -44,6 +47,12 @@ public:
 		kNumCorners, // 要素数
 	};
 
+	enum class Behavior {
+		kUnknown,
+		kRoot,   // 通常
+		kAttack, // 攻撃
+	};
+
 	// コンストラクタ
 	Player();
 
@@ -51,7 +60,7 @@ public:
 	~Player();
 
 	// 初期化
-	void Initialize(Model* model, Camera* camera, const Vector3& position);
+	void Initialize(Camera* camera, const Vector3& position);
 
 	void HandleMovementInput();
 
@@ -111,20 +120,55 @@ public:
 	void UpdateWallSlide(const CollisionMapInfo& info);
 	void HandleWallJump(const CollisionMapInfo& info);
 
-	public:
+	void OnCollision(Enemy* enemy);
+
+	void UpdateAABB();
+
+	//攻撃
+
+	// 行動初期化
+	void BehaviorRootInitialize();
+
+	// 攻撃行動初期化
+	void BehaviorAttackInitialize();
+
+	//通常行動更新
+	void BehaviorRootUpdate();
+
+	//攻撃行動更新
+	void BehaviorAttackUpdate();
+
+public:
 	KamataEngine::WorldTransform& GetWorldTransform() { return worldTransform_; }
 	KamataEngine::Vector3 GetPosition() const { return worldTransform_.translation_; }
+
+	AABB& GetAABB() { return aabb_; }
+
+	bool isAlive() const { return isAlive_; }
+
+	// カメラコントローラの参照を渡す（カメラシェイクを呼ぶため）
+	void SetCameraController(CameraController* controller) { cameraController_ = controller; }
 
 private:
 	// ワールド変換データ
 	WorldTransform worldTransform_;
 
 	Model* model_ = nullptr;
+	// Player が自身で生成した Model を所有しているか
+	bool ownsModel_ = false;
 
 	Camera* camera_ = nullptr;
 
 	// マップチップフィールド
 	MapChipField* mapChipField_ = nullptr;
+
+	AABB aabb_;
+
+	// 現在の行動状態
+	Behavior behavior_ = Behavior::kRoot;
+	Behavior behaviorRequest_ = Behavior::kUnknown;
+	
+private:
 
 	uint32_t textureHandle_ = 0u;
 
@@ -174,4 +218,15 @@ private:
 	static inline const float kWallJumpVerticalSpeed = 2.5f;   // 壁けり時のY速度
 	static inline const float kWallSlideMaxFallSpeed = 3.0f;   // 壁滑り中の最大落下速度
 	static inline const float kWallJumpCooldownTime = 0.2f;    // クールダウン時間(秒)
+
+	bool isAlive_ = true; 	
+
+	//攻撃ギミックの経過時間
+	uint32_t attackParameter_ = 0;
+
+	float static inline const kAttackDuration = 10; // 攻撃動作の継続時間(フレーム)
+
+	// カメラコントローラ参照（シェイク呼び出し用）
+	CameraController* cameraController_ = nullptr;
+
 };

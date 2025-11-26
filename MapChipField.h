@@ -6,6 +6,8 @@
 enum class MapChipType {
 	kBlank, // 0
 	kBlock, // 1
+	kReserved2, // 2: reserved / kept open
+	kEnemySpawn, // 3: enemy spawn marker
 };
 
 struct MapChipData {
@@ -71,22 +73,28 @@ public:
 
 	Rects GetRectByIndex(uint32_t xIndex, uint32_t yIndex);
 
+	/// <summary>
+	/// CSV のサイズに基づいてカメラの移動可能領域を返す
+	/// </summary>
+	/// <returns>CameraController::Rect と同等の構造体 (left,right,top,bottom)</returns>
+	Rect GetMovableArea() const;
+
 public:
-	uint32_t GetNumBlockHorizontal() const { return kNumBlockHorizontal; }
-	uint32_t GetNumBlockVertical() const { return kNumBlockVirtical; }
+	uint32_t GetNumBlockHorizontal() const { return numBlockHorizontal_; }
+	uint32_t GetNumBlockVertical() const { return numBlockVertical_; }
 
 	void SetNumBlockHorizontal(uint32_t count) {
 		if (count == 0) {
 			count = 1;
 		}
-		kNumBlockHorizontal = count;
+		numBlockHorizontal_ = count;
 	}
 
 	void SetNumBlockVertical(uint32_t count) {
 		if (count == 0) {
 			count = 1;
 		}
-		kNumBlockVirtical = count;
+		numBlockVertical_ = count;
 	}
 
 private:
@@ -94,8 +102,9 @@ private:
 	static inline const float kBlockWidth = 2.0f;
 	static inline const float kBlockHeight = 2.0f;
 
-	static inline uint32_t kNumBlockHorizontal = 20;
-	static inline uint32_t kNumBlockVirtical = 10;
+	// ブロック数はインスタンスメンバにして CSV に合わせて変更可能にする
+	uint32_t numBlockHorizontal_ = 20;
+	uint32_t numBlockVertical_ = 10;
 
 	MapChipData mapChipData_;
 };
