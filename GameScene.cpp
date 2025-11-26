@@ -60,7 +60,12 @@ void GameScene::Initialize() {
 	enemy_->Initialize(model_, &camera_, Vector3{12.0f, 2.0f, 0.0f});
 
 	cameraController_ = new CameraController();
-	cameraController_->SetMovableArea({-50.0f, 50.0f, 50.0f, -50.0f});
+	// Set movable area based on loaded map CSV instead of hardcoded values
+	if (mapChipField_) {
+		cameraController_->SetMovableArea(mapChipField_->GetMovableArea());
+	} else {
+		cameraController_->SetMovableArea({-50.0f, 50.0f, 50.0f, -50.0f});
+	}
 	cameraController_->Initialize(&camera_);
 	cameraController_->SetTarget(player_);
 	// プレイヤーにカメラコントローラ参照を渡す（初回割当て）
