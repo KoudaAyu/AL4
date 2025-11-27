@@ -11,10 +11,10 @@
 using namespace KamataEngine;
 
 namespace {
-// Simple rumble controller for player 1 (index 0)
+
 struct RumbleState {
     bool active = false;
-    ULONGLONG endTick = 0; // GetTickCount64 based end time
+    ULONGLONG endTick = 0; 
 };
 
 RumbleState g_rumble;
@@ -34,7 +34,7 @@ void StartRumble(float left, float right, int durationMs, DWORD userIndex = 0) {
 }
 
 void StopRumble(DWORD userIndex = 0) {
-    XINPUT_VIBRATION vib{}; // zeros stop the motors
+    XINPUT_VIBRATION vib{};
     XInputSetState(userIndex, &vib);
     g_rumble.active = false;
 }
@@ -48,9 +48,9 @@ void UpdateRumble(DWORD userIndex = 0) {
     }
 }
 
-// Helper: normalize left stick X to [-1,1] with deadzone applied
+
 static float NormalizeLeftStickX(SHORT rawValue) {
-    // note: rawValue can be -32768..32767
+ 
     const float denom = 32767.0f;
     float v = 0.0f;
     if (rawValue == -32768) {
@@ -66,16 +66,16 @@ static float NormalizeLeftStickX(SHORT rawValue) {
     return v;
 }
 
-// Helper: get input intensity for horizontal movement [0,1]
+
 static float GetHorizontalInputIntensity(float stickX, bool keyRight, bool keyLeft) {
-    // Keyboard has full intensity. If keyboard present, prefer it.
+
     if (keyRight) return 1.0f;
     if (keyLeft) return 1.0f;
-    // Stick intensity is absolute value in [0,1]
+   
     return std::clamp(std::fabs(stickX), 0.0f, 1.0f);
 }
 
-// Helper: check if player is pressing toward given wall (keyboard or stick)
+
 static bool IsPressingTowardWall(const XINPUT_STATE& state, WallSide side) {
     float stickX = NormalizeLeftStickX(state.Gamepad.sThumbLX);
     switch (side) {
@@ -93,7 +93,7 @@ static bool IsPressingTowardWall(const XINPUT_STATE& state, WallSide side) {
 Player::Player() {}
 
 Player::~Player() {
-    // If Player created its own model during Initialize, delete it
+
     if (ownsModel_ && model_) {
         delete model_;
         model_ = nullptr;
@@ -103,13 +103,15 @@ Player::~Player() {
 // Updated signature: no Model* parameter
 void Player::Initialize(Camera* camera, const Vector3& position) {
 
-    textureHandle_ = TextureManager::Load("uvChecker.png");
+    textureHandle_ = TextureManager::Load("attack_effect/attack_effect.png");
 
     // Always create player's model from OBJ
     model_ = Model::CreateFromOBJ("Player", true);
     ownsModel_ = true;
 
     assert(model_);
+
+    attackModel_ = Model::CreateFromOBJ("attack_effect", true);
 
     camera_ = camera;
 
@@ -124,10 +126,10 @@ void Player::Initialize(Camera* camera, const Vector3& position) {
 // 移動処理
 void Player::HandleMovementInput() {
 
-    // Update controller state from Input singleton so checks below see latest buttons
+  
     Input::GetInstance()->GetJoystickState(0, state);
 
-    // Normalize left stick X
+  
     float stickX = NormalizeLeftStickX(state.Gamepad.sThumbLX);
 
     bool keyRight = Input::GetInstance()->PushKey(DIK_RIGHT);
@@ -288,8 +290,14 @@ void Player::Draw() {
 
     // ここに3Dモデルインスタンスの描画処理を記述する
     if (model_) {
-        model_->Draw(worldTransform_, *camera_, textureHandle_);
+   
+        model_->Draw(worldTransform_, *camera_);
     }
+
+    if (attackModel_ && behavior_ == Behavior::kAttack) {
+    
+        attackModel_->Draw(worldTransform_, *camera_, textureHandle_);
+	}
 }
 
 Vector3 Player::CornerPosition(const Vector3& center, Corner corner) {
@@ -735,9 +743,28 @@ void Player::BehaviorAttackUpdate() {
         behaviorRequest_ = Behavior::kRoot;
     }
 
-    // 直接座標を動かすと衝突判定を迂回して壁を貫通するため、
-    // 攻撃による水平移動は速度へ反映し既存の判定(mapChipCollisionCheck)に処理させる。
-    constexpr float kAttackSpeed = 1.0f; // 1フレーム当たりの攻撃ダッシュ速度（必要なら調整）
-    velocity_.x = kAttackSpeed * ((lrDirection_ == LRDirection::kRight) ? 1.0f : -1.0f);
+  
+    velocity_.x = 0.0f;
+
     // 縦方向は通常の物理挙動に任せる。
+}
+
+// 新しい関数: プレイヤーの攻撃用AABBを返す
+AABB Player::GetAttackAABB() const {
+ 
+    Vector3 center = worldTransform_.translation_;
+
+    float dir = (lrDirection_ == LRDirection::kRight) ? 1.0f : -1.0f;
+
+   
+    float halfAttackWidth = kAttackWidth * 0.5f;
+    float halfAttackHeight = kAttackHeight * 0.5f;
+
+    Vector3 attackCenter = center;
+    attackCenter.x += dir * (kWidth * 0.5f + halfAttackWidth);
+
+    AABB hitbox;
+    hitbox.min = {attackCenter.x - halfAttackWidth, attackCenter.y - halfAttackHeight, attackCenter.z - 1.0f};
+    hitbox.max = {attackCenter.x + halfAttackWidth, attackCenter.y + halfAttackHeight, attackCenter.z + 1.0f};
+    return hitbox;
 }

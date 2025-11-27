@@ -141,6 +141,10 @@ public:
 
 	LRDirection GetLRDirection() const { return lrDirection_; }
 
+	// Attack accessors
+	bool IsAttacking() const { return behavior_ == Behavior::kAttack; }
+	AABB GetAttackAABB() const;
+
 public:
 	KamataEngine::WorldTransform& GetWorldTransform() { return worldTransform_; }
 	KamataEngine::Vector3 GetPosition() const { return worldTransform_.translation_; }
@@ -157,6 +161,9 @@ private:
 	WorldTransform worldTransform_;
 
 	Model* model_ = nullptr;
+
+	Model* attackModel_ = nullptr;
+
 	// Player が自身で生成した Model を所有しているか
 	bool ownsModel_ = false;
 
@@ -228,6 +235,11 @@ private:
 	uint32_t attackParameter_ = 0;
 
 	float static inline const kAttackDuration = 10; // 攻撃動作の継続時間(フレーム)
+
+	// attack hitbox
+	static inline const float kAttackReach = 1.0f; // 前方への到達距離
+	static inline const float kAttackWidth = 1.2f; // 当たり判定の幅(横)
+	static inline const float kAttackHeight = 0.8f; // 当たり判定の高さ
 
 	// カメラコントローラ参照（シェイク呼び出し用）
 	CameraController* cameraController_ = nullptr;
