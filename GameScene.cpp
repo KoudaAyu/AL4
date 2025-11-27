@@ -1,5 +1,6 @@
 #include "GameScene.h"
 #include "AABB.h"
+#include "FrontShieldEnemy.h"
 #include "MapChipField.h"
 #include "MathUtl.h"
 using namespace KamataEngine;
@@ -15,7 +16,11 @@ GameScene::~GameScene() {
 	delete cameraController_;
 	delete mapChipField_;
 	delete model_;
-	delete enemy_;
+	// delete all enemies
+	for (Enemy* enemy : enemies_) {
+		delete enemy;
+	}
+	enemies_.clear();
 	delete player_;
 
 	delete deathParticle_;
@@ -56,24 +61,32 @@ void GameScene::Initialize() {
 	player_->Initialize(&camera_, playerPosition);
 	player_->SetMapChipField(mapChipField_);
 
-	Vector3 enemyPosition = {12.0f, 2.0f, 0.0f};
+	// Create enemies based on map chip CSV spawn points
 	if (mapChipField_) {
-		bool found = false;
 		uint32_t vh = mapChipField_->GetNumBlockVertical();
 		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
-		for (uint32_t y = 0; y < vh && !found; ++y) {
+		for (uint32_t y = 0; y < vh; ++y) {
 			for (uint32_t x = 0; x < wh; ++x) {
-				if (mapChipField_->GetMapChipTypeByIndex(x, y) == MapChipType::kEnemySpawn) {
-					enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
-					found = true;
-					break;
+				MapChipType t = mapChipField_->GetMapChipTypeByIndex(x, y);
+				if (t == MapChipType::kEnemySpawn) {
+					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					Enemy* enemy = new Enemy();
+					// Use overload where Enemy creates/owns its own model
+					enemy->Initialize(&camera_, enemyPosition);
+					enemies_.push_back(enemy);
+				} else if (t == MapChipType::kEnemySpawnShield) {
+					// We use CSV value '4' mapped to kEnemySpawnShield to indicate shield enemy spawn
+					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					FrontShieldEnemy* fse = new FrontShieldEnemy();
+					// Use overload where FrontShieldEnemy creates/owns its own model
+					fse->Initialize(&camera_, enemyPosition);
+					// optional: adjust threshold for variety
+					fse->SetFrontDotThreshold(0.6f);
+					enemies_.push_back(fse);
 				}
 			}
 		}
 	}
-
-	enemy_ = new Enemy();
-	enemy_->Initialize(model_, &camera_, enemyPosition);
 
 	cameraController_ = new CameraController();
 	// Set movable area based on loaded map CSV instead of hardcoded values
@@ -112,13 +125,10 @@ void GameScene::Update() {
 		return;
 	}
 
-
-
-
 	switch (phase_) {
 	case Phase::kPlay:
 
-		#ifdef _DEBUG
+#ifdef _DEBUG
 
 		ImGui::Begin("Window");
 
@@ -153,7 +163,11 @@ void GameScene::Update() {
 
 		skydome_->Update();
 
-		enemy_->Update();
+		// Update all enemies
+		for (Enemy* enemy : enemies_) {
+			if (enemy)
+				enemy->Update();
+		}
 
 		player_->Update();
 
@@ -179,7 +193,7 @@ void GameScene::Update() {
 
 		/*if (!enemy_->isAlive())
 		{
-			delete enemy_;
+		    delete enemy_;
 		}
 		*/
 
@@ -188,7 +202,7 @@ void GameScene::Update() {
 		break;
 	case Phase::kDeath:
 
-		#ifdef _DEBUG
+#ifdef _DEBUG
 
 		ImGui::Begin("Window");
 
@@ -222,7 +236,11 @@ void GameScene::Update() {
 #endif //  _DEBUG
 
 		skydome_->Update();
-		enemy_->Update();
+		// Update all enemies
+		for (Enemy* enemy : enemies_) {
+			if (enemy)
+				enemy->Update();
+		}
 
 		// Particle関係
 		if (deathParticle_) {
@@ -260,7 +278,11 @@ void GameScene::Draw() {
 		skydome_->Draw();
 	}
 
-	enemy_->Draw();
+	// Draw all enemies
+	for (Enemy* enemy : enemies_) {
+		if (enemy)
+			enemy->Draw();
+	}
 
 	// デス中はプレイヤーの描画を抑制してエフェクトを見やすくする
 	if (phase_ != Phase::kDeath) {
@@ -316,16 +338,17 @@ void GameScene::CheckAllCollisions() {
 #pragma region プレイヤーと敵の当たり判定
 
 	// 敵またはプレイヤーが死亡している場合は衝突判定をスキップ
-	//敵を複数追加したら消す
-	if (!player_ || !enemy_ || !player_->isAlive() || !enemy_->isAlive()) {
+	if (!player_ || enemies_.empty() || !player_->isAlive()) {
 		return;
 	}
 
-	if (IsCollisionAABBAABB(player_->GetAABB(), enemy_->GetAABB())) {
-
-		player_->OnCollision(enemy_);
-		enemy_->OnCollision(player_);
-	
+	for (Enemy* enemy : enemies_) {
+		if (!enemy || !enemy->isAlive())
+			continue;
+		if (IsCollisionAABBAABB(player_->GetAABB(), enemy->GetAABB())) {
+			player_->OnCollision(enemy);
+			enemy->OnCollision(player_);
+		}
 	}
 
 #pragma endregion
@@ -336,13 +359,11 @@ void GameScene::ChangePhase() {
 	switch (phase_) {
 	case Phase::kPlay:
 
-		if (!player_->isAlive())
-		{
+		if (!player_->isAlive()) {
 			phase_ = Phase::kDeath;
 			const Vector3& deathPos = player_->GetPosition();
 
-			if (deathParticle_)
-			{
+			if (deathParticle_) {
 				delete deathParticle_;
 				deathParticle_ = nullptr;
 			}
@@ -374,28 +395,34 @@ void GameScene::Reset() {
 		player_->SetCameraController(cameraController_);
 	}
 
-	// Delete existing enemy and recreate
-	if (enemy_) {
-		delete enemy_;
-		enemy_ = nullptr;
+	// Delete existing enemies and recreate from map
+	for (Enemy* enemy : enemies_) {
+		delete enemy;
 	}
-	Vector3 enemyPosition = {12.0f, 2.0f, 0.0f};
+	enemies_.clear();
+
 	if (mapChipField_) {
-		bool found = false;
 		uint32_t vh = mapChipField_->GetNumBlockVertical();
 		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
-		for (uint32_t y = 0; y < vh && !found; ++y) {
+		for (uint32_t y = 0; y < vh; ++y) {
 			for (uint32_t x = 0; x < wh; ++x) {
 				if (mapChipField_->GetMapChipTypeByIndex(x, y) == MapChipType::kEnemySpawn) {
-					enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
-					found = true;
-					break;
+					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					Enemy* enemy = new Enemy();
+					enemy->Initialize(&camera_, enemyPosition);
+					enemies_.push_back(enemy);
+				} else if (mapChipField_->GetMapChipTypeByIndex(x, y) == MapChipType::kEnemySpawnShield) {
+					// We use CSV value '4' mapped to kEnemySpawnShield to indicate shield enemy spawn
+					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					FrontShieldEnemy* fse = new FrontShieldEnemy();
+					fse->Initialize(&camera_, enemyPosition);
+					// optional: adjust threshold for variety
+					fse->SetFrontDotThreshold(0.6f);
+					enemies_.push_back(fse);
 				}
 			}
 		}
 	}
-	enemy_ = new Enemy();
-	enemy_->Initialize(model_, &camera_, enemyPosition);
 
 	if (deathParticle_) {
 		delete deathParticle_;

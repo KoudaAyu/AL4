@@ -225,9 +225,15 @@ void Player::Update() {
     // 1. 移動入力
     HandleMovementInput();
 
-    if (Input::GetInstance()->TriggerKey(DIK_SPACE) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_B)) {
+   
+    bool spaceTriggered = Input::GetInstance()->TriggerKey(DIK_SPACE);
+    bool rtPressed = (state.Gamepad.bRightTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
+   
+    if (spaceTriggered || (rtPressed && !prevRightTriggerPressed_)) {
         behaviorRequest_ = Behavior::kAttack;
     }
+    // 現在のRT状態を保存（次フレームのため）
+    prevRightTriggerPressed_ = rtPressed;
 
     // 衝突情報を初期化
     CollisionMapInfo collisionInfo;

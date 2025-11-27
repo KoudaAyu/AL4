@@ -4,10 +4,11 @@
 #include "KamataEngine.h"
 
 enum class MapChipType {
-	kBlank, // 0
-	kBlock, // 1
-	kReserved2, // 2: reserved / kept open
-	kEnemySpawn, // 3: enemy spawn marker
+	kBlank = 0, // 0
+	kBlock = 1, // 1
+	kReserved2 = 2, // 2: reserved / kept open
+	kEnemySpawn = 3, // 3: enemy spawn marker
+	kEnemySpawnShield = 4, // 4: spawn enemy with front shield
 };
 
 struct MapChipData {

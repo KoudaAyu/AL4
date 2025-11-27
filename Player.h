@@ -138,6 +138,9 @@ public:
 	//攻撃行動更新
 	void BehaviorAttackUpdate();
 
+
+	LRDirection GetLRDirection() const { return lrDirection_; }
+
 public:
 	KamataEngine::WorldTransform& GetWorldTransform() { return worldTransform_; }
 	KamataEngine::Vector3 GetPosition() const { return worldTransform_.translation_; }
@@ -230,5 +233,8 @@ private:
 	CameraController* cameraController_ = nullptr;
 
 	XINPUT_STATE state;
+
+    // 前フレームで右トリガーが押されていたか（単発入力判定用）
+    bool prevRightTriggerPressed_ = false;
 
 };
