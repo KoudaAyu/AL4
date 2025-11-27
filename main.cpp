@@ -48,10 +48,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	gameScene = new GameScene();
 	gameScene->Initialize();
 
+	XINPUT_STATE state;
+
 	while (true) {
 		if (KamataEngine::Update()) {
 			break;
 		}
+
+		Input::GetInstance()->GetJoystickState(0, state);
 
 #ifdef _DEBUG
 
