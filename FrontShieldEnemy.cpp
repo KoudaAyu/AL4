@@ -16,7 +16,8 @@ void FrontShieldEnemy::Initialize(KamataEngine::Camera* camera, const KamataEngi
     // ワールド変換の初期化
     worldTransform_.Initialize();
     worldTransform_.translation_ = pos;
-    worldTransform_.rotation_.y = std::numbers::pi_v<float> / 2.0f;
+    // 左向きにする
+    worldTransform_.rotation_.y = -std::numbers::pi_v<float> / 2.0f;
 
     UpdateAABB();
 }
@@ -24,30 +25,15 @@ void FrontShieldEnemy::Initialize(KamataEngine::Camera* camera, const KamataEngi
 void FrontShieldEnemy::OnCollision(Player* player) {
     if (!player) return;
 
-    Vector3 enemyPos = worldTransform_.translation_;
-    Vector3 playerPos = player->GetPosition();
-    Vector3 toPlayer = playerPos - enemyPos;
-    toPlayer.z = 0.0f;
-
-    float lenSq = toPlayer.x * toPlayer.x + toPlayer.y * toPlayer.y;
-    if (lenSq == 0.0f) {
-        Enemy::OnCollision(player);
+    if (player->GetLRDirection() == Player::LRDirection::kLeft && lrDirection_ == FrontShieldEnemy::LRDirection::kRight) {
+        // プレイヤーが左向きで敵も左向きの場合、衝突を無効化
         return;
     }
-    float invLen = 1.0f / std::sqrt(lenSq);
-    toPlayer.x *= invLen;
-    toPlayer.y *= invLen;
 
-   
-    float ry = worldTransform_.rotation_.y;
-    float adj = ry - std::numbers::pi_v<float> / 2.0f;
-    Vector3 forward = { std::cos(adj), std::sin(adj), 0.0f };
-
-    float dot = forward.x * toPlayer.x + forward.y * toPlayer.y;
-
-    if (dot > frontDotThreshold_) {
+    if (player->GetLRDirection() == Player::LRDirection::kRight && lrDirection_ == FrontShieldEnemy::LRDirection::kLeft) {
+        // プレイヤーが右向きで敵も右向きの場合、衝突を無効化
         return;
-    }
+	}
 
     Enemy::OnCollision(player);
 }

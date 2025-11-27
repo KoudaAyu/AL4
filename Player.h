@@ -138,6 +138,9 @@ public:
 	//攻撃行動更新
 	void BehaviorAttackUpdate();
 
+
+	LRDirection GetLRDirection() const { return lrDirection_; }
+
 public:
 	KamataEngine::WorldTransform& GetWorldTransform() { return worldTransform_; }
 	KamataEngine::Vector3 GetPosition() const { return worldTransform_.translation_; }
