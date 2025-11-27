@@ -79,7 +79,8 @@ private:
 	// Particle関係
 	DeathParticle* deathParticle_ = nullptr;
 
-	Enemy* enemy_ = nullptr;
+	// Support multiple enemies
+	std::vector<Enemy*> enemies_;
 	Player* player_ = nullptr;
 
 	std::vector<std::vector<KamataEngine::WorldTransform*>> worldTransformBlocks_;

@@ -6,22 +6,28 @@
 
 using namespace KamataEngine;
 
-Enemy::~Enemy() {}
+Enemy::~Enemy() {
+    if (ownsModel_ && model_) {
+        delete model_;
+        model_ = nullptr;
+    }
+}
 
-void Enemy::Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera, const KamataEngine::Vector3& pos) {
 
-	assert(model);
-	// 引数として受け取ったデータをメンバ関数に記録
-	model_ = model;
-	/*textureHandle_ = textureHandle;*/
-	camera_ = camera;
-	// ワールド変換の初期化
-	worldTransform_.Initialize();
-	worldTransform_.translation_ = pos;
-	worldTransform_.rotation_.y = std::numbers::pi_v<float> / 2.0f;
 
-	// 初期AABB更新
-	UpdateAABB();
+void Enemy::Initialize(KamataEngine::Camera* camera, const KamataEngine::Vector3& pos) {
+    model_ = Model::CreateFromOBJ("enemy", true);
+    ownsModel_ = true;
+
+    assert(model_);
+
+    camera_ = camera;
+
+    worldTransform_.Initialize();
+    worldTransform_.translation_ = pos;
+    worldTransform_.rotation_.y = std::numbers::pi_v<float> / 2.0f;
+
+    UpdateAABB();
 }
 
 void Enemy::Update() {

@@ -13,6 +13,8 @@ std::map<std::string, MapChipType> mapChipTable = {
     {"1", MapChipType::kBlock},
     {"2", MapChipType::kReserved2},
     {"3", MapChipType::kEnemySpawn},
+    // 4: spawn enemy with front shield
+    {"4", MapChipType::kEnemySpawnShield},
 };
 }
 
@@ -89,6 +91,8 @@ void MapChipField::LoadMapChipCsv(const std::string& filename) {
 
 			if (mapChipTable.contains(word)) {
 				mapChipData_.data[i][j] = mapChipTable[word];
+			} else {
+				// Unknown value: leave as blank
 			}
 		}
 	}
