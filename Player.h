@@ -231,4 +231,7 @@ private:
 
 	XINPUT_STATE state;
 
+    // 前フレームで右トリガーが押されていたか（単発入力判定用）
+    bool prevRightTriggerPressed_ = false;
+
 };
