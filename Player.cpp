@@ -126,10 +126,20 @@ void Player::Initialize(Camera* camera, const Vector3& position) {
 // 移動処理
 void Player::HandleMovementInput() {
 
-  
+    
     Input::GetInstance()->GetJoystickState(0, state);
 
-  
+   
+    if (isDodging_) {
+       
+        if (!onGround_) {
+            velocity_.y += -kGravityAcceleration;
+            velocity_.y = std::max(velocity_.y, -kLimitFallSpeed);
+        }
+        return;
+    }
+
+    
     float stickX = NormalizeLeftStickX(state.Gamepad.sThumbLX);
 
     bool keyRight = Input::GetInstance()->PushKey(DIK_RIGHT);
@@ -142,7 +152,7 @@ void Player::HandleMovementInput() {
         if (moveRight || moveLeft) {
             Vector3 acceleration = {};
 
-            // compute input intensity preferring keyboard
+            
             float inputIntensityRight = (keyRight) ? 1.0f : std::max(0.0f, stickX);
             float inputIntensityLeft = (keyLeft) ? 1.0f : std::max(0.0f, -stickX);
 
@@ -237,6 +247,9 @@ void Player::Update() {
     // 現在のRT状態を保存（次フレームのため）
     prevRightTriggerPressed_ = rtPressed;
 
+   EmergencyAvoidance();
+   
+
     // 衝突情報を初期化
     CollisionMapInfo collisionInfo;
     // 移動量を加味して現在地を算定するために、現在の速度をcollisionInfoにセット
@@ -277,6 +290,7 @@ void Player::Update() {
     } else {
         float destinationRotationYTable[] = {std::numbers::pi_v<float> / 2.0f, std::numbers::pi_v<float> * 3.0f / 2.0f};
         worldTransform_.rotation_.y = destinationRotationYTable[static_cast<uint32_t>(lrDirection_)];
+
     }
 
     UpdateAABB();
@@ -327,6 +341,19 @@ void Player::mapChipCollisionCheck(CollisionMapInfo& info) {
     info.isWallContact_ = xInfo.isWallContact_;
     info.wallSide_ = xInfo.wallSide_;
 
+    
+    if (info.isWallContact_) {
+        if (lastWallSide_ != info.wallSide_) {
+            
+            wallJumpCount_ = 0;
+            lastWallSide_ = info.wallSide_;
+        }
+       
+        wallContactGraceTimer_ = kWallContactGraceTime;
+    } else {
+        lastWallSide_ = WallSide::kNone;
+    }
+
     // Xを一時的に反映して、Yの判定に使う
     worldTransform_.translation_.x += dx;
 
@@ -366,11 +393,11 @@ void Player::HitWallCollision(CollisionMapInfo& info) {
     }
 
     // 空中時のみ、壁に向かう速度成分を殺す（壁ジャンプ着地直後の再侵入を防止）
-//	if (!onGround_) {
+    if (!isDodging_) {
         if ((info.wallSide_ == WallSide::kLeft && velocity_.x < 0.0f) || (info.wallSide_ == WallSide::kRight && velocity_.x > 0.0f)) {
             velocity_.x = 0.0f;
         }
-//	}
+    }
 
     // 地上時は位置のクランプのみに任せ、速度は触らない（ガタつき抑制）
 }
@@ -427,6 +454,9 @@ void Player::SwitchingTheGrounding(CollisionMapInfo& info) {
 
             // Y座標をゼロにする
             velocity_.y = 0.0f;
+
+            // Reset wall-jump count when landing
+            wallJumpCount_ = 0;
         }
     }
 }
@@ -647,6 +677,12 @@ void Player::UpdateWallSlide(const CollisionMapInfo& info) {
         }
     }
 
+    // decrement grace timer
+    if (wallContactGraceTimer_ > 0.0f) {
+        wallContactGraceTimer_ -= 1.0f / 60.0f;
+        if (wallContactGraceTimer_ < 0.0f) wallContactGraceTimer_ = 0.0f;
+    }
+
     isWallSliding_ = false;
     if (onGround_) {
         return;
@@ -663,11 +699,9 @@ void Player::UpdateWallSlide(const CollisionMapInfo& info) {
 }
 
 void Player::HandleWallJump(const CollisionMapInfo& info) {
-    if (onGround_) {
-        return;
-    }
+  
 
-    bool canWallJump = (isWallSliding_ || info.isWallContact_);
+    bool canWallJump = (isWallSliding_ || info.isWallContact_ || wallContactGraceTimer_ > 0.0f);
     if (!canWallJump) {
         return;
     }
@@ -675,16 +709,40 @@ void Player::HandleWallJump(const CollisionMapInfo& info) {
     // 壁ジャンプ入力: キーボードの上キーまたはXboxコントローラのAボタン
     bool jumpPressed = Input::GetInstance()->PushKey(DIK_UP) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A);
     if (jumpPressed && wallJumpCooldown_ <= 0.0f) {
+      
+        if (wallJumpCount_ >= kMaxWallJumps) {
+            return;
+        }
+
+      
+        float horizSpeed = (wallJumpCount_ == 0) ? kWallJumpHorizontalSpeed : kWallJumpHorizontalSpeed2;
+        float vertSpeed = (wallJumpCount_ == 0) ? kWallJumpVerticalSpeed : kWallJumpVerticalSpeed2;
+
         // 反対方向へ跳ねる
         if (info.wallSide_ == WallSide::kLeft) {
-            velocity_.x = +kWallJumpHorizontalSpeed;
+            velocity_.x = +horizSpeed;
             lrDirection_ = LRDirection::kRight;
         } else if (info.wallSide_ == WallSide::kRight) {
-            velocity_.x = -kWallJumpHorizontalSpeed;
+            velocity_.x = -horizSpeed;
             lrDirection_ = LRDirection::kLeft;
+        } else {
+           
+            float dir = (lrDirection_ == LRDirection::kRight) ? 1.0f : -1.0f;
+            velocity_.x = dir * horizSpeed;
         }
-        velocity_.y = kWallJumpVerticalSpeed;
+
+      
+        velocity_.x *= kWallJumpHorizontalDamp;
+
+       
+        velocity_.y = vertSpeed;
         isWallSliding_ = false;
+
+        // increment wall jump count
+        wallJumpCount_++;
+
+        // stop grace timer after jump
+        wallContactGraceTimer_ = 0.0f;
 
         // 旋回演出
         turnFirstRotationY_ = worldTransform_.rotation_.y;
@@ -723,6 +781,36 @@ void Player::UpdateAABB() {
     // 回転は無視して軸整列AABBを更新（必要ならメッシュ頂点から算出実装へ拡張）
     aabb_.min = {center.x - half.x, center.y - half.y, center.z - half.z};
     aabb_.max = {center.x + half.x, center.y + half.y, center.z + half.z};
+}
+
+void Player::EmergencyAvoidance() {
+	bool dodgePressed = Input::GetInstance()->TriggerKey(DIK_E);
+	if (dodgePressed && !isDodging_ && dodgeCooldown_ <= 0.0f && behavior_ != Behavior::kAttack) {
+
+		float dir = (lrDirection_ == LRDirection::kRight) ? 1.0f : -1.0f;
+		velocity_.x = dir * kDodgeSpeed;
+		isDodging_ = true;
+		dodgeTimer_ = kDodgeDuration;
+		dodgeCooldown_ = kDodgeCooldownTime;
+		if (cameraController_)
+			cameraController_->StartShake(0.5f, 0.12f);
+	}
+
+	if (isDodging_) {
+		dodgeTimer_ -= 1.0f / 60.0f;
+		if (dodgeTimer_ <= 0.0f) {
+			isDodging_ = false;
+
+			velocity_.x *= 0.5f;
+
+			velocity_.x = std::clamp(velocity_.x, -kLimitRunSpeed, kLimitRunSpeed);
+		}
+	}
+	if (dodgeCooldown_ > 0.0f) {
+		dodgeCooldown_ -= 1.0f / 60.0f;
+		if (dodgeCooldown_ < 0.0f)
+			dodgeCooldown_ = 0.0f;
+	}
 }
 
 void Player::BehaviorRootInitialize() {}

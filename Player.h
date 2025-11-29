@@ -124,6 +124,11 @@ public:
 
 	void UpdateAABB();
 
+	/// <summary>
+	/// 緊急回避
+	/// </summary>
+	void EmergencyAvoidance();
+
 	//攻撃
 
 	// 行動初期化
@@ -182,11 +187,13 @@ private:
 
 	uint32_t textureHandle_ = 0u;
 
-	static inline const float kAcceleration = 0.1f;
+	//加速量
+	static inline const float kAcceleration = 0.05f;
 
 	static inline const float kAttenuation = 0.05f;
 
-	static inline const float kLimitRunSpeed = 1.0f;
+	//横移動の最大速度
+	static inline const float kLimitRunSpeed = 0.5f;
 
 	// 旋回開始の角度
 	float turnFirstRotationY_ = 0.0f;
@@ -207,7 +214,7 @@ private:
 	static inline const float kLimitFallSpeed = 12.0f;
 
 	// 最大落下速度(上方向)
-	static inline const float kJumpAcceleration = 1.5f;
+	static inline const float kJumpAcceleration = 1.0f;
 
 	// キャラクターの当たり判定サイズ
 	static inline const float kWidth = 0.8f * 2.0f;
@@ -224,10 +231,29 @@ private:
 	// --- 壁けり関連 ---
 	bool isWallSliding_ = false;
 	float wallJumpCooldown_ = 0.0f; // 同一入力で連続発動しないためのクールダウン
-	static inline const float kWallJumpHorizontalSpeed = 1.2f; // 壁から離れるX速度
-	static inline const float kWallJumpVerticalSpeed = 2.5f;   // 壁けり時のY速度
+	// Much smaller horizontal speed so wall-kick is short
+	static inline const float kWallJumpHorizontalSpeed = 0.4f; // 壁から離れるX速度 (reduced)
+	// Much smaller vertical speed for shorter arc
+	static inline const float kWallJumpVerticalSpeed = 1.1f;   // 壁けり時のY速度 (reduced)
+	// Secondary (weaker) speeds for second wall-jump
+	static inline const float kWallJumpHorizontalSpeed2 = 0.25f; // second jump horizontal
+	static inline const float kWallJumpVerticalSpeed2 = 0.9f; // second jump vertical
 	static inline const float kWallSlideMaxFallSpeed = 3.0f;   // 壁滑り中の最大落下速度
-	static inline const float kWallJumpCooldownTime = 0.2f;    // クールダウン時間(秒)
+	// Short cooldown to allow quick re-kick
+	static inline const float kWallJumpCooldownTime = 0.1f;    // クールダウン時間(秒) (reduced)
+	// horizontal damping factor applied immediately after wall jump to reduce overshoot
+	static inline const float kWallJumpHorizontalDamp = 0.8f; // multiply velocity_.x by this after jump
+
+	// Allow up to two wall jumps in air
+	int wallJumpCount_ = 0;
+	static inline const int kMaxWallJumps = 2;
+
+	// Track last wall side touched to allow resetting wall jump count when contacting a new wall
+	WallSide lastWallSide_ = WallSide::kNone;
+
+	// Grace time after contacting wall to allow immediate wall-jump (prevents small fall)
+	static inline const float kWallContactGraceTime = 0.1f; // seconds
+	float wallContactGraceTimer_ = 0.0f;
 
 	bool isAlive_ = true; 	
 
@@ -248,5 +274,13 @@ private:
 
     // 前フレームで右トリガーが押されていたか（単発入力判定用）
     bool prevRightTriggerPressed_ = false;
+
+	// --- Emergency dodge (Eキー) ---
+	bool isDodging_ = false;
+	float dodgeTimer_ = 0.0f;
+	float dodgeCooldown_ = 0.0f;
+	static inline const float kDodgeDuration = 0.15f; // seconds
+	static inline const float kDodgeSpeed = 2.0f; // dash speed
+	static inline const float kDodgeCooldownTime = 0.5f; // seconds
 
 };
