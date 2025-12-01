@@ -80,9 +80,9 @@ static bool IsPressingTowardWall(const XINPUT_STATE& state, WallSide side) {
     float stickX = NormalizeLeftStickX(state.Gamepad.sThumbLX);
     switch (side) {
     case WallSide::kLeft:
-        return Input::GetInstance()->PushKey(DIK_LEFT) || (stickX < 0.0f);
+        return Input::GetInstance()->PushKey(DIK_LEFT) || Input::GetInstance()->PushKey(DIK_A) || (stickX < 0.0f);
     case WallSide::kRight:
-        return Input::GetInstance()->PushKey(DIK_RIGHT) || (stickX > 0.0f);
+        return Input::GetInstance()->PushKey(DIK_RIGHT) || Input::GetInstance()->PushKey(DIK_D) || (stickX > 0.0f);
     default:
         return false;
     }
@@ -142,8 +142,8 @@ void Player::HandleMovementInput() {
     
     float stickX = NormalizeLeftStickX(state.Gamepad.sThumbLX);
 
-    bool keyRight = Input::GetInstance()->PushKey(DIK_RIGHT);
-    bool keyLeft = Input::GetInstance()->PushKey(DIK_LEFT);
+    bool keyRight = Input::GetInstance()->PushKey(DIK_RIGHT) || Input::GetInstance()->PushKey(DIK_D);
+    bool keyLeft = Input::GetInstance()->PushKey(DIK_LEFT) || Input::GetInstance()->PushKey(DIK_A);
 
     bool moveRight = keyRight || (stickX > 0.0f);
     bool moveLeft = keyLeft || (stickX < 0.0f);
@@ -185,8 +185,8 @@ void Player::HandleMovementInput() {
             velocity_.x *= (1.0f - kAttenuation);
         }
 
-        // ジャンプ入力: キーボードの上キーまたはXboxコントローラのAボタン
-        if (Input::GetInstance()->PushKey(DIK_UP) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A)) {
+        // ジャンプ入力: キーボードの上キーまたはWキーまたはXboxコントローラのAボタン
+        if (Input::GetInstance()->PushKey(DIK_UP) || Input::GetInstance()->PushKey(DIK_W) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A)) {
             velocity_.y += kJumpAcceleration;
         }
 
@@ -706,8 +706,8 @@ void Player::HandleWallJump(const CollisionMapInfo& info) {
         return;
     }
 
-    // 壁ジャンプ入力: キーボードの上キーまたはXboxコントローラのAボタン
-    bool jumpPressed = Input::GetInstance()->PushKey(DIK_UP) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A);
+    // 壁ジャンプ入力: キーボードの上キーまたはWキーまたはXboxコントローラのAボタン
+    bool jumpPressed = Input::GetInstance()->PushKey(DIK_UP) || Input::GetInstance()->PushKey(DIK_W) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A);
     if (jumpPressed && wallJumpCooldown_ <= 0.0f) {
       
         if (wallJumpCount_ >= kMaxWallJumps) {
