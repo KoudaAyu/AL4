@@ -75,17 +75,19 @@ static float GetHorizontalInputIntensity(float stickX, bool keyRight, bool keyLe
     return std::clamp(std::fabs(stickX), 0.0f, 1.0f);
 }
 
-// Helper: check if player is pressing toward given wall (keyboard or stick)
 static bool IsPressingTowardWall(const XINPUT_STATE& state, WallSide side) {
-    float stickX = NormalizeLeftStickX(state.Gamepad.sThumbLX);
-    switch (side) {
-    case WallSide::kLeft:
-        return Input::GetInstance()->PushKey(DIK_LEFT) || (stickX < 0.0f);
-    case WallSide::kRight:
-        return Input::GetInstance()->PushKey(DIK_RIGHT) || (stickX > 0.0f);
-    default:
-        return false;
-    }
+	float stickX = NormalizeLeftStickX(state.Gamepad.sThumbLX);
+	bool keyLeft = Input::GetInstance()->PushKey(DIK_LEFT);
+	bool keyRight = Input::GetInstance()->PushKey(DIK_RIGHT);
+
+	switch (side) {
+	case WallSide::kLeft:
+		return keyLeft || (stickX < -0.2f); 
+	case WallSide::kRight:
+		return keyRight || (stickX > 0.2f);
+	default:
+		return false;
+	}
 }
 
 } // anonymous namespace
@@ -93,19 +95,19 @@ static bool IsPressingTowardWall(const XINPUT_STATE& state, WallSide side) {
 Player::Player() {}
 
 Player::~Player() {
-    // If Player created its own model during Initialize, delete it
+  
     if (ownsModel_ && model_) {
         delete model_;
         model_ = nullptr;
     }
 }
 
-// Updated signature: no Model* parameter
+
 void Player::Initialize(Camera* camera, const Vector3& position) {
 
     textureHandle_ = TextureManager::Load("uvChecker.png");
 
-    // Always create player's model from OBJ
+  
     model_ = Model::CreateFromOBJ("Player", true);
     ownsModel_ = true;
 
@@ -124,10 +126,9 @@ void Player::Initialize(Camera* camera, const Vector3& position) {
 // 移動処理
 void Player::HandleMovementInput() {
 
-    // Update controller state from Input singleton so checks below see latest buttons
     Input::GetInstance()->GetJoystickState(0, state);
 
-    // Normalize left stick X
+    
     float stickX = NormalizeLeftStickX(state.Gamepad.sThumbLX);
 
     bool keyRight = Input::GetInstance()->PushKey(DIK_RIGHT);
@@ -140,7 +141,7 @@ void Player::HandleMovementInput() {
         if (moveRight || moveLeft) {
             Vector3 acceleration = {};
 
-            // compute input intensity preferring keyboard
+           
             float inputIntensityRight = (keyRight) ? 1.0f : std::max(0.0f, stickX);
             float inputIntensityLeft = (keyLeft) ? 1.0f : std::max(0.0f, -stickX);
 
@@ -179,9 +180,16 @@ void Player::HandleMovementInput() {
         }
 
     } else {
-        velocity_.y += -kGravityAcceleration;
-        velocity_.y = std::max(velocity_.y, -kLimitFallSpeed);
+		// 常に重力を加える（空中）
+		velocity_.y += -kGravityAcceleration;
+
+		// 落下速度の上限を設ける
+		if (velocity_.y < -kLimitFallSpeed) {
+			velocity_.y = -kLimitFallSpeed;
+		}
     }
+
+ 
 }
 
 void Player::Update() {
@@ -277,6 +285,8 @@ void Player::Update() {
         worldTransform_.rotation_.y = destinationRotationYTable[static_cast<uint32_t>(lrDirection_)];
     }
 
+     
+
     UpdateAABB();
 
     // 8. 行列計算
@@ -353,19 +363,17 @@ void Player::HitCeilingCollision(CollisionMapInfo& info) {
 }
 
 void Player::HitWallCollision(CollisionMapInfo& info) {
-    if (!info.isWallContact_) {
-        return;
-    }
+	if (!info.isWallContact_)
+		return;
 
-    // 空中時のみ、壁に向かう速度成分を殺す（壁ジャンプ着地直後の再侵入を防止）
-//	if (!onGround_) {
-        if ((info.wallSide_ == WallSide::kLeft && velocity_.x < 0.0f) || (info.wallSide_ == WallSide::kRight && velocity_.x > 0.0f)) {
-            velocity_.x = 0.0f;
-        }
-//	}
-
-    // 地上時は位置のクランプのみに任せ、速度は触らない（ガタつき抑制）
+	// 空中時に壁へ押し込むような速度のみ制限
+	if (!onGround_) {
+		if ((info.wallSide_ == WallSide::kLeft && velocity_.x < 0.0f) || (info.wallSide_ == WallSide::kRight && velocity_.x > 0.0f)) {
+			velocity_.x *= 0.2f; // 完全に0にせず、勢いを少し残す
+		}
+	}
 }
+
 
 void Player::SwitchingTheGrounding(CollisionMapInfo& info) {
     // 自キャラが接地状態
@@ -477,56 +485,59 @@ void Player::HandleMapCollisionUp(CollisionMapInfo& info) {
 
 void Player::HandleMapCollisionDown(CollisionMapInfo& info) {
 
-    std::array<Vector3, kNumCorners> positionNew;
-    for (uint32_t i = 0; i < positionNew.size(); ++i) {
-        positionNew[i] = CornerPosition(worldTransform_.translation_ + info.movement_, static_cast<Corner>(i));
-    }
+	std::array<Vector3, kNumCorners> positionNew;
+	for (uint32_t i = 0; i < positionNew.size(); ++i) {
+		positionNew[i] = CornerPosition(worldTransform_.translation_ + info.movement_, static_cast<Corner>(i));
+	}
 
-    // 下降あり
-    if (info.movement_.y >= 0) {
-        return;
-    }
-    MapChipType mapChipType;
+	// 上方向に動いているなら処理しない
+	if (info.movement_.y >= 0) {
+		return;
+	}
 
-    // 真下の当たり判定を行う
-    bool hit = false;
+	MapChipType mapChipType;
+	bool hit = false;
+	IndexSet indexSet;
 
-    IndexSet indexSet;
+	// 左下点の座標
+	indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kLeftBottom]);
+	mapChipType = mapChipField_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
+	if (mapChipType == MapChipType::kBlock) {
+		hit = true;
+	}
 
-    // 左下点の座標
-    indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kLeftBottom]);
-    mapChipType = mapChipField_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
-    if (mapChipType == MapChipType::kBlock) {
-        hit = true;
-    }
+	// 右下点の座標
+	indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kRightBottom]);
+	mapChipType = mapChipField_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
+	if (mapChipType == MapChipType::kBlock) {
+		hit = true;
+	}
 
-    // 右下点の座標
-    indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kRightBottom]);
-    mapChipType = mapChipField_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
-    if (mapChipType == MapChipType::kBlock) {
-        hit = true;
-    }
+	if (hit) {
+		// めり込みを排除する方向に移動量を設定する
+		indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kLeftBottom]);
 
-    if (hit) {
-        // めり込みを排除する方向に移動量を設定する
-        indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kLeftBottom]);
+		// 現在の左下点のタイルと比較して、下方向への遷移を検出
+		IndexSet indexSetNow = mapChipField_->GetMapChipIndexSetByPosition(CornerPosition(worldTransform_.translation_, kLeftBottom));
 
-        // 現在の左下点のタイルと比較して、下方向への遷移を検出
-        IndexSet indexSetNow;
-        indexSetNow = mapChipField_->GetMapChipIndexSetByPosition(CornerPosition(worldTransform_.translation_, kLeftBottom));
+		// 「別のマスに移動した」かつ「実際に下方向に動いている」ときだけ着地判定
+		if (indexSetNow.yIndex != indexSet.yIndex && info.movement_.y < 0.0f) {
 
-        if (indexSetNow.yIndex != indexSet.yIndex) {
+			// めり込み先ブロックの範囲矩形
+			Rects rects = mapChipField_->GetRectByIndex(indexSet.xIndex, indexSet.yIndex);
 
-            // めり込み先ブロックの範囲矩形
-            Rects rects = mapChipField_->GetRectByIndex(indexSet.xIndex, indexSet.yIndex);
+			// 修正後の移動量
+			info.movement_.y = std::min(0.0f, rects.top - worldTransform_.translation_.y + (kHeight * 0.5f + kBlank));
 
-            info.movement_.y = std::min(0.0f, rects.top - worldTransform_.translation_.y + (kHeight * 0.5f + kBlank));
-
-            // 地面に当たったことを記録する
-            info.isLanding_ = true;
-        }
-    }
+			
+			// 実際に地面に“ほぼ接触している”場合だけ着地扱いにする
+			if (std::abs(info.movement_.y) < 0.05f) {
+				info.isLanding_ = true;
+			}
+		}
+	}
 }
+
 
 void Player::HandleMapCollisionLeft(CollisionMapInfo& info) {
     std::array<Vector3, kNumCorners> positionNew;
@@ -631,61 +642,99 @@ void Player::HandleMapCollisionRight(CollisionMapInfo& info) {
 }
 
 void Player::UpdateWallSlide(const CollisionMapInfo& info) {
-    // クールダウン更新
-    if (wallJumpCooldown_ > 0.0f) {
-        wallJumpCooldown_ -= 1.0f / 60.0f;
-        if (wallJumpCooldown_ < 0.0f) {
-            wallJumpCooldown_ = 0.0f;
-        }
-    }
+	static WallSide prevWallSide = WallSide::kNone;
 
-    isWallSliding_ = false;
-    if (onGround_) {
-        return;
-    }
+	// クールダウン減算
+	if (wallJumpCooldown_ > 0.0f) {
+		wallJumpCooldown_ -= 1.0f / 60.0f;
+		wallJumpCooldown_ = std::max(wallJumpCooldown_, 0.0f);
+	}
 
-    if (info.isWallContact_ && velocity_.y < 0.0f) {
-        bool pressingTowardWall = IsPressingTowardWall(state, info.wallSide_);
-        if (pressingTowardWall) {
-            isWallSliding_ = true; 
-            // 落下速度を制限
-            velocity_.y = std::max(velocity_.y, -kWallSlideMaxFallSpeed);
-        }
-    }
+	isWallSliding_ = false;
+	if (onGround_) {
+		prevWallSide = WallSide::kNone;
+		return;
+	}
+
+	if (info.isWallContact_ && velocity_.y < 0.0f) {
+		bool pressingTowardWall = IsPressingTowardWall(state, info.wallSide_);
+		if (pressingTowardWall) {
+			isWallSliding_ = true;
+			velocity_.y = std::max(velocity_.y, -kWallSlideMaxFallSpeed);
+
+			// 👇 壁を切り替えたら即ジャンプできるようにクールダウン解除
+			if (prevWallSide != info.wallSide_) {
+				wallJumpCooldown_ = 0.0f;
+			}
+		}
+	}
+
+    ImGui::Begin("Wall Debug");
+	ImGui::Text("onGround: %s", onGround_ ? "true" : "false");
+	ImGui::Text("isWallContact: %s", info.isWallContact_ ? "true" : "false");
+	ImGui::Text("isWallSliding: %s", isWallSliding_ ? "true" : "false");
+	ImGui::Text("velocityY: %.3f", velocity_.y);
+	ImGui::End();
+
+	prevWallSide = info.wallSide_;
 }
+
+
 
 void Player::HandleWallJump(const CollisionMapInfo& info) {
-    if (onGround_) {
-        return;
-    }
+	if (onGround_) {
+		return;
+	}
 
-    bool canWallJump = (isWallSliding_ || info.isWallContact_);
-    if (!canWallJump) {
-        return;
-    }
+	bool canWallJump = (isWallSliding_ || info.isWallContact_);
+	if (!canWallJump) {
+		return;
+	}
 
-    // 壁ジャンプ入力: キーボードの上キーまたはXboxコントローラのAボタン
-    bool jumpPressed = Input::GetInstance()->PushKey(DIK_UP) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A);
-    if (jumpPressed && wallJumpCooldown_ <= 0.0f) {
-        // 反対方向へ跳ねる
-        if (info.wallSide_ == WallSide::kLeft) {
-            velocity_.x = +kWallJumpHorizontalSpeed;
-            lrDirection_ = LRDirection::kRight;
-        } else if (info.wallSide_ == WallSide::kRight) {
-            velocity_.x = -kWallJumpHorizontalSpeed;
-            lrDirection_ = LRDirection::kLeft;
-        }
-        velocity_.y = kWallJumpVerticalSpeed;
-        isWallSliding_ = false;
+	// 入力緩和：ジャンプ押しっぱでも短時間なら再入力扱い
+	static float jumpBufferTimer = 0.0f;
+	bool jumpPressed = Input::GetInstance()->PushKey(DIK_UP) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A);
+	if (jumpPressed) {
+		jumpBufferTimer = 0.15f; // 0.15秒以内ならジャンプ受付
+	} else {
+		jumpBufferTimer -= 1.0f / 60.0f;
+		jumpBufferTimer = std::max(jumpBufferTimer, 0.0f);
+	}
 
-        // 旋回演出
-        turnFirstRotationY_ = worldTransform_.rotation_.y;
-        turnTimer_ = kTimeTurn;
+	// ジャンプ発動条件
+	if (jumpBufferTimer > 0.0f && wallJumpCooldown_ <= 0.0f) {
 
-        // 連続発動防止
-        wallJumpCooldown_ = kWallJumpCooldownTime;
-    }
+		// 反対方向へ跳ねる
+		if (info.wallSide_ == WallSide::kLeft) {
+			velocity_.x = +kWallJumpHorizontalSpeed;
+			lrDirection_ = LRDirection::kRight;
+		} else if (info.wallSide_ == WallSide::kRight) {
+			velocity_.x = -kWallJumpHorizontalSpeed;
+			lrDirection_ = LRDirection::kLeft;
+		}
+
+		// 上方向へ強い加速
+		velocity_.y = kWallJumpVerticalSpeed;
+		isWallSliding_ = false;
+
+		// 壁ジャンプ直後も操作できるように、空中で左右入力を許可
+		if (Input::GetInstance()->PushKey(DIK_LEFT)) {
+			velocity_.x -= 0.15f; // 少し上書きして操作性を柔らかく
+		}
+		if (Input::GetInstance()->PushKey(DIK_RIGHT)) {
+			velocity_.x += 0.15f;
+		}
+
+		// 旋回演出
+		turnFirstRotationY_ = worldTransform_.rotation_.y;
+		turnTimer_ = kTimeTurn;
+
+		// 連続発動防止
+		wallJumpCooldown_ = kWallJumpCooldownTime;
+		jumpBufferTimer = 0.0f; // 消費
+	}
 }
+
 
 void Player::OnCollision(Enemy* enemy) {
 

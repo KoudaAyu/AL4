@@ -217,8 +217,8 @@ private:
 	// --- 壁けり関連 ---
 	bool isWallSliding_ = false;
 	float wallJumpCooldown_ = 0.0f; // 同一入力で連続発動しないためのクールダウン
-	static inline const float kWallJumpHorizontalSpeed = 1.2f; // 壁から離れるX速度
-	static inline const float kWallJumpVerticalSpeed = 2.5f;   // 壁けり時のY速度
+	static inline const float kWallJumpHorizontalSpeed = 0.5f; // 壁から離れるX速度
+	static inline const float kWallJumpVerticalSpeed = 3.5f;   // 壁けり時のY速度
 	static inline const float kWallSlideMaxFallSpeed = 3.0f;   // 壁滑り中の最大落下速度
 	static inline const float kWallJumpCooldownTime = 0.2f;    // クールダウン時間(秒)
 
