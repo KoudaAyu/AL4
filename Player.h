@@ -213,8 +213,16 @@ private:
 	// 最大落下速度(下方向)
 	static inline const float kLimitFallSpeed = 12.0f;
 
+
+	// ジャンプ用の上向き速度（地上からの一段目）
+	// 固定値で上向き速度を設定することで、二段ジャンプの高さが入力時の落下速度に依存しないようにする
+	static inline const float kJumpVelocityGround = 1.0f; // 調整可能: 一段目の上向き速度
+	// 空中での二段ジャンプ時の上向き速度（地上ジャンプよりやや小さめに）
+	static inline const float kJumpVelocityAir = 0.8f; // 調整可能: 二段目の上向き速度
+
 	// 最大落下速度(上方向)
 	static inline const float kJumpAcceleration = 1.0f;
+
 
 	// キャラクターの当たり判定サイズ
 	static inline const float kWidth = 0.8f * 2.0f;
@@ -231,13 +239,14 @@ private:
 	// --- 壁けり関連 ---
 	bool isWallSliding_ = false;
 	float wallJumpCooldown_ = 0.0f; // 同一入力で連続発動しないためのクールダウン
-	// Much smaller horizontal speed so wall-kick is short
-	static inline const float kWallJumpHorizontalSpeed = 0.4f; // 壁から離れるX速度 (reduced)
-	// Much smaller vertical speed for shorter arc
-	static inline const float kWallJumpVerticalSpeed = 1.1f;   // 壁けり時のY速度 (reduced)
+
+	static inline const float kWallJumpHorizontalSpeed = 0.5f; // 壁から離れるX速度
+	static inline const float kWallJumpVerticalSpeed = 3.5f;   // 壁けり時のY速度
+
 	// Secondary (weaker) speeds for second wall-jump
 	static inline const float kWallJumpHorizontalSpeed2 = 0.25f; // second jump horizontal
 	static inline const float kWallJumpVerticalSpeed2 = 0.9f; // second jump vertical
+
 	static inline const float kWallSlideMaxFallSpeed = 3.0f;   // 壁滑り中の最大落下速度
 	// Short cooldown to allow quick re-kick
 	static inline const float kWallJumpCooldownTime = 0.1f;    // クールダウン時間(秒) (reduced)
@@ -275,6 +284,15 @@ private:
     // 前フレームで右トリガーが押されていたか（単発入力判定用）
     bool prevRightTriggerPressed_ = false;
 
+
+	// 二段ジャンプ関連
+	static inline const int kMaxJumps = 2; // 最大ジャンプ回数（地上から含む）
+	int jumpCount_ = 0; // 現在のジャンプ回数
+	// ゲームパッドのAボタンの前フレーム状態（ライズエッジ検出用）
+	bool prevAButtonPressed_ = false;
+	// キーボードジャンプキーの前フレーム状態（ライズエッジ検出用）
+	bool prevJumpKeyPressed_ = false;
+
 	// --- Emergency dodge (Eキー) ---
 	bool isDodging_ = false;
 	float dodgeTimer_ = 0.0f;
@@ -282,5 +300,6 @@ private:
 	static inline const float kDodgeDuration = 0.15f; // seconds
 	static inline const float kDodgeSpeed = 2.0f; // dash speed
 	static inline const float kDodgeCooldownTime = 0.5f; // seconds
+
 
 };
