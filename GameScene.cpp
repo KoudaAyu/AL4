@@ -345,6 +345,23 @@ void GameScene::CheckAllCollisions() {
 	for (Enemy* enemy : enemies_) {
 		if (!enemy || !enemy->isAlive())
 			continue;
+
+		// If player is attacking, check attack hitbox first
+		if (player_->IsAttacking()) {
+			AABB attackBox = player_->GetAttackAABB();
+			if (IsCollisionAABBAABB(attackBox, enemy->GetAABB())) {
+				// Hit enemy with attack
+				enemy->OnCollision(player_);
+				// Optionally, play hit effects here (camera shake, rumble)
+				if (cameraController_) {
+					cameraController_->StartShake(1.0f, 0.15f);
+				}
+				// Skip body collision for this enemy this frame
+				continue;
+			}
+		}
+
+		// Normal body collision (player takes damage)
 		if (IsCollisionAABBAABB(player_->GetAABB(), enemy->GetAABB())) {
 			player_->OnCollision(enemy);
 			enemy->OnCollision(player_);

@@ -124,6 +124,11 @@ public:
 
 	void UpdateAABB();
 
+	/// <summary>
+	/// 緊急回避
+	/// </summary>
+	void EmergencyAvoidance();
+
 	//攻撃
 
 	// 行動初期化
@@ -141,6 +146,10 @@ public:
 
 	LRDirection GetLRDirection() const { return lrDirection_; }
 
+	// Attack accessors
+	bool IsAttacking() const { return behavior_ == Behavior::kAttack; }
+	AABB GetAttackAABB() const;
+
 public:
 	KamataEngine::WorldTransform& GetWorldTransform() { return worldTransform_; }
 	KamataEngine::Vector3 GetPosition() const { return worldTransform_.translation_; }
@@ -157,6 +166,9 @@ private:
 	WorldTransform worldTransform_;
 
 	Model* model_ = nullptr;
+
+	Model* attackModel_ = nullptr;
+
 	// Player が自身で生成した Model を所有しているか
 	bool ownsModel_ = false;
 
@@ -175,11 +187,13 @@ private:
 
 	uint32_t textureHandle_ = 0u;
 
-	static inline const float kAcceleration = 0.1f;
+	//加速量
+	static inline const float kAcceleration = 0.05f;
 
 	static inline const float kAttenuation = 0.05f;
 
-	static inline const float kLimitRunSpeed = 1.0f;
+	//横移動の最大速度
+	static inline const float kLimitRunSpeed = 0.5f;
 
 	// 旋回開始の角度
 	float turnFirstRotationY_ = 0.0f;
@@ -199,11 +213,16 @@ private:
 	// 最大落下速度(下方向)
 	static inline const float kLimitFallSpeed = 12.0f;
 
+
 	// ジャンプ用の上向き速度（地上からの一段目）
 	// 固定値で上向き速度を設定することで、二段ジャンプの高さが入力時の落下速度に依存しないようにする
 	static inline const float kJumpVelocityGround = 1.0f; // 調整可能: 一段目の上向き速度
 	// 空中での二段ジャンプ時の上向き速度（地上ジャンプよりやや小さめに）
 	static inline const float kJumpVelocityAir = 0.8f; // 調整可能: 二段目の上向き速度
+
+	// 最大落下速度(上方向)
+	static inline const float kJumpAcceleration = 1.0f;
+
 
 	// キャラクターの当たり判定サイズ
 	static inline const float kWidth = 0.8f * 2.0f;
@@ -220,10 +239,30 @@ private:
 	// --- 壁けり関連 ---
 	bool isWallSliding_ = false;
 	float wallJumpCooldown_ = 0.0f; // 同一入力で連続発動しないためのクールダウン
+
 	static inline const float kWallJumpHorizontalSpeed = 0.5f; // 壁から離れるX速度
 	static inline const float kWallJumpVerticalSpeed = 3.5f;   // 壁けり時のY速度
+
+	// Secondary (weaker) speeds for second wall-jump
+	static inline const float kWallJumpHorizontalSpeed2 = 0.25f; // second jump horizontal
+	static inline const float kWallJumpVerticalSpeed2 = 0.9f; // second jump vertical
+
 	static inline const float kWallSlideMaxFallSpeed = 3.0f;   // 壁滑り中の最大落下速度
-	static inline const float kWallJumpCooldownTime = 0.2f;    // クールダウン時間(秒)
+	// Short cooldown to allow quick re-kick
+	static inline const float kWallJumpCooldownTime = 0.1f;    // クールダウン時間(秒) (reduced)
+	// horizontal damping factor applied immediately after wall jump to reduce overshoot
+	static inline const float kWallJumpHorizontalDamp = 0.8f; // multiply velocity_.x by this after jump
+
+	// Allow up to two wall jumps in air
+	int wallJumpCount_ = 0;
+	static inline const int kMaxWallJumps = 2;
+
+	// Track last wall side touched to allow resetting wall jump count when contacting a new wall
+	WallSide lastWallSide_ = WallSide::kNone;
+
+	// Grace time after contacting wall to allow immediate wall-jump (prevents small fall)
+	static inline const float kWallContactGraceTime = 0.1f; // seconds
+	float wallContactGraceTimer_ = 0.0f;
 
 	bool isAlive_ = true; 	
 
@@ -231,6 +270,11 @@ private:
 	uint32_t attackParameter_ = 0;
 
 	float static inline const kAttackDuration = 10; // 攻撃動作の継続時間(フレーム)
+
+	// attack hitbox
+	static inline const float kAttackReach = 1.0f; // 前方への到達距離
+	static inline const float kAttackWidth = 1.2f; // 当たり判定の幅(横)
+	static inline const float kAttackHeight = 0.8f; // 当たり判定の高さ
 
 	// カメラコントローラ参照（シェイク呼び出し用）
 	CameraController* cameraController_ = nullptr;
@@ -240,6 +284,7 @@ private:
     // 前フレームで右トリガーが押されていたか（単発入力判定用）
     bool prevRightTriggerPressed_ = false;
 
+
 	// 二段ジャンプ関連
 	static inline const int kMaxJumps = 2; // 最大ジャンプ回数（地上から含む）
 	int jumpCount_ = 0; // 現在のジャンプ回数
@@ -247,5 +292,14 @@ private:
 	bool prevAButtonPressed_ = false;
 	// キーボードジャンプキーの前フレーム状態（ライズエッジ検出用）
 	bool prevJumpKeyPressed_ = false;
+
+	// --- Emergency dodge (Eキー) ---
+	bool isDodging_ = false;
+	float dodgeTimer_ = 0.0f;
+	float dodgeCooldown_ = 0.0f;
+	static inline const float kDodgeDuration = 0.15f; // seconds
+	static inline const float kDodgeSpeed = 2.0f; // dash speed
+	static inline const float kDodgeCooldownTime = 0.5f; // seconds
+
 
 };

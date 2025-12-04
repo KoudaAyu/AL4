@@ -11,10 +11,10 @@
 using namespace KamataEngine;
 
 namespace {
-// Simple rumble controller for player 1 (index 0)
+
 struct RumbleState {
     bool active = false;
-    ULONGLONG endTick = 0; // GetTickCount64 based end time
+    ULONGLONG endTick = 0; 
 };
 
 RumbleState g_rumble;
@@ -34,7 +34,7 @@ void StartRumble(float left, float right, int durationMs, DWORD userIndex = 0) {
 }
 
 void StopRumble(DWORD userIndex = 0) {
-    XINPUT_VIBRATION vib{}; // zeros stop the motors
+    XINPUT_VIBRATION vib{};
     XInputSetState(userIndex, &vib);
     g_rumble.active = false;
 }
@@ -48,9 +48,9 @@ void UpdateRumble(DWORD userIndex = 0) {
     }
 }
 
-// Helper: normalize left stick X to [-1,1] with deadzone applied
+
 static float NormalizeLeftStickX(SHORT rawValue) {
-    // note: rawValue can be -32768..32767
+ 
     const float denom = 32767.0f;
     float v = 0.0f;
     if (rawValue == -32768) {
@@ -66,14 +66,15 @@ static float NormalizeLeftStickX(SHORT rawValue) {
     return v;
 }
 
-// Helper: get input intensity for horizontal movement [0,1]
+
 static float GetHorizontalInputIntensity(float stickX, bool keyRight, bool keyLeft) {
-    // Keyboard has full intensity. If keyboard present, prefer it.
+
     if (keyRight) return 1.0f;
     if (keyLeft) return 1.0f;
-    // Stick intensity is absolute value in [0,1]
+   
     return std::clamp(std::fabs(stickX), 0.0f, 1.0f);
 }
+
 
 static bool IsPressingTowardWall(const XINPUT_STATE& state, WallSide side) {
 	float stickX = NormalizeLeftStickX(state.Gamepad.sThumbLX);
@@ -89,6 +90,7 @@ static bool IsPressingTowardWall(const XINPUT_STATE& state, WallSide side) {
 	default:
 		return false;
 	}
+
 }
 
 } // anonymous namespace
@@ -96,7 +98,8 @@ static bool IsPressingTowardWall(const XINPUT_STATE& state, WallSide side) {
 Player::Player() {}
 
 Player::~Player() {
-  
+
+
     if (ownsModel_ && model_) {
         delete model_;
         model_ = nullptr;
@@ -106,13 +109,15 @@ Player::~Player() {
 
 void Player::Initialize(Camera* camera, const Vector3& position) {
 
-    textureHandle_ = TextureManager::Load("uvChecker.png");
+    textureHandle_ = TextureManager::Load("attack_effect/attack_effect.png");
 
   
     model_ = Model::CreateFromOBJ("Player", true);
     ownsModel_ = true;
 
     assert(model_);
+
+    attackModel_ = Model::CreateFromOBJ("attack_effect", true);
 
     camera_ = camera;
 
@@ -127,12 +132,28 @@ void Player::Initialize(Camera* camera, const Vector3& position) {
 // 移動処理
 void Player::HandleMovementInput() {
 
+<
     Input::GetInstance()->GetJoystickState(0, state);
+
+    
+
+
+    // Accept arrow keys or WASD (A/D for left/right)
+
+
+   
+    if (isDodging_) {
+       
+        if (!onGround_) {
+            velocity_.y += -kGravityAcceleration;
+            velocity_.y = std::max(velocity_.y, -kLimitFallSpeed);
+        }
+        return;
+    }
 
     
     float stickX = NormalizeLeftStickX(state.Gamepad.sThumbLX);
 
-    // Accept arrow keys or WASD (A/D for left/right)
     bool keyRight = Input::GetInstance()->PushKey(DIK_RIGHT) || Input::GetInstance()->PushKey(DIK_D);
     bool keyLeft = Input::GetInstance()->PushKey(DIK_LEFT) || Input::GetInstance()->PushKey(DIK_A);
 
@@ -143,7 +164,7 @@ void Player::HandleMovementInput() {
         if (moveRight || moveLeft) {
             Vector3 acceleration = {};
 
-           
+
             float inputIntensityRight = (keyRight) ? 1.0f : std::max(0.0f, stickX);
             float inputIntensityLeft = (keyLeft) ? 1.0f : std::max(0.0f, -stickX);
 
@@ -175,6 +196,13 @@ void Player::HandleMovementInput() {
             // 地上での減衰
             velocity_.x *= (1.0f - kAttenuation);
         }
+
+
+        // ジャンプ入力: キーボードの上キーまたはWキーまたはXboxコントローラのAボタン
+        if (Input::GetInstance()->PushKey(DIK_UP) || Input::GetInstance()->PushKey(DIK_W) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A)) {
+            velocity_.y += kJumpAcceleration;
+        }
+
 
     } else {
 		// 常に重力を加える（空中）
@@ -264,6 +292,9 @@ void Player::Update() {
     // 現在のRT状態を保存（次フレームのため）
     prevRightTriggerPressed_ = rtPressed;
 
+   EmergencyAvoidance();
+   
+
     // 衝突情報を初期化
     CollisionMapInfo collisionInfo;
     // 移動量を加味して現在地を算定するために、現在の速度をcollisionInfoにセット
@@ -304,6 +335,7 @@ void Player::Update() {
     } else {
         float destinationRotationYTable[] = {std::numbers::pi_v<float> / 2.0f, std::numbers::pi_v<float> * 3.0f / 2.0f};
         worldTransform_.rotation_.y = destinationRotationYTable[static_cast<uint32_t>(lrDirection_)];
+
     }
 
      
@@ -319,8 +351,14 @@ void Player::Draw() {
 
     // ここに3Dモデルインスタンスの描画処理を記述する
     if (model_) {
-        model_->Draw(worldTransform_, *camera_, textureHandle_);
+   
+        model_->Draw(worldTransform_, *camera_);
     }
+
+    if (attackModel_ && behavior_ == Behavior::kAttack) {
+    
+        attackModel_->Draw(worldTransform_, *camera_, textureHandle_);
+	}
 }
 
 Vector3 Player::CornerPosition(const Vector3& center, Corner corner) {
@@ -349,6 +387,19 @@ void Player::mapChipCollisionCheck(CollisionMapInfo& info) {
     float dx = xInfo.movement_.x;
     info.isWallContact_ = xInfo.isWallContact_;
     info.wallSide_ = xInfo.wallSide_;
+
+    
+    if (info.isWallContact_) {
+        if (lastWallSide_ != info.wallSide_) {
+            
+            wallJumpCount_ = 0;
+            lastWallSide_ = info.wallSide_;
+        }
+       
+        wallContactGraceTimer_ = kWallContactGraceTime;
+    } else {
+        lastWallSide_ = WallSide::kNone;
+    }
 
     // Xを一時的に反映して、Yの判定に使う
     worldTransform_.translation_.x += dx;
@@ -384,6 +435,7 @@ void Player::HitCeilingCollision(CollisionMapInfo& info) {
 }
 
 void Player::HitWallCollision(CollisionMapInfo& info) {
+
 	if (!info.isWallContact_)
 		return;
 
@@ -393,6 +445,7 @@ void Player::HitWallCollision(CollisionMapInfo& info) {
 			velocity_.x *= 0.2f; // 完全に0にせず、勢いを少し残す
 		}
 	}
+
 }
 
 
@@ -449,8 +502,13 @@ void Player::SwitchingTheGrounding(CollisionMapInfo& info) {
             // Y座標をゼロにする
             velocity_.y = 0.0f;
 
+
             // 二段ジャンプのリセット
             jumpCount_ = 0;
+
+            // Reset wall-jump count when landing
+            wallJumpCount_ = 0;
+
         }
     }
 }
@@ -666,6 +724,7 @@ void Player::HandleMapCollisionRight(CollisionMapInfo& info) {
 }
 
 void Player::UpdateWallSlide(const CollisionMapInfo& info) {
+
 	static WallSide prevWallSide = WallSide::kNone;
 
 	// クールダウン減算
@@ -761,6 +820,7 @@ void Player::HandleWallJump(const CollisionMapInfo& info) {
 		wallJumpCooldown_ = kWallJumpCooldownTime;
 		jumpBufferTimer = 0.0f; // 消費
 	}
+
 }
 
 
@@ -794,6 +854,36 @@ void Player::UpdateAABB() {
     aabb_.max = {center.x + half.x, center.y + half.y, center.z + half.z};
 }
 
+void Player::EmergencyAvoidance() {
+	bool dodgePressed = Input::GetInstance()->TriggerKey(DIK_E);
+	if (dodgePressed && !isDodging_ && dodgeCooldown_ <= 0.0f && behavior_ != Behavior::kAttack) {
+
+		float dir = (lrDirection_ == LRDirection::kRight) ? 1.0f : -1.0f;
+		velocity_.x = dir * kDodgeSpeed;
+		isDodging_ = true;
+		dodgeTimer_ = kDodgeDuration;
+		dodgeCooldown_ = kDodgeCooldownTime;
+		if (cameraController_)
+			cameraController_->StartShake(0.5f, 0.12f);
+	}
+
+	if (isDodging_) {
+		dodgeTimer_ -= 1.0f / 60.0f;
+		if (dodgeTimer_ <= 0.0f) {
+			isDodging_ = false;
+
+			velocity_.x *= 0.5f;
+
+			velocity_.x = std::clamp(velocity_.x, -kLimitRunSpeed, kLimitRunSpeed);
+		}
+	}
+	if (dodgeCooldown_ > 0.0f) {
+		dodgeCooldown_ -= 1.0f / 60.0f;
+		if (dodgeCooldown_ < 0.0f)
+			dodgeCooldown_ = 0.0f;
+	}
+}
+
 void Player::BehaviorRootInitialize() {}
 
 void Player::BehaviorAttackInitialize() {
@@ -812,9 +902,28 @@ void Player::BehaviorAttackUpdate() {
         behaviorRequest_ = Behavior::kRoot;
     }
 
-    // 直接座標を動かすと衝突判定を迂回して壁を貫通するため、
-    // 攻撃による水平移動は速度へ反映し既存の判定(mapChipCollisionCheck)に処理させる。
-    constexpr float kAttackSpeed = 1.0f; // 1フレーム当たりの攻撃ダッシュ速度（必要なら調整）
-    velocity_.x = kAttackSpeed * ((lrDirection_ == LRDirection::kRight) ? 1.0f : -1.0f);
+  
+    velocity_.x = 0.0f;
+
     // 縦方向は通常の物理挙動に任せる。
+}
+
+// 新しい関数: プレイヤーの攻撃用AABBを返す
+AABB Player::GetAttackAABB() const {
+ 
+    Vector3 center = worldTransform_.translation_;
+
+    float dir = (lrDirection_ == LRDirection::kRight) ? 1.0f : -1.0f;
+
+   
+    float halfAttackWidth = kAttackWidth * 0.5f;
+    float halfAttackHeight = kAttackHeight * 0.5f;
+
+    Vector3 attackCenter = center;
+    attackCenter.x += dir * (kWidth * 0.5f + halfAttackWidth);
+
+    AABB hitbox;
+    hitbox.min = {attackCenter.x - halfAttackWidth, attackCenter.y - halfAttackHeight, attackCenter.z - 1.0f};
+    hitbox.max = {attackCenter.x + halfAttackWidth, attackCenter.y + halfAttackHeight, attackCenter.z + 1.0f};
+    return hitbox;
 }
