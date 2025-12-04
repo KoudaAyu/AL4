@@ -176,12 +176,6 @@ void Player::HandleMovementInput() {
             velocity_.x *= (1.0f - kAttenuation);
         }
 
-        // ジャンプ入力: キーボードの上キーまたはXboxコントローラのAボタン
-        // Also accept 'W' for jump
-        if (Input::GetInstance()->PushKey(DIK_UP) || Input::GetInstance()->PushKey(DIK_W) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A)) {
-            velocity_.y += kJumpAcceleration;
-        }
-
     } else {
 		// 常に重力を加える（空中）
 		velocity_.y += -kGravityAcceleration;
@@ -192,7 +186,31 @@ void Player::HandleMovementInput() {
 		}
     }
 
- 
+    // --- Jump handling (supports double-jump) ---
+    // Keyboard: use TriggerKey (pressed this frame). Gamepad A: rising edge.
+    // Manual rising-edge detection for keyboard jump (supports repeated presses reliably)
+    bool keyJumpDown = Input::GetInstance()->PushKey(DIK_UP) || Input::GetInstance()->PushKey(DIK_W);
+    bool keyboardRising = keyJumpDown && !prevJumpKeyPressed_;
+    prevJumpKeyPressed_ = keyJumpDown;
+
+    bool gamepadA = (state.Gamepad.wButtons & XINPUT_GAMEPAD_A) != 0;
+    bool gamepadRising = gamepadA && !prevAButtonPressed_;
+    prevAButtonPressed_ = gamepadA;
+
+    if ((keyboardRising || gamepadRising) && (onGround_ || jumpCount_ < kMaxJumps)) {
+        if (onGround_) {
+            // 地上ジャンプは上向き速度を固定で与える（現在の落下速度に依存させない）
+            velocity_.y = kJumpVelocityGround;
+        } else {
+            // 二段ジャンプも固定上向き速度を設定して高さを安定させる
+            velocity_.y = kJumpVelocityAir;
+        }
+        // 急速な二段ジャンプ入力で想定外に高くなるのを防ぐため、上向き速度を上限でクランプする
+        velocity_.y = std::min(velocity_.y, kJumpVelocityGround);
+        jumpCount_++;
+        onGround_ = false;
+    }
+
 }
 
 void Player::Update() {
@@ -430,6 +448,9 @@ void Player::SwitchingTheGrounding(CollisionMapInfo& info) {
 
             // Y座標をゼロにする
             velocity_.y = 0.0f;
+
+            // 二段ジャンプのリセット
+            jumpCount_ = 0;
         }
     }
 }
@@ -720,6 +741,9 @@ void Player::HandleWallJump(const CollisionMapInfo& info) {
 		// 上方向へ強い加速
 		velocity_.y = kWallJumpVerticalSpeed;
 		isWallSliding_ = false;
+
+		// 壁ジャンプはジャンプ回数を1にする（空中での二段ジャンプを一回許可）
+		jumpCount_ = 1;
 
 		// 壁ジャンプ直後も操作できるように、空中で左右入力を許可
 		if (Input::GetInstance()->PushKey(DIK_LEFT) || Input::GetInstance()->PushKey(DIK_A)) {

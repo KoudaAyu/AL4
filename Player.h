@@ -199,8 +199,11 @@ private:
 	// 最大落下速度(下方向)
 	static inline const float kLimitFallSpeed = 12.0f;
 
-	// 最大落下速度(上方向)
-	static inline const float kJumpAcceleration = 1.5f;
+	// ジャンプ用の上向き速度（地上からの一段目）
+	// 固定値で上向き速度を設定することで、二段ジャンプの高さが入力時の落下速度に依存しないようにする
+	static inline const float kJumpVelocityGround = 1.0f; // 調整可能: 一段目の上向き速度
+	// 空中での二段ジャンプ時の上向き速度（地上ジャンプよりやや小さめに）
+	static inline const float kJumpVelocityAir = 0.8f; // 調整可能: 二段目の上向き速度
 
 	// キャラクターの当たり判定サイズ
 	static inline const float kWidth = 0.8f * 2.0f;
@@ -236,5 +239,13 @@ private:
 
     // 前フレームで右トリガーが押されていたか（単発入力判定用）
     bool prevRightTriggerPressed_ = false;
+
+	// 二段ジャンプ関連
+	static inline const int kMaxJumps = 2; // 最大ジャンプ回数（地上から含む）
+	int jumpCount_ = 0; // 現在のジャンプ回数
+	// ゲームパッドのAボタンの前フレーム状態（ライズエッジ検出用）
+	bool prevAButtonPressed_ = false;
+	// キーボードジャンプキーの前フレーム状態（ライズエッジ検出用）
+	bool prevJumpKeyPressed_ = false;
 
 };
