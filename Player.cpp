@@ -132,7 +132,6 @@ void Player::Initialize(Camera* camera, const Vector3& position) {
 // 移動処理
 void Player::HandleMovementInput() {
 
-<
     Input::GetInstance()->GetJoystickState(0, state);
 
     
@@ -785,28 +784,37 @@ void Player::HandleWallJump(const CollisionMapInfo& info) {
 		jumpBufferTimer = std::max(jumpBufferTimer, 0.0f);
 	}
 
-	// ジャンプ発動条件
-	if (jumpBufferTimer > 0.0f && wallJumpCooldown_ <= 0.0f) {
+	// 制限：壁ジャンプ回数を超えないようにする
+	if (jumpBufferTimer > 0.0f && wallJumpCooldown_ <= 0.0f && wallJumpCount_ < kMaxWallJumps) {
+
+		// 1回目と2回目で挙動を少し変える
+		float horizSpeed = (wallJumpCount_ == 0) ? kWallJumpHorizontalSpeed : kWallJumpHorizontalSpeed2;
+		float vertSpeed = (wallJumpCount_ == 0) ? kWallJumpVerticalSpeed : kWallJumpVerticalSpeed2;
 
 		// 反対方向へ跳ねる
 		if (info.wallSide_ == WallSide::kLeft) {
-			velocity_.x = +kWallJumpHorizontalSpeed;
+			velocity_.x = +horizSpeed;
 			lrDirection_ = LRDirection::kRight;
 		} else if (info.wallSide_ == WallSide::kRight) {
-			velocity_.x = -kWallJumpHorizontalSpeed;
+			velocity_.x = -horizSpeed;
 			lrDirection_ = LRDirection::kLeft;
 		}
 
-		// 上方向へ強い加速
-		velocity_.y = kWallJumpVerticalSpeed;
+		// 上方向へ加速（高すぎないようにクリップ）
+		velocity_.y = vertSpeed;
+		velocity_.y = std::min(velocity_.y, vertSpeed);
+
+		// 壁ジャンプ直後の横方向制御をやわらかくするために減衰をかける
+		velocity_.x *= kWallJumpHorizontalDamp;
+
 		isWallSliding_ = false;
 
 		// 壁ジャンプはジャンプ回数を1にする（空中での二段ジャンプを一回許可）
 		jumpCount_ = 1;
 
-		// 壁ジャンプ直後も操作できるように、空中で左右入力を許可
+		// プレイヤーの入力に応じて微調整を許可（操作性向上）
 		if (Input::GetInstance()->PushKey(DIK_LEFT) || Input::GetInstance()->PushKey(DIK_A)) {
-			velocity_.x -= 0.15f; // 少し上書きして操作性を柔らかく
+			velocity_.x -= 0.15f;
 		}
 		if (Input::GetInstance()->PushKey(DIK_RIGHT) || Input::GetInstance()->PushKey(DIK_D)) {
 			velocity_.x += 0.15f;
@@ -819,6 +827,9 @@ void Player::HandleWallJump(const CollisionMapInfo& info) {
 		// 連続発動防止
 		wallJumpCooldown_ = kWallJumpCooldownTime;
 		jumpBufferTimer = 0.0f; // 消費
+
+		// カウントを増やす
+		wallJumpCount_ = std::min(wallJumpCount_ + 1, kMaxWallJumps);
 	}
 
 }

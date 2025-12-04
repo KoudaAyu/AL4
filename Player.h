@@ -240,18 +240,19 @@ private:
 	bool isWallSliding_ = false;
 	float wallJumpCooldown_ = 0.0f; // 同一入力で連続発動しないためのクールダウン
 
-	static inline const float kWallJumpHorizontalSpeed = 0.5f; // 壁から離れるX速度
-	static inline const float kWallJumpVerticalSpeed = 3.5f;   // 壁けり時のY速度
+	// Tuned to be Mario-like: smaller vertical and controlled horizontal
+	static inline const float kWallJumpHorizontalSpeed = 0.6f; // 壁から離れるX速度
+	static inline const float kWallJumpVerticalSpeed = 1.4f;   // 壁けり時のY速度 (reduced)
 
 	// Secondary (weaker) speeds for second wall-jump
-	static inline const float kWallJumpHorizontalSpeed2 = 0.25f; // second jump horizontal
+	static inline const float kWallJumpHorizontalSpeed2 = 0.3f; // second jump horizontal
 	static inline const float kWallJumpVerticalSpeed2 = 0.9f; // second jump vertical
 
 	static inline const float kWallSlideMaxFallSpeed = 3.0f;   // 壁滑り中の最大落下速度
 	// Short cooldown to allow quick re-kick
 	static inline const float kWallJumpCooldownTime = 0.1f;    // クールダウン時間(秒) (reduced)
 	// horizontal damping factor applied immediately after wall jump to reduce overshoot
-	static inline const float kWallJumpHorizontalDamp = 0.8f; // multiply velocity_.x by this after jump
+	static inline const float kWallJumpHorizontalDamp = 0.6f; // multiply velocity_.x by this after jump
 
 	// Allow up to two wall jumps in air
 	int wallJumpCount_ = 0;
