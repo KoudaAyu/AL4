@@ -77,8 +77,9 @@ static float GetHorizontalInputIntensity(float stickX, bool keyRight, bool keyLe
 
 static bool IsPressingTowardWall(const XINPUT_STATE& state, WallSide side) {
 	float stickX = NormalizeLeftStickX(state.Gamepad.sThumbLX);
-	bool keyLeft = Input::GetInstance()->PushKey(DIK_LEFT);
-	bool keyRight = Input::GetInstance()->PushKey(DIK_RIGHT);
+	// Accept both arrow keys and A/D keys for horizontal input
+	bool keyLeft = Input::GetInstance()->PushKey(DIK_LEFT) || Input::GetInstance()->PushKey(DIK_A);
+	bool keyRight = Input::GetInstance()->PushKey(DIK_RIGHT) || Input::GetInstance()->PushKey(DIK_D);
 
 	switch (side) {
 	case WallSide::kLeft:
@@ -131,8 +132,9 @@ void Player::HandleMovementInput() {
     
     float stickX = NormalizeLeftStickX(state.Gamepad.sThumbLX);
 
-    bool keyRight = Input::GetInstance()->PushKey(DIK_RIGHT);
-    bool keyLeft = Input::GetInstance()->PushKey(DIK_LEFT);
+    // Accept arrow keys or WASD (A/D for left/right)
+    bool keyRight = Input::GetInstance()->PushKey(DIK_RIGHT) || Input::GetInstance()->PushKey(DIK_D);
+    bool keyLeft = Input::GetInstance()->PushKey(DIK_LEFT) || Input::GetInstance()->PushKey(DIK_A);
 
     bool moveRight = keyRight || (stickX > 0.0f);
     bool moveLeft = keyLeft || (stickX < 0.0f);
@@ -175,7 +177,8 @@ void Player::HandleMovementInput() {
         }
 
         // ジャンプ入力: キーボードの上キーまたはXboxコントローラのAボタン
-        if (Input::GetInstance()->PushKey(DIK_UP) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A)) {
+        // Also accept 'W' for jump
+        if (Input::GetInstance()->PushKey(DIK_UP) || Input::GetInstance()->PushKey(DIK_W) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A)) {
             velocity_.y += kJumpAcceleration;
         }
 
@@ -693,7 +696,8 @@ void Player::HandleWallJump(const CollisionMapInfo& info) {
 
 	// 入力緩和：ジャンプ押しっぱでも短時間なら再入力扱い
 	static float jumpBufferTimer = 0.0f;
-	bool jumpPressed = Input::GetInstance()->PushKey(DIK_UP) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A);
+	// Support W key as jump as well
+	bool jumpPressed = Input::GetInstance()->PushKey(DIK_UP) || Input::GetInstance()->PushKey(DIK_W) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A);
 	if (jumpPressed) {
 		jumpBufferTimer = 0.15f; // 0.15秒以内ならジャンプ受付
 	} else {
@@ -718,10 +722,10 @@ void Player::HandleWallJump(const CollisionMapInfo& info) {
 		isWallSliding_ = false;
 
 		// 壁ジャンプ直後も操作できるように、空中で左右入力を許可
-		if (Input::GetInstance()->PushKey(DIK_LEFT)) {
+		if (Input::GetInstance()->PushKey(DIK_LEFT) || Input::GetInstance()->PushKey(DIK_A)) {
 			velocity_.x -= 0.15f; // 少し上書きして操作性を柔らかく
 		}
-		if (Input::GetInstance()->PushKey(DIK_RIGHT)) {
+		if (Input::GetInstance()->PushKey(DIK_RIGHT) || Input::GetInstance()->PushKey(DIK_D)) {
 			velocity_.x += 0.15f;
 		}
 
