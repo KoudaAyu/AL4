@@ -914,8 +914,18 @@ void Player::BehaviorAttackUpdate() {
         behaviorRequest_ = Behavior::kRoot;
     }
 
-  
-    velocity_.x = 0.0f;
+    // ダッシュ切り実装: 攻撃開始から最初の数フレームだけ前方へ短距離ダッシュ
+    float dir = (lrDirection_ == LRDirection::kRight) ? 1.0f : -1.0f;
+
+    if (attackParameter_ <= kAttackDashFrames) {
+        // 攻撃開始フレームは強制的にダッシュ速度を与える
+        velocity_.x = dir * kAttackDashSpeed;
+    } else {
+        // ダッシュ終了後は急速に減衰させて停止に持っていく
+        velocity_.x *= 0.5f;
+        // 安全にクランプ
+        velocity_.x = std::clamp(velocity_.x, -kLimitRunSpeed, kLimitRunSpeed);
+    }
 
     // 縦方向は通常の物理挙動に任せる。
 }

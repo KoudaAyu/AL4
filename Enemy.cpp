@@ -25,7 +25,7 @@ void Enemy::Initialize(KamataEngine::Camera* camera, const KamataEngine::Vector3
 
     worldTransform_.Initialize();
     worldTransform_.translation_ = pos;
-    worldTransform_.rotation_.y = std::numbers::pi_v<float> / 2.0f;
+    worldTransform_.rotation_.y = -std::numbers::pi_v<float> / 2.0f;
 
     UpdateAABB();
 }

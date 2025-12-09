@@ -277,6 +277,10 @@ private:
 	static inline const float kAttackWidth = 1.2f; // 当たり判定の幅(横)
 	static inline const float kAttackHeight = 0.8f; // 当たり判定の高さ
 
+	// 攻撃時の短距離ダッシュ設定
+	static inline const float kAttackDashSpeed = 1.5f; // 攻撃開始時のダッシュ速度
+	static inline const int kAttackDashFrames = 6;     // ダッシュが続くフレーム数
+
 	// カメラコントローラ参照（シェイク呼び出し用）
 	CameraController* cameraController_ = nullptr;
 

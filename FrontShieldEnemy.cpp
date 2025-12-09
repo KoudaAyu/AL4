@@ -6,7 +6,7 @@ using namespace KamataEngine;
 
 void FrontShieldEnemy::Initialize(KamataEngine::Camera* camera, const KamataEngine::Vector3& pos) {
     // Create OBJ model similarly to Player
-    model_ = Model::CreateFromOBJ("enemy", true);
+    model_ = Model::CreateFromOBJ("FrontShieldEnemy", true);
     ownsModel_ = true;
 
     assert(model_);
@@ -17,7 +17,7 @@ void FrontShieldEnemy::Initialize(KamataEngine::Camera* camera, const KamataEngi
     worldTransform_.Initialize();
     worldTransform_.translation_ = pos;
     // 左向きにする
-    worldTransform_.rotation_.y = -std::numbers::pi_v<float> / 2.0f;
+    worldTransform_.rotation_.y = std::numbers::pi_v<float> / 2.0f;
 
     UpdateAABB();
 }
