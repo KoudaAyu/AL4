@@ -90,4 +90,7 @@ private:
 	// HUD: sprite-based UI (PNG)
 	KamataEngine::Sprite* hudSprite_ = nullptr;
 	uint32_t hudTextureHandle_ = 0u;
+
+	// Delay timer used when all enemies are defeated to allow a short victory moment
+	float victoryTimer_ = 0.0f;
 };

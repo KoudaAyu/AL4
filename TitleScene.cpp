@@ -1,5 +1,6 @@
 #include "TitleScene.h"
 #include "MathUtl.h"
+#include "KeyInput.h"
 #include <cassert>
 #include <numbers>
 
@@ -58,7 +59,8 @@ void TitleScene::Update() {
 		break;
 
 		case Phase::kMain:
-		if (Input::GetInstance()->PushKey(DIK_SPACE)) {
+		// accept space key or Xbox A button
+		if (Input::GetInstance()->PushKey(DIK_SPACE) || KeyInput::GetInstance()->TriggerPadButton(KeyInput::XINPUT_BUTTON_A)) {
 			phase_ = Phase::kFadeOut;
 			fade_->Start(Fade::Status::FadeOut, 3.0f);
 		}

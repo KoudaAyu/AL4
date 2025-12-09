@@ -136,6 +136,9 @@ void GameScene::Initialize() {
 			hudSprite_->SetSize(KamataEngine::Vector2{hudWidth, hudHeight});
 		}
 	}
+
+	// Initialize victory timer to zero
+	victoryTimer_ = 0.0f;
 }
 
 void GameScene::Update() {
@@ -225,8 +228,20 @@ void GameScene::Update() {
 			// Finish the scene when there are no living enemies.
 			// (Previously required the player to be alive as well; remove that to allow switching even if player died.)
 			if (!anyAlive) {
-				finished_ = true;
-				return;
+				// Start a short victory timer if not already started
+				if (victoryTimer_ <= 0.0f) {
+					// give a short delay so attack animation can finish
+					victoryTimer_ = 0.6f; // 0.6 seconds delay (adjust as desired)
+				}
+
+				// Count down only if player is not attacking
+				if (!player_->IsAttacking()) {
+					victoryTimer_ -= 1.0f / 60.0f;
+					if (victoryTimer_ <= 0.0f) {
+						finished_ = true;
+						return;
+					}
+				}
 			}
 		}
 
@@ -518,4 +533,7 @@ void GameScene::Reset() {
 	}
 
 	phase_ = Phase::kPlay;
+
+	// Reset victory timer
+	victoryTimer_ = 0.0f;
 }

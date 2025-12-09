@@ -197,8 +197,8 @@ void Player::HandleMovementInput() {
         }
 
 
-        // ジャンプ入力: キーボードの上キーまたはWキーまたはXboxコントローラのAボタン
-        if (Input::GetInstance()->PushKey(DIK_UP) || Input::GetInstance()->PushKey(DIK_W) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A)) {
+        // ジャンプ入力: キーボードの上キーまたはSPACEキーまたはXboxコントローラのAボタン
+        if (Input::GetInstance()->PushKey(DIK_UP) || Input::GetInstance()->PushKey(DIK_SPACE) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A)) {
             velocity_.y += kJumpAcceleration;
         }
 
@@ -216,7 +216,7 @@ void Player::HandleMovementInput() {
     // --- Jump handling (supports double-jump) ---
     // Keyboard: use TriggerKey (pressed this frame). Gamepad A: rising edge.
     // Manual rising-edge detection for keyboard jump (supports repeated presses reliably)
-    bool keyJumpDown = Input::GetInstance()->PushKey(DIK_UP) || Input::GetInstance()->PushKey(DIK_W);
+    bool keyJumpDown = Input::GetInstance()->PushKey(DIK_UP) || Input::GetInstance()->PushKey(DIK_SPACE);
     bool keyboardRising = keyJumpDown && !prevJumpKeyPressed_;
     prevJumpKeyPressed_ = keyJumpDown;
 
@@ -281,14 +281,15 @@ void Player::Update() {
     // 1. 移動入力
     HandleMovementInput();
 
-   
-    bool spaceTriggered = Input::GetInstance()->TriggerKey(DIK_SPACE);
+    // Attack input: E key (keyboard) or RT (Xbox) rising edge
+    bool eTriggered = Input::GetInstance()->TriggerKey(DIK_E);
     bool rtPressed = (state.Gamepad.bRightTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
-   
-    if (spaceTriggered || (rtPressed && !prevRightTriggerPressed_)) {
+    
+    // Eキー押下（トリガー）またはRTの立ち上がりで攻撃
+    if (eTriggered || (rtPressed && !prevRightTriggerPressed_)) {
         behaviorRequest_ = Behavior::kAttack;
     }
-    // 現在のRT状態を保存（次フレームのため）
+    // 現在のRT状態を保存（次フレームとの比較用）
     prevRightTriggerPressed_ = rtPressed;
 
    EmergencyAvoidance();
@@ -776,8 +777,8 @@ void Player::HandleWallJump(const CollisionMapInfo& info) {
 
 	// 入力緩和：ジャンプ押しっぱでも短時間なら再入力扱い
 	static float jumpBufferTimer = 0.0f;
-	// Support W key as jump as well
-	bool jumpPressed = Input::GetInstance()->PushKey(DIK_UP) || Input::GetInstance()->PushKey(DIK_W) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A);
+	// Support SPACE as jump as well
+	bool jumpPressed = Input::GetInstance()->PushKey(DIK_UP) || Input::GetInstance()->PushKey(DIK_SPACE) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A);
 	if (jumpPressed) {
 		jumpBufferTimer = 0.15f; // 0.15秒以内ならジャンプ受付
 	} else {
