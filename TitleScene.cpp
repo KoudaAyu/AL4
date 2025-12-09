@@ -66,6 +66,8 @@ void TitleScene::Update() {
 		break;
 
 		case Phase::kFadeOut:
+			// advance fade once per frame so it can finish
+			fade_->Update();
 			if (fade_->IsFinished()) {
 			finished_ = true;
 		    }

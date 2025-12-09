@@ -58,16 +58,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		Input::GetInstance()->GetJoystickState(0, state);
 
 #ifdef _DEBUG
-
 		imguiManager->Begin();
-
 #endif //  _DEBUG
-#ifdef _DEBUG
-		gameScene->Update();
-#else
+
+		// Always run scene change and scene-managed update so transitions happen in all builds
 		ChangeScene();
 		UpdateScene();
-#endif
 
 #ifdef _DEBUG
 		imguiManager->End();
@@ -75,16 +71,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 		dxCommom->PreDraw();
 
-#ifdef _DEBUG
-		gameScene->Draw();
-#else
+		// Use scene-managed draw so the active scene is shown
 		DrawScene();
-#endif
 
 #ifdef _DEBUG
-
 		AxisIndicator::GetInstance()->Draw();
-
 		imguiManager->Draw();
 #endif //  _DEBUG
 

@@ -3,6 +3,7 @@
 #include "FrontShieldEnemy.h"
 #include "MapChipField.h"
 #include "MathUtl.h"
+#include <2d/Sprite.h>
 using namespace KamataEngine;
 
 GameScene::GameScene() {}
@@ -33,6 +34,12 @@ GameScene::~GameScene() {
 	worldTransformBlocks_.clear();
 
 	delete skydome_;
+
+	// HUD sprite
+	if (hudSprite_) {
+		delete hudSprite_;
+		hudSprite_ = nullptr;
+	}
 }
 
 void GameScene::Initialize() {
@@ -114,6 +121,21 @@ void GameScene::Initialize() {
 	// Particle関係
 	deathParticle_ = new DeathParticle();
 	deathParticle_->Initialize(model_, &camera_, playerPosition);
+
+	// HUD: load PNG and create sprite for release build
+	// Put your PNG under Resources/UI/hud.png
+	hudTextureHandle_ = TextureManager::Load("Debug/Goal.png");
+	if (hudTextureHandle_ != 0u) {
+		// Create sprite anchored at bottom-center
+		const float hudWidth = 250.0f;
+		const float hudHeight = 30.0f;
+		const float hudMargin = 20.0f;
+		// Position at bottom-center using window constants
+		hudSprite_ = KamataEngine::Sprite::Create(hudTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) - hudMargin}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 1.0f});
+		if (hudSprite_) {
+			hudSprite_->SetSize(KamataEngine::Vector2{hudWidth, hudHeight});
+		}
+	}
 }
 
 void GameScene::Update() {
@@ -200,19 +222,20 @@ void GameScene::Update() {
 					break;
 				}
 			}
-			// Only finish the scene if all enemies are defeated AND the player is still alive.
-			// This prevents returning to title on mutual kill (both player and last enemy die simultaneously).
-			if (!anyAlive && player_ && player_->isAlive()) {
+			// Finish the scene when there are no living enemies.
+			// (Previously required the player to be alive as well; remove that to allow switching even if player died.)
+			if (!anyAlive) {
 				finished_ = true;
 				return;
 			}
 		}
 
-		/*if (!enemy_->isAlive())
-		{
-		    delete enemy_;
+		// HUD update: keep HUD positioned relative to screen if sprite exists
+		if (hudSprite_) {
+			// Keep it anchored bottom-center in case window size changes
+			const float hudMargin = 20.0f;
+			hudSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) - hudMargin});
 		}
-		*/
 
 		// フェーズ切り替えをチェック
 		ChangePhase();
@@ -321,6 +344,15 @@ void GameScene::Draw() {
 	}
 
 	Model::PostDraw();
+
+	// Draw HUD sprite in screen space after 3D post-draw
+	if (hudSprite_) {
+		// Sprite requires PreDraw/PostDraw when drawing; get command list and call
+		KamataEngine::DirectXCommon* dx = KamataEngine::DirectXCommon::GetInstance();
+		KamataEngine::Sprite::PreDraw(dx->GetCommandList());
+		hudSprite_->Draw();
+		KamataEngine::Sprite::PostDraw();
+	}
 }
 
 void GameScene::GenerateBlocks() {
@@ -461,6 +493,21 @@ void GameScene::Reset() {
 	if (deathParticle_) {
 		delete deathParticle_;
 		deathParticle_ = nullptr;
+	}
+
+	// Recreate HUD sprite (texture likely already loaded in TextureManager)
+	if (hudSprite_) {
+		delete hudSprite_;
+		hudSprite_ = nullptr;
+	}
+	if (hudTextureHandle_ != 0u) {
+		const float hudWidth = 250.0f;
+		const float hudHeight = 30.0f;
+		const float hudMargin = 20.0f;
+		hudSprite_ = KamataEngine::Sprite::Create(hudTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) - hudMargin}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 1.0f});
+		if (hudSprite_) {
+			hudSprite_->SetSize(KamataEngine::Vector2{hudWidth, hudHeight});
+		}
 	}
 
 	GenerateBlocks();

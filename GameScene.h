@@ -86,4 +86,8 @@ private:
 	std::vector<std::vector<KamataEngine::WorldTransform*>> worldTransformBlocks_;
 
 	Phase phase_ = Phase::kPlay;
+
+	// HUD: sprite-based UI (PNG)
+	KamataEngine::Sprite* hudSprite_ = nullptr;
+	uint32_t hudTextureHandle_ = 0u;
 };
