@@ -33,4 +33,9 @@ private:
 
 	Phase phase_ = Phase::kFadeIn;
 
+	// 3D title model
+	KamataEngine::Model* model_ = nullptr;
+	KamataEngine::Camera camera_;
+	KamataEngine::WorldTransform worldTransform_;
+
 };
