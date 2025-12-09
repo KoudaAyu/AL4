@@ -750,13 +750,14 @@ void Player::UpdateWallSlide(const CollisionMapInfo& info) {
 			}
 		}
 	}
-
+#ifdef _DEBUG
     ImGui::Begin("Wall Debug");
 	ImGui::Text("onGround: %s", onGround_ ? "true" : "false");
 	ImGui::Text("isWallContact: %s", info.isWallContact_ ? "true" : "false");
 	ImGui::Text("isWallSliding: %s", isWallSliding_ ? "true" : "false");
 	ImGui::Text("velocityY: %.3f", velocity_.y);
 	ImGui::End();
+#endif
 
 	prevWallSide = info.wallSide_;
 }

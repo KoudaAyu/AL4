@@ -191,6 +191,23 @@ void GameScene::Update() {
 
 		CheckAllCollisions();
 
+		// If all enemies are defeated, finish this scene to return to title
+		{
+			bool anyAlive = false;
+			for (Enemy* enemy : enemies_) {
+				if (enemy && enemy->isAlive()) {
+					anyAlive = true;
+					break;
+				}
+			}
+			// Only finish the scene if all enemies are defeated AND the player is still alive.
+			// This prevents returning to title on mutual kill (both player and last enemy die simultaneously).
+			if (!anyAlive && player_ && player_->isAlive()) {
+				finished_ = true;
+				return;
+			}
+		}
+
 		/*if (!enemy_->isAlive())
 		{
 		    delete enemy_;
