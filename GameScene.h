@@ -91,6 +91,14 @@ private:
 	KamataEngine::Sprite* hudSprite_ = nullptr;
 	uint32_t hudTextureHandle_ = 0u;
 
+	// Additional UI sprites (e.g. left/top indicators)
+	KamataEngine::Sprite* uiLeftSprite_ = nullptr;
+	uint32_t uiLeftTextureHandle_ = 0u;
+	KamataEngine::Sprite* uiMidSprite_ = nullptr;
+	uint32_t uiMidTextureHandle_ = 0u;
+	KamataEngine::Sprite* uiRightSprite_ = nullptr;
+	uint32_t uiRightTextureHandle_ = 0u;
+
 	// Delay timer used when all enemies are defeated to allow a short victory moment
 	float victoryTimer_ = 0.0f;
 };
