@@ -4,16 +4,19 @@
 
 #include "GameScene.h"
 #include "TitleScene.h"
+#include "SelectScene.h"
 
 using namespace KamataEngine;
 
 TitleScene* titleScene = nullptr;
+SelectScene* selectScene = nullptr;
 GameScene* gameScene = nullptr;
 
 enum class Scene {
 
 	kUnknown = 0,
 	kTitle,
+	kSelect,
 	kGame,
 };
 
@@ -42,11 +45,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	scene = Scene::kTitle;
 #endif
 
-	titleScene = new TitleScene();
-	titleScene->Initialize();
-
-	gameScene = new GameScene();
-	gameScene->Initialize();
+	
+	if (scene == Scene::kTitle) {
+		titleScene = new TitleScene();
+		titleScene->Initialize();
+	} else if (scene == Scene::kGame) {
+		gameScene = new GameScene();
+		gameScene->Initialize();
+	}
 
 	XINPUT_STATE state;
 
@@ -61,28 +67,29 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		imguiManager->Begin();
 #endif //  _DEBUG
 
-		// Always run scene change and scene-managed update so transitions happen in all builds
+	
 		ChangeScene();
 		UpdateScene();
 
 #ifdef _DEBUG
 		imguiManager->End();
-#endif //  _DEBUG
+#endif
 
 		dxCommom->PreDraw();
 
-		// Use scene-managed draw so the active scene is shown
+		
 		DrawScene();
 
 #ifdef _DEBUG
 		AxisIndicator::GetInstance()->Draw();
 		imguiManager->Draw();
-#endif //  _DEBUG
+#endif 
 
 		dxCommom->PostDraw();
 	}
 
 	delete titleScene;
+	delete selectScene;
 	delete gameScene;
 
 	KamataEngine::Finalize();
@@ -94,16 +101,25 @@ void ChangeScene() {
 
 	switch (scene) {
 	case Scene::kTitle:
-		if (titleScene->IsFinished()) {
-			scene = Scene::kGame;
+		if (titleScene && titleScene->IsFinished()) {
+			scene = Scene::kSelect;
 			delete titleScene;
 			titleScene = nullptr;
+			selectScene = new SelectScene();
+			selectScene->Initialize();
+		}
+		break;
+	case Scene::kSelect:
+		if (selectScene && selectScene->IsFinished()) {
+			scene = Scene::kGame;
+			delete selectScene;
+			selectScene = nullptr;
 			gameScene = new GameScene();
 			gameScene->Initialize();
 		}
 		break;
 	case Scene::kGame:
-		if (gameScene->IsFinished()) {
+		if (gameScene && gameScene->IsFinished()) {
 			scene = Scene::kTitle;
 			delete gameScene;
 			gameScene = nullptr;
@@ -117,10 +133,13 @@ void ChangeScene() {
 void UpdateScene() {
 	switch (scene) {
 	case Scene::kTitle:
-		titleScene->Update();
+		if (titleScene) titleScene->Update();
+		break;
+	case Scene::kSelect:
+		if (selectScene) selectScene->Update();
 		break;
 	case Scene::kGame:
-		gameScene->Update();
+		if (gameScene) gameScene->Update();
 		break;
 	}
 }
@@ -129,11 +148,13 @@ void DrawScene() {
 
 	switch (scene) {
 	case Scene::kTitle:
-		titleScene->Draw();
+		if (titleScene) titleScene->Draw();
 		break;
-
+	case Scene::kSelect:
+		if (selectScene) selectScene->Draw();
+		break;
 	case Scene::kGame:
-		gameScene->Draw();
+		if (gameScene) gameScene->Draw();
 		break;
 	}
 }

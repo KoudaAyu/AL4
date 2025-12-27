@@ -55,6 +55,12 @@ GameScene::~GameScene() {
 		delete uiRightSprite_;
 		uiRightSprite_ = nullptr;
 	}
+
+	// Countdown sprite
+	if (countdownSprite_) {
+		delete countdownSprite_;
+		countdownSprite_ = nullptr;
+	}
 }
 
 void GameScene::Initialize() {
@@ -185,6 +191,29 @@ void GameScene::Initialize() {
 
 	// Initialize victory timer to zero
 	victoryTimer_ = 0.0f;
+
+	// Initialize countdown
+	countdownTime_ = countdownStart_;
+	// Load number textures from Resources/Number/0.png ... 9.png
+	for (int i = 0; i < 10; ++i) {
+		char buf[64];
+		sprintf_s(buf, "Number/%d.png", i);
+		countdownTextureHandles_[i] = TextureManager::Load(buf);
+	}
+	// Create countdown sprite anchored center
+	int initialIndex = static_cast<int>(std::ceil(countdownTime_));
+	if (initialIndex < 0) initialIndex = 0;
+	if (initialIndex > 9) initialIndex = 9;
+	if (countdownTextureHandles_[initialIndex] != 0u) {
+		countdownSprite_ = KamataEngine::Sprite::Create(countdownTextureHandles_[initialIndex], KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) / 2.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 0.5f});
+		if (countdownSprite_) {
+			// Reasonable visible size
+			countdownSprite_->SetSize(KamataEngine::Vector2{200.0f, 200.0f});
+		}
+	}
+
+	// Start in countdown phase
+	phase_ = Phase::kCountdown;
 }
 
 void GameScene::Update() {
@@ -197,6 +226,63 @@ void GameScene::Update() {
 	}
 
 	switch (phase_) {
+	case Phase::kCountdown: {
+		// Update camera so scene isn't static during countdown
+		#ifdef _DEBUG
+		// minimal debug handling: allow toggling debug camera
+		if (Input::GetInstance()->TriggerKey(DIK_C)) {
+			isDebugCameraActive_ = !isDebugCameraActive_;
+		}
+		if (isDebugCameraActive_) {
+			debugCamera_->Update();
+			camera_.matView = debugCamera_->GetCamera().matView;
+			camera_.matProjection = debugCamera_->GetCamera().matProjection;
+			camera_.TransferMatrix();
+		} else {
+			cameraController_->Update();
+			camera_.UpdateMatrix();
+		}
+		#else
+		cameraController_->Update();
+		camera_.UpdateMatrix();
+		#endif
+
+		skydome_->Update();
+
+		// Update block world matrices
+		for (auto& row : worldTransformBlocks_) {
+			for (WorldTransform* wt : row) {
+				if (!wt) continue;
+				wt->matWorld_ = MakeAffineMatrix(wt->scale_, wt->rotation_, wt->translation_);
+				if (wt->parent_) wt->matWorld_ = Multiply(wt->parent_->matWorld_, wt->matWorld_);
+				wt->TransferMatrix();
+			}
+		}
+
+		// Countdown timing (fixed-step matching game loop)
+		countdownTime_ -= 1.0f / 60.0f;
+		if (countdownTime_ <= 0.0f) {
+			// Transition to play
+			phase_ = Phase::kPlay;
+			// ensure player/enemy states are ready (player already initialized)
+			return;
+		} else {
+			// Update countdown sprite texture to current integer (ceil)
+			int display = static_cast<int>(std::ceil(countdownTime_));
+			if (display < 0) display = 0;
+			if (display > 9) display = 9;
+			if (countdownTextureHandles_[display] != 0u) {
+				if (!countdownSprite_) {
+					countdownSprite_ = KamataEngine::Sprite::Create(countdownTextureHandles_[display], KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) / 2.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 0.5f});
+					if (countdownSprite_) countdownSprite_->SetSize(KamataEngine::Vector2{200.0f, 200.0f});
+				} else {
+					countdownSprite_->SetTextureHandle(countdownTextureHandles_[display]);
+				}
+			}
+		}
+
+		break;
+	}
 	case Phase::kPlay:
 
 #ifdef _DEBUG
@@ -418,7 +504,7 @@ void GameScene::Draw() {
 	Model::PostDraw();
 
 	// Draw HUD and additional UI sprites in screen space after 3D post-draw
-	if (hudSprite_ || uiLeftSprite_ || uiMidSprite_ || uiRightSprite_) {
+	if (hudSprite_ || uiLeftSprite_ || uiMidSprite_ || uiRightSprite_ || countdownSprite_) {
 		// Sprite requires PreDraw/PostDraw when drawing; get command list and call
 		KamataEngine::DirectXCommon* dx = KamataEngine::DirectXCommon::GetInstance();
 		KamataEngine::Sprite::PreDraw(dx->GetCommandList());
@@ -426,6 +512,8 @@ void GameScene::Draw() {
 		if (uiLeftSprite_) uiLeftSprite_->Draw();
 		if (uiMidSprite_) uiMidSprite_->Draw();
 		if (uiRightSprite_) uiRightSprite_->Draw();
+		// Draw countdown on top when in countdown phase
+		if (phase_ == Phase::kCountdown && countdownSprite_) countdownSprite_->Draw();
 		KamataEngine::Sprite::PostDraw();
 	}
 }
@@ -516,6 +604,9 @@ void GameScene::ChangePhase() {
 		break;
 	case Phase::kDeath:
 
+		break;
+	case Phase::kCountdown:
+		// nothing
 		break;
 	}
 }
@@ -622,7 +713,9 @@ void GameScene::Reset() {
 		cameraController_->Reset();
 	}
 
-	phase_ = Phase::kPlay;
+	// Reset to countdown phase
+	phase_ = Phase::kCountdown;
+	countdownTime_ = countdownStart_;
 
 	// Reset victory timer
 	victoryTimer_ = 0.0f;

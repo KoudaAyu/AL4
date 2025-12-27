@@ -166,6 +166,7 @@
     <ClCompile Include="MapChipField.cpp" />
     <ClCompile Include="MathUtl.cpp" />
     <ClCompile Include="Player.cpp" />
+    <ClCompile Include="SelectScene.cpp" />
     <ClCompile Include="Skydome.cpp" />
     <ClCompile Include="TitleScene.cpp" />
   </ItemGroup>

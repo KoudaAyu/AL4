@@ -15,6 +15,7 @@ class MapChipField_;
 class GameScene {
 public:
 	enum class Phase {
+		kCountdown,
 		kPlay,
 		kDeath,
 	};
@@ -101,4 +102,10 @@ private:
 
 	// Delay timer used when all enemies are defeated to allow a short victory moment
 	float victoryTimer_ = 0.0f;
+
+	// Countdown before gameplay starts
+	KamataEngine::Sprite* countdownSprite_ = nullptr;
+	uint32_t countdownTextureHandles_[10] = {0};
+	float countdownTime_ = 0.0f; // remaining seconds
+	float countdownStart_ = 3.0f; // initial countdown duration
 };
