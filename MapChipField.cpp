@@ -13,8 +13,8 @@ std::map<std::string, MapChipType> mapChipTable = {
     {"1", MapChipType::kBlock},
     {"2", MapChipType::kReserved2},
     {"3", MapChipType::kEnemySpawn},
-    // 4: spawn enemy with front shield
     {"4", MapChipType::kEnemySpawnShield},
+    {"5", MapChipType::kSpike},
 };
 }
 

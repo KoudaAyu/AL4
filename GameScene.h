@@ -11,6 +11,7 @@
 #include <vector>
 
 class MapChipField_;
+class Spike; 
 
 class GameScene {
 public:
@@ -80,19 +81,21 @@ private:
 	// Particle関係
 	DeathParticle* deathParticle_ = nullptr;
 
-	// Support multiple enemies
+	
 	std::vector<Enemy*> enemies_;
+	
+	std::vector<Spike*> spikes_;
 	Player* player_ = nullptr;
 
 	std::vector<std::vector<KamataEngine::WorldTransform*>> worldTransformBlocks_;
 
 	Phase phase_ = Phase::kPlay;
 
-	// HUD: sprite-based UI (PNG)
+
 	KamataEngine::Sprite* hudSprite_ = nullptr;
 	uint32_t hudTextureHandle_ = 0u;
 
-	// Additional UI sprites (e.g. left/top indicators)
+	
 	KamataEngine::Sprite* uiLeftSprite_ = nullptr;
 	uint32_t uiLeftTextureHandle_ = 0u;
 	KamataEngine::Sprite* uiMidSprite_ = nullptr;
@@ -100,12 +103,12 @@ private:
 	KamataEngine::Sprite* uiRightSprite_ = nullptr;
 	uint32_t uiRightTextureHandle_ = 0u;
 
-	// Delay timer used when all enemies are defeated to allow a short victory moment
+	
 	float victoryTimer_ = 0.0f;
 
-	// Countdown before gameplay starts
+	
 	KamataEngine::Sprite* countdownSprite_ = nullptr;
 	uint32_t countdownTextureHandles_[10] = {0};
-	float countdownTime_ = 0.0f; // remaining seconds
-	float countdownStart_ = 3.0f; // initial countdown duration
+	float countdownTime_ = 0.0f; 
+	float countdownStart_ = 3.0f; 
 };

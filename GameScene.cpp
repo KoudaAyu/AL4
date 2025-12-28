@@ -5,6 +5,7 @@
 #include "MathUtl.h"
 #include <2d/Sprite.h>
 #include "KeyInput.h"
+#include "Spike.h"
 using namespace KamataEngine;
 
 GameScene::GameScene() {}
@@ -12,13 +13,13 @@ GameScene::GameScene() {}
 GameScene::~GameScene() {
 #ifdef _DEBUG
 	delete debugCamera_;
-#endif //  _DEBUG
+#endif 
 
 	delete blockModel_;
 	delete cameraController_;
 	delete mapChipField_;
 	delete model_;
-	// delete all enemies
+
 	for (Enemy* enemy : enemies_) {
 		delete enemy;
 	}
@@ -36,13 +37,13 @@ GameScene::~GameScene() {
 
 	delete skydome_;
 
-	// HUD sprite
+
 	if (hudSprite_) {
 		delete hudSprite_;
 		hudSprite_ = nullptr;
 	}
 
-	// Additional UI sprites
+	
 	if (uiLeftSprite_) {
 		delete uiLeftSprite_;
 		uiLeftSprite_ = nullptr;
@@ -56,11 +57,17 @@ GameScene::~GameScene() {
 		uiRightSprite_ = nullptr;
 	}
 
-	// Countdown sprite
+	
 	if (countdownSprite_) {
 		delete countdownSprite_;
 		countdownSprite_ = nullptr;
 	}
+
+
+	for (Spike* s : spikes_) {
+		delete s;
+	}
+	spikes_.clear();
 }
 
 void GameScene::Initialize() {
@@ -93,7 +100,7 @@ void GameScene::Initialize() {
 	player_->Initialize(&camera_, playerPosition);
 	player_->SetMapChipField(mapChipField_);
 
-	// Create enemies based on map chip CSV spawn points
+	
 	if (mapChipField_) {
 		uint32_t vh = mapChipField_->GetNumBlockVertical();
 		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
@@ -103,7 +110,49 @@ void GameScene::Initialize() {
 				if (t == MapChipType::kEnemySpawn) {
 					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
 					Enemy* enemy = new Enemy();
-					// Use overload where Enemy creates/owns its own model
+					
+					enemy->Initialize(&camera_, enemyPosition);
+					enemies_.push_back(enemy);
+				} else if (t == MapChipType::kEnemySpawnShield) {
+					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					FrontShieldEnemy* fse = new FrontShieldEnemy();
+					fse->Initialize(&camera_, enemyPosition);
+					fse->SetFrontDotThreshold(0.6f);
+					enemies_.push_back(fse);
+				} else if (t == MapChipType::kSpike) {
+					Spike* s = new Spike();
+					Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
+					s->SetPosition(pos);
+					s->Initialize();
+					spikes_.push_back(s);
+				}
+			}
+		}
+	}
+
+	
+	if (!spikes_.empty()) {
+		DebugText::GetInstance()->ConsolePrintf("GameScene: created %u spikes\n", static_cast<uint32_t>(spikes_.size()));
+		for (uint32_t i = 0; i < spikes_.size(); ++i) {
+			Spike* s = spikes_[i];
+			if (s) {
+				DebugText::GetInstance()->ConsolePrintf("  spike[%u] HasModel=%s pos=(%.2f,%.2f,%.2f)\n", i, s->HasModel() ? "true" : "false", s->GetPosition().x, s->GetPosition().y, s->GetPosition().z);
+			} else {
+				DebugText::GetInstance()->ConsolePrintf("  spike[%u] is null\n", i);
+			}
+		}
+	}
+
+	if (mapChipField_) {
+		uint32_t vh = mapChipField_->GetNumBlockVertical();
+		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
+		for (uint32_t y = 0; y < vh; ++y) {
+			for (uint32_t x = 0; x < wh; ++x) {
+				MapChipType t = mapChipField_->GetMapChipTypeByIndex(x, y);
+				if (t == MapChipType::kEnemySpawn) {
+					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					Enemy* enemy = new Enemy();
+					
 					enemy->Initialize(&camera_, enemyPosition);
 					enemies_.push_back(enemy);
 				} else if (t == MapChipType::kEnemySpawnShield) {
@@ -121,7 +170,7 @@ void GameScene::Initialize() {
 	}
 
 	cameraController_ = new CameraController();
-	// Set movable area based on loaded map CSV instead of hardcoded values
+	
 	if (mapChipField_) {
 		cameraController_->SetMovableArea(mapChipField_->GetMovableArea());
 	} else {
@@ -147,32 +196,30 @@ void GameScene::Initialize() {
 	deathParticle_ = new DeathParticle();
 	deathParticle_->Initialize(model_, &camera_, playerPosition);
 
-	// HUD: load PNG and create sprite for release build
-	// Put your PNG under Resources/UI/hud.png
+
 	hudTextureHandle_ = TextureManager::Load("Debug/Goal.png");
 	if (hudTextureHandle_ != 0u) {
-		// Create sprite anchored at top-center
+		
 		const float hudWidth = 250.0f;
 		const float hudHeight = 30.0f;
 		const float hudMargin = 20.0f;
-		// Position at top-center using window constants
+		
 		hudSprite_ = KamataEngine::Sprite::Create(hudTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, hudMargin}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 0.0f});
 		if (hudSprite_) {
 			hudSprite_->SetSize(KamataEngine::Vector2{hudWidth, hudHeight});
 		}
 	}
 
-	// Load two additional UI textures and create sprites
-	// Place them at bottom-left and bottom-right corners
+	
 	uiLeftTextureHandle_ = TextureManager::Load("Debug/Attack.png");
 	if (uiLeftTextureHandle_ != 0u) {
-		// Place at bottom-left (flip Y) and anchor to bottom-left
+		
 		uiLeftSprite_ = KamataEngine::Sprite::Create(uiLeftTextureHandle_, KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
 		if (uiLeftSprite_) {
 			uiLeftSprite_->SetSize(KamataEngine::Vector2{150.0f, 30.0f});
 		}
 	}
-	// Middle UI between left and right
+	
 	uiMidTextureHandle_ = TextureManager::Load("Debug/Reset.png");
 	if (uiMidTextureHandle_ != 0u) {
 		uiMidSprite_ = KamataEngine::Sprite::Create(uiMidTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 1.0f});
@@ -182,37 +229,37 @@ void GameScene::Initialize() {
 	}
 	uiRightTextureHandle_ = TextureManager::Load("Debug/Jump.png");
 	if (uiRightTextureHandle_ != 0u) {
-		// Place at bottom-right (flip Y) and anchor to bottom-right
+		
 		uiRightSprite_ = KamataEngine::Sprite::Create(uiRightTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) - 50.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{1.0f, 1.0f});
 		if (uiRightSprite_) {
 			uiRightSprite_->SetSize(KamataEngine::Vector2{330.0f, 30.0f});
 		}
 	}
 
-	// Initialize victory timer to zero
+
 	victoryTimer_ = 0.0f;
 
-	// Initialize countdown
+	
 	countdownTime_ = countdownStart_;
-	// Load number textures from Resources/Number/0.png ... 9.png
+
 	for (int i = 0; i < 10; ++i) {
 		char buf[64];
 		sprintf_s(buf, "Number/%d.png", i);
 		countdownTextureHandles_[i] = TextureManager::Load(buf);
 	}
-	// Create countdown sprite anchored center
+
 	int initialIndex = static_cast<int>(std::ceil(countdownTime_));
 	if (initialIndex < 0) initialIndex = 0;
 	if (initialIndex > 9) initialIndex = 9;
 	if (countdownTextureHandles_[initialIndex] != 0u) {
 		countdownSprite_ = KamataEngine::Sprite::Create(countdownTextureHandles_[initialIndex], KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) / 2.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 0.5f});
 		if (countdownSprite_) {
-			// Reasonable visible size
+			
 			countdownSprite_->SetSize(KamataEngine::Vector2{200.0f, 200.0f});
 		}
 	}
 
-	// Start in countdown phase
+
 	phase_ = Phase::kCountdown;
 }
 
@@ -221,15 +268,14 @@ void GameScene::Update() {
 	// リセットキーでシーンをリセット
 	if (Input::GetInstance()->TriggerKey(DIK_R) || KeyInput::GetInstance()->TriggerPadButton(XINPUT_GAMEPAD_B)) {
 		Reset();
-		// Reset() may delete deathParticle_ and other objects; stop further Update this frame to avoid using freed memory
 		return;
 	}
 
 	switch (phase_) {
 	case Phase::kCountdown: {
-		// Update camera so scene isn't static during countdown
+		
 		#ifdef _DEBUG
-		// minimal debug handling: allow toggling debug camera
+		
 		if (Input::GetInstance()->TriggerKey(DIK_C)) {
 			isDebugCameraActive_ = !isDebugCameraActive_;
 		}
@@ -249,7 +295,7 @@ void GameScene::Update() {
 
 		skydome_->Update();
 
-		// Update block world matrices
+		
 		for (auto& row : worldTransformBlocks_) {
 			for (WorldTransform* wt : row) {
 				if (!wt) continue;
@@ -259,15 +305,23 @@ void GameScene::Update() {
 			}
 		}
 
-		// Countdown timing (fixed-step matching game loop)
+		
+		if (player_) {
+			
+			KamataEngine::WorldTransform& pwt = player_->GetWorldTransform();
+			pwt.matWorld_ = MakeAffineMatrix(pwt.scale_, pwt.rotation_, pwt.translation_);
+			pwt.TransferMatrix();
+		}
+
+		
 		countdownTime_ -= 1.0f / 60.0f;
 		if (countdownTime_ <= 0.0f) {
-			// Transition to play
+		
 			phase_ = Phase::kPlay;
-			// ensure player/enemy states are ready (player already initialized)
+		
 			return;
 		} else {
-			// Update countdown sprite texture to current integer (ceil)
+			
 			int display = static_cast<int>(std::ceil(countdownTime_));
 			if (display < 0) display = 0;
 			if (display > 9) display = 9;
@@ -316,14 +370,21 @@ void GameScene::Update() {
 			camera_.UpdateMatrix();
 		}
 
-#endif //  _DEBUG
+#endif
 
 		skydome_->Update();
 
-		// Update all enemies
+		
 		for (Enemy* enemy : enemies_) {
 			if (enemy)
 				enemy->Update();
+		}
+
+		
+		if (!spikes_.empty()) {
+			for (Spike* s : spikes_) {
+				if (s) s->Update(1.0f / 60.0f);
+			}
 		}
 
 		player_->Update();
@@ -344,11 +405,11 @@ void GameScene::Update() {
 #ifndef _DEBUG
 		cameraController_->Update();
 		camera_.UpdateMatrix();
-#endif //  _DEBUG
+#endif 
 
 		CheckAllCollisions();
 
-		// If all enemies are defeated, finish this scene to return to title
+		
 		{
 			bool anyAlive = false;
 			for (Enemy* enemy : enemies_) {
@@ -357,16 +418,14 @@ void GameScene::Update() {
 					break;
 				}
 			}
-			// Finish the scene when there are no living enemies.
-			// (Previously required the player to be alive as well; remove that to allow switching even if player died.)
 			if (!anyAlive) {
-				// Start a short victory timer if not already started
+				
 				if (victoryTimer_ <= 0.0f) {
-					// give a short delay so attack animation can finish
-					victoryTimer_ = 0.6f; // 0.6 seconds delay (adjust as desired)
+				
+					victoryTimer_ = 0.6f;
 				}
 
-				// Count down only if player is not attacking
+				
 				if (!player_->IsAttacking()) {
 					victoryTimer_ -= 1.0f / 60.0f;
 					if (victoryTimer_ <= 0.0f) {
@@ -377,14 +436,13 @@ void GameScene::Update() {
 			}
 		}
 
-		// HUD update: keep HUD positioned relative to screen if sprite exists
+	
 		if (hudSprite_) {
-			// Keep it anchored top-center in case window size changes
+			
 			const float hudMargin = 20.0f;
 			hudSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, hudMargin});
 		}
-
-		// Update additional UI sprites positions if they exist
+	
 		if (uiLeftSprite_) {
 			uiLeftSprite_->SetPosition(KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 50.0f});
 		}
@@ -431,7 +489,7 @@ void GameScene::Update() {
 			camera_.UpdateMatrix();
 		}
 
-#endif //  _DEBUG
+#endif 
 
 		skydome_->Update();
 		// Update all enemies
@@ -477,9 +535,18 @@ void GameScene::Draw() {
 	}
 
 	// Draw all enemies
-	for (Enemy* enemy : enemies_) {
-		if (enemy)
-			enemy->Draw();
+	if (phase_ != Phase::kCountdown) {
+		for (Enemy* enemy : enemies_) {
+			if (enemy && enemy->isAlive())
+				enemy->Draw();
+		}
+	}
+
+
+	if (!spikes_.empty() && phase_ != Phase::kDeath) {
+		for (Spike* s : spikes_) {
+			if (s) s->Draw(&camera_);
+		}
 	}
 
 	// デス中はプレイヤーの描画を抑制してエフェクトを見やすくする
@@ -503,16 +570,15 @@ void GameScene::Draw() {
 
 	Model::PostDraw();
 
-	// Draw HUD and additional UI sprites in screen space after 3D post-draw
+	
 	if (hudSprite_ || uiLeftSprite_ || uiMidSprite_ || uiRightSprite_ || countdownSprite_) {
-		// Sprite requires PreDraw/PostDraw when drawing; get command list and call
+		
 		KamataEngine::DirectXCommon* dx = KamataEngine::DirectXCommon::GetInstance();
 		KamataEngine::Sprite::PreDraw(dx->GetCommandList());
 		if (hudSprite_) hudSprite_->Draw();
 		if (uiLeftSprite_) uiLeftSprite_->Draw();
 		if (uiMidSprite_) uiMidSprite_->Draw();
 		if (uiRightSprite_) uiRightSprite_->Draw();
-		// Draw countdown on top when in countdown phase
 		if (phase_ == Phase::kCountdown && countdownSprite_) countdownSprite_->Draw();
 		KamataEngine::Sprite::PostDraw();
 	}
@@ -558,22 +624,22 @@ void GameScene::CheckAllCollisions() {
 		if (!enemy || !enemy->isAlive())
 			continue;
 
-		// If player is attacking, check attack hitbox first
+		
 		if (player_->IsAttacking()) {
 			AABB attackBox = player_->GetAttackAABB();
 			if (IsCollisionAABBAABB(attackBox, enemy->GetAABB())) {
-				// Hit enemy with attack
+			
 				enemy->OnCollision(player_);
-				// Optionally, play hit effects here (camera shake, rumble)
+				
 				if (cameraController_) {
 					cameraController_->StartShake(1.0f, 0.15f);
 				}
-				// Skip body collision for this enemy this frame
+			
 				continue;
 			}
 		}
 
-		// Normal body collision (player takes damage)
+	
 		if (IsCollisionAABBAABB(player_->GetAABB(), enemy->GetAABB())) {
 			player_->OnCollision(enemy);
 			enemy->OnCollision(player_);
@@ -606,14 +672,14 @@ void GameScene::ChangePhase() {
 
 		break;
 	case Phase::kCountdown:
-		// nothing
+		
 		break;
 	}
 }
 
 // リセット処理
 void GameScene::Reset() {
-	// Delete existing player and recreate
+	
 	if (player_) {
 		delete player_;
 		player_ = nullptr;
@@ -627,41 +693,53 @@ void GameScene::Reset() {
 		player_->SetCameraController(cameraController_);
 	}
 
-	// Delete existing enemies and recreate from map
+	
 	for (Enemy* enemy : enemies_) {
 		delete enemy;
 	}
 	enemies_.clear();
+
+	
+	for (Spike* s : spikes_) {
+		delete s;
+	}
+	spikes_.clear();
 
 	if (mapChipField_) {
 		uint32_t vh = mapChipField_->GetNumBlockVertical();
 		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
 		for (uint32_t y = 0; y < vh; ++y) {
 			for (uint32_t x = 0; x < wh; ++x) {
-				if (mapChipField_->GetMapChipTypeByIndex(x, y) == MapChipType::kEnemySpawn) {
+				MapChipType t = mapChipField_->GetMapChipTypeByIndex(x, y);
+				if (t == MapChipType::kEnemySpawn) {
 					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
 					Enemy* enemy = new Enemy();
 					enemy->Initialize(&camera_, enemyPosition);
 					enemies_.push_back(enemy);
-				} else if (mapChipField_->GetMapChipTypeByIndex(x, y) == MapChipType::kEnemySpawnShield) {
-					// We use CSV value '4' mapped to kEnemySpawnShield to indicate shield enemy spawn
+				} else if (t == MapChipType::kEnemySpawnShield) {
 					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
 					FrontShieldEnemy* fse = new FrontShieldEnemy();
 					fse->Initialize(&camera_, enemyPosition);
-					// optional: adjust threshold for variety
 					fse->SetFrontDotThreshold(0.6f);
 					enemies_.push_back(fse);
+				} else if (t == MapChipType::kSpike) {
+					Spike* s = new Spike();
+					Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
+					s->SetPosition(pos);
+					s->Initialize();
+					spikes_.push_back(s);
 				}
 			}
 		}
 	}
+
 
 	if (deathParticle_) {
 		delete deathParticle_;
 		deathParticle_ = nullptr;
 	}
 
-	// Recreate HUD sprite (texture likely already loaded in TextureManager)
+	
 	if (hudSprite_) {
 		delete hudSprite_;
 		hudSprite_ = nullptr;
@@ -670,14 +748,14 @@ void GameScene::Reset() {
 		const float hudWidth = 250.0f;
 		const float hudHeight = 30.0f;
 		const float hudMargin = 20.0f;
-		// Recreate anchored at top-center
+		
 		hudSprite_ = KamataEngine::Sprite::Create(hudTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, hudMargin}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 0.0f});
 		if (hudSprite_) {
 			hudSprite_->SetSize(KamataEngine::Vector2{hudWidth, hudHeight});
 		}
 	}
 
-	// Recreate additional UI sprites
+	
 	if (uiLeftSprite_) {
 		delete uiLeftSprite_;
 		uiLeftSprite_ = nullptr;
@@ -687,12 +765,12 @@ void GameScene::Reset() {
 		uiMidSprite_ = nullptr;
 	}
 	if (uiLeftTextureHandle_ != 0u) {
-		// Recreate at bottom-left and anchor to bottom-left, preserve size
+		
 		uiLeftSprite_ = KamataEngine::Sprite::Create(uiLeftTextureHandle_, KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
 		if (uiLeftSprite_) uiLeftSprite_->SetSize(KamataEngine::Vector2{150.0f, 30.0f});
 	}
 	if (uiMidTextureHandle_ != 0u) {
-		// Recreate middle UI at bottom-center
+		
 		uiMidSprite_ = KamataEngine::Sprite::Create(uiMidTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 1.0f});
 		if (uiMidSprite_) uiMidSprite_->SetSize(KamataEngine::Vector2{150.0f, 30.0f});
 	}
@@ -701,7 +779,7 @@ void GameScene::Reset() {
 		uiRightSprite_ = nullptr;
 	}
 	if (uiRightTextureHandle_ != 0u) {
-		// Recreate at bottom-right and anchor to bottom-right, preserve size
+		
 		uiRightSprite_ = KamataEngine::Sprite::Create(uiRightTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) - 50.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{1.0f, 1.0f});
 		if (uiRightSprite_) uiRightSprite_->SetSize(KamataEngine::Vector2{330.0f, 30.0f});
 	}
@@ -713,10 +791,10 @@ void GameScene::Reset() {
 		cameraController_->Reset();
 	}
 
-	// Reset to countdown phase
+	
 	phase_ = Phase::kCountdown;
 	countdownTime_ = countdownStart_;
 
-	// Reset victory timer
+	
 	victoryTimer_ = 0.0f;
 }

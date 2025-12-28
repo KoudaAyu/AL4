@@ -7,8 +7,9 @@ enum class MapChipType {
 	kBlank = 0, // 0
 	kBlock = 1, // 1
 	kReserved2 = 2, // 2: reserved / kept open
-	kEnemySpawn = 3, // 3: enemy spawn marker
-	kEnemySpawnShield = 4, // 4: spawn enemy with front shield
+	kEnemySpawn = 3,       // 3: 敵 スポーン場所
+	kEnemySpawnShield = 4, // 4: シールド持ち敵 スポーン場所
+	kSpike = 5, //5: 棘
 };
 
 struct MapChipData {
