@@ -242,6 +242,19 @@ void Player::Update() {
         return;
     }
 
+    // If in dying delay state, count down and finalize death when timer elapses
+    if (isDying_) {
+        // freeze player: ensure no movement
+        velocity_ = {0.0f, 0.0f, 0.0f};
+        // decrement timer
+        deathDelayTimer_ -= 1.0f / 60.0f;
+        if (deathDelayTimer_ <= 0.0f) {
+            isAlive_ = false;
+            isDying_ = false; // clear flag
+        }
+        return;
+    }
+
 #ifdef _DEBUG
     ImGui::Begin("Debug");
     ImGui::SliderFloat3("velocity", &velocity_.x, -10.0f, 10.0f);
@@ -839,15 +852,19 @@ void Player::OnCollision(Enemy* enemy) {
         return;
     }
 
-    (void)enemy;
-    isAlive_ = false;
+    // If already dying or dead, ignore further collisions
+    if (isDying_ || !isAlive_) return;
 
-    if (cameraController_) {
-        // 揺れ幅: 2.0f, 継続: 0.5秒（必要なら調整）
-        cameraController_->StartShake(2.0f, 0.5f);
-    } else {
-        DebugText::GetInstance()->ConsolePrintf("cameraController_ is null\n");
-    }
+    (void)enemy;
+    // Start dying delay instead of instant death
+    isDying_ = true;
+    deathDelayTimer_ = kDeathDelay;
+
+    // Freeze motion and inputs
+    velocity_ = {0.0f, 0.0f, 0.0f};
+
+    // Do NOT start camera shake here to avoid shake during the death pause.
+    // If needed, other systems (GameScene) can trigger shake conditionally.
 }
 
 void Player::UpdateAABB() {

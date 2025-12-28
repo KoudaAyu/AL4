@@ -1,6 +1,7 @@
 #pragma once
 
 #include "KamataEngine.h"
+#include "AABB.h"
 
 class Spike {
 public:
@@ -17,11 +18,14 @@ public:
 
     bool HasModel() const { return model_ != nullptr; }
 
+    // 追加: Spike の軸整列AABBを取得する
+    AABB GetAABB() const;
+
 private:
     KamataEngine::Vector3 position_ = {0,0,0};
     int frame_ = 0; // アニメーションフレーム
 
-    // Model handling similar to Player
+   
     KamataEngine::Model* model_ = nullptr;
     bool ownsModel_ = false;
     KamataEngine::WorldTransform worldTransform_;

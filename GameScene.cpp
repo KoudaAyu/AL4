@@ -543,7 +543,8 @@ void GameScene::Draw() {
 	}
 
 
-	if (!spikes_.empty() && phase_ != Phase::kDeath) {
+	// Draw spikes (always visible, even during death)
+	if (!spikes_.empty()) {
 		for (Spike* s : spikes_) {
 			if (s) s->Draw(&camera_);
 		}
@@ -615,38 +616,42 @@ void GameScene::GenerateBlocks() {
 void GameScene::CheckAllCollisions() {
 #pragma region プレイヤーと敵の当たり判定
 
-	// 敵またはプレイヤーが死亡している場合は衝突判定をスキップ
-	if (!player_ || enemies_.empty() || !player_->isAlive()) {
-		return;
-	}
+    // 敵またはプレイヤーが死亡している場合は衝突判定をスキップ
+    if (!player_ || !player_->isAlive()) {
+        return;
+    }
 
-	for (Enemy* enemy : enemies_) {
-		if (!enemy || !enemy->isAlive())
-			continue;
+    for (Enemy* enemy : enemies_) {
+        if (!enemy || !enemy->isAlive())
+            continue;
 
-		
-		if (player_->IsAttacking()) {
-			AABB attackBox = player_->GetAttackAABB();
-			if (IsCollisionAABBAABB(attackBox, enemy->GetAABB())) {
-			
-				enemy->OnCollision(player_);
-				
-				if (cameraController_) {
-					cameraController_->StartShake(1.0f, 0.15f);
-				}
-			
-				continue;
-			}
-		}
+        if (player_->IsAttacking()) {
+            AABB attackBox = player_->GetAttackAABB();
+            if (IsCollisionAABBAABB(attackBox, enemy->GetAABB())) {
+                enemy->OnCollision(player_);
+                if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(1.0f, 0.15f);
+                continue;
+            }
+        }
 
-	
-		if (IsCollisionAABBAABB(player_->GetAABB(), enemy->GetAABB())) {
-			player_->OnCollision(enemy);
-			enemy->OnCollision(player_);
-		}
-	}
+        if (IsCollisionAABBAABB(player_->GetAABB(), enemy->GetAABB())) {
+            player_->OnCollision(enemy);
+            enemy->OnCollision(player_);
+        }
+    }
 
 #pragma endregion
+
+    // Spike とプレイヤーの当たり判定（Spike 側で AABB を提供）
+    for (Spike* s : spikes_) {
+        if (!s) continue;
+        if (IsCollisionAABBAABB(player_->GetAABB(), s->GetAABB())) {
+            player_->OnCollision(nullptr);
+            // Only start shake if player is not in dying pause
+            if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(1.5f, 0.3f);
+            break;
+        }
+    }
 }
 
 void GameScene::ChangePhase() {

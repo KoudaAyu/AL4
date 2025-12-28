@@ -7,14 +7,14 @@ using namespace KamataEngine;
 
 void Spike::Initialize() {
     frame_ = 0;
-    // モデルをthorn.objから読み込む
+    
     model_ = KamataEngine::Model::CreateFromOBJ("thorn", true);
     if (model_) {
         ownsModel_ = true;
         DebugText::GetInstance()->ConsolePrintf("Spike: model 'thorn' loaded\n");
     } else {
         DebugText::GetInstance()->ConsolePrintf("Spike: failed to load model 'thorn', using fallback model\n");
-        // Fallback: create a simple default model so something is visible
+      
         model_ = KamataEngine::Model::Create();
         if (model_) {
             ownsModel_ = true;
@@ -24,13 +24,13 @@ void Spike::Initialize() {
 
     worldTransform_.Initialize();
     worldTransform_.translation_ = position_;
-    // Slightly bring spike forward so it is not occluded by block geometry
+   
     worldTransform_.translation_.z = -0.5f;
     worldTransform_.rotation_ = {0, 0, 0};
-    // Make it reasonably visible by default
+  
     worldTransform_.scale_ = {0.8f, 0.8f, 0.8f};
 
-    // Update initial matrix
+ 
     worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
     worldTransform_.TransferMatrix();
 }
@@ -54,10 +54,10 @@ void Spike::Update(float delta) {
 
     // 位置を反映
     worldTransform_.translation_ = position_;
-    // keep z offset
+  
     worldTransform_.translation_.z = -0.5f;
 
-    // Update matrix for drawing
+   
     worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
     worldTransform_.TransferMatrix();
 }
@@ -66,9 +66,24 @@ void Spike::Draw(KamataEngine::Camera* camera) {
     if (!model_) return;
     if (!camera) return;
 
-    // Ensure world matrix is up-to-date
+  
     worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
     worldTransform_.TransferMatrix();
 
     model_->Draw(worldTransform_, *camera);
+}
+
+AABB Spike::GetAABB() const {
+  
+    static constexpr float kWidth = 0.8f * 2.0f;
+    static constexpr float kHeight = 0.8f * 2.0f;
+    static constexpr float kDepth = 0.8f * 2.0f;
+
+    Vector3 center = position_;
+    Vector3 half = {kWidth * 0.5f, kHeight * 0.5f, kDepth * 0.5f};
+
+    AABB aabb;
+    aabb.min = {center.x - half.x, center.y - half.y, center.z - half.z};
+    aabb.max = {center.x + half.x, center.y + half.y, center.z + half.z};
+    return aabb;
 }

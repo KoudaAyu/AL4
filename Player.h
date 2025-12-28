@@ -158,6 +158,9 @@ public:
 
 	bool isAlive() const { return isAlive_; }
 
+	// 死亡一時停止中かどうか
+	bool IsDying() const { return isDying_; }
+
 	// カメラコントローラの参照を渡す（カメラシェイクを呼ぶため）
 	void SetCameraController(CameraController* controller) { cameraController_ = controller; }
 
@@ -306,5 +309,9 @@ private:
 	static inline const float kDodgeSpeed = 2.0f; // dash speed
 	static inline const float kDodgeCooldownTime = 0.5f; // seconds
 
+	// 死亡遷移用フラグ（接触直後に一瞬静止してから死亡扱いにする）
+	bool isDying_ = false;
+	float deathDelayTimer_ = 0.0f;
+	static inline const float kDeathDelay = 0.5f; // seconds: 一瞬静止する時間
 
 };
