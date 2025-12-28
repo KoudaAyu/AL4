@@ -63,6 +63,11 @@ GameScene::~GameScene() {
 		countdownSprite_ = nullptr;
 	}
 
+	// destroy heart sprites
+	for (KamataEngine::Sprite* s : heartSprites_) {
+		if (s) delete s;
+	}
+	heartSprites_.clear();
 
 	for (Spike* s : spikes_) {
 		delete s;
@@ -97,7 +102,6 @@ void GameScene::Initialize() {
 
 	player_ = new Player();
 	Vector3 playerPosition = {4.0f, 4.0f, 0.0f};
-	// If the map contains a map-chip with value 2 (reserved for player spawn), use its position as the player spawn.
 	if (mapChipField_) {
 		uint32_t vh = mapChipField_->GetNumBlockVertical();
 		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
@@ -114,6 +118,23 @@ void GameScene::Initialize() {
 	}
 	player_->Initialize(&camera_, playerPosition);
 	player_->SetMapChipField(mapChipField_);
+
+
+	heartTextureHandle_ = TextureManager::Load("Sprite/PlayerHP.png");
+	if (heartTextureHandle_ != 0u && player_) {
+		// create initial hearts equal to player's HP
+		int hp = player_->GetHP();
+		const float heartSize = 32.0f;
+		const float heartMarginX = 20.0f;
+		const float heartSpacing = 8.0f;
+		for (int i = 0; i < hp; ++i) {
+			float x = heartMarginX + i * (heartSize + heartSpacing);
+			float y = static_cast<float>(kWindowHeight) - 20.0f; // pivot will be bottom-aligned
+			KamataEngine::Sprite* s = KamataEngine::Sprite::Create(heartTextureHandle_, KamataEngine::Vector2{x, y}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
+			if (s) s->SetSize(KamataEngine::Vector2{heartSize, heartSize});
+			heartSprites_.push_back(s);
+		}
+	}
 
 	
 	if (mapChipField_) {
@@ -468,6 +489,35 @@ void GameScene::Update() {
 			uiRightSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) - 50.0f, static_cast<float>(kWindowHeight) - 50.0f});
 		}
 
+		// Update heart sprites to match player's current HP
+		{
+			if (player_) {
+				int hp = player_->GetHP();
+				if (hp < 0) hp = 0;
+				// If number of heart sprites differs from current HP, rebuild
+				if (static_cast<int>(heartSprites_.size()) != hp) {
+					// destroy existing
+					for (KamataEngine::Sprite* s : heartSprites_) {
+						if (s) delete s;
+					}
+					heartSprites_.clear();
+
+					if (heartTextureHandle_ != 0u) {
+						const float heartSize = 32.0f;
+						const float heartMarginX = 20.0f;
+						const float heartSpacing = 8.0f;
+						for (int i = 0; i < hp; ++i) {
+							float x = heartMarginX + i * (heartSize + heartSpacing);
+							float y = static_cast<float>(kWindowHeight) - 20.0f; // bottom-aligned
+							KamataEngine::Sprite* s = KamataEngine::Sprite::Create(heartTextureHandle_, KamataEngine::Vector2{x, y}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
+							if (s) s->SetSize(KamataEngine::Vector2{heartSize, heartSize});
+							heartSprites_.push_back(s);
+						}
+					}
+				}
+			}
+		}
+
 		// フェーズ切り替えをチェック
 		ChangePhase();
 		break;
@@ -587,8 +637,7 @@ void GameScene::Draw() {
 	Model::PostDraw();
 
 	
-	if (hudSprite_ || uiLeftSprite_ || uiMidSprite_ || uiRightSprite_ || countdownSprite_) {
-		
+	if (hudSprite_ || uiLeftSprite_ || uiMidSprite_ || uiRightSprite_ || countdownSprite_ || !heartSprites_.empty()) {
 		KamataEngine::DirectXCommon* dx = KamataEngine::DirectXCommon::GetInstance();
 		KamataEngine::Sprite::PreDraw(dx->GetCommandList());
 		if (hudSprite_) hudSprite_->Draw();
@@ -596,6 +645,10 @@ void GameScene::Draw() {
 		if (uiMidSprite_) uiMidSprite_->Draw();
 		if (uiRightSprite_) uiRightSprite_->Draw();
 		if (phase_ == Phase::kCountdown && countdownSprite_) countdownSprite_->Draw();
+		// Draw heart sprites (show during all phases, including countdown)
+		for (KamataEngine::Sprite* s : heartSprites_) {
+			if (s) s->Draw();
+		}
 		KamataEngine::Sprite::PostDraw();
 	}
 }

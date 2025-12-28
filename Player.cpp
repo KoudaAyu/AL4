@@ -128,6 +128,11 @@ void Player::Initialize(Camera* camera, const Vector3& position) {
 	worldTransform_.scale_ = {0.5f, 0.5f, 0.5f};
 
     UpdateAABB();
+
+    // Reset HP on initialize
+    hp_ = kMaxHP;
+    isAlive_ = true;
+    isDying_ = false;
 }
 
 // 移動処理
@@ -253,6 +258,15 @@ void Player::Update() {
             isDying_ = false; // clear flag
         }
         return;
+    }
+
+    // Invincibility timer update
+    if (invincible_) {
+        invincibleTimer_ -= 1.0f / 60.0f;
+        if (invincibleTimer_ <= 0.0f) {
+            invincible_ = false;
+            invincibleTimer_ = 0.0f;
+        }
     }
 
 #ifdef _DEBUG
@@ -855,16 +869,31 @@ void Player::OnCollision(Enemy* enemy) {
     // If already dying or dead, ignore further collisions
     if (isDying_ || !isAlive_) return;
 
+    // If currently invincible, ignore damage
+    if (invincible_) return;
+
     (void)enemy;
-    // Start dying delay instead of instant death
-    isDying_ = true;
-    deathDelayTimer_ = kDeathDelay;
+    // Reduce HP and trigger damage feedback
+    hp_ = std::max(0, hp_ - 1);
 
-    // Freeze motion and inputs
-    velocity_ = {0.0f, 0.0f, 0.0f};
+    DebugText::GetInstance()->ConsolePrintf("Player damaged. HP=%d\n", hp_);
 
-    // Do NOT start camera shake here to avoid shake during the death pause.
-    // If needed, other systems (GameScene) can trigger shake conditionally.
+    // Start invincibility frames
+    invincible_ = true;
+    invincibleTimer_ = kInvincibleDuration;
+
+    // Rumble and camera shake
+    StartRumble(0.8f, 0.8f, 150);
+    if (cameraController_) cameraController_->StartShake(0.8f, 0.12f);
+
+    // If HP reaches zero, start dying delay instead of instant death
+    if (hp_ <= 0) {
+        isDying_ = true;
+        deathDelayTimer_ = kDeathDelay;
+
+        // Freeze motion and inputs
+        velocity_ = {0.0f, 0.0f, 0.0f};
+    }
 }
 
 void Player::UpdateAABB() {

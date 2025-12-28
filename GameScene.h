@@ -103,6 +103,10 @@ private:
 	KamataEngine::Sprite* uiRightSprite_ = nullptr;
 	uint32_t uiRightTextureHandle_ = 0u;
 
+	// HP hearts UI
+	std::vector<KamataEngine::Sprite*> heartSprites_;
+	uint32_t heartTextureHandle_ = 0u;
+
 	
 	float victoryTimer_ = 0.0f;
 

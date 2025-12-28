@@ -48,7 +48,7 @@
     <ClCompile Include="Skydome.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Enemy.cpp">
+    <ClCompile Include="Enemy\Enemy.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="AABB.cpp">
@@ -120,7 +120,7 @@
     <ClInclude Include="Player.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="Enemy.h">
+    <ClInclude Include="Enemy\Enemy.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="GameScene.h">
@@ -153,9 +153,6 @@
     <ClInclude Include="Skydome.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="AABB.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
     <ClInclude Include="DeathParticle.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
@@ -163,6 +160,9 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Spike.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="AABB.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>

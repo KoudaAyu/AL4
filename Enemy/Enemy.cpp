@@ -1,8 +1,8 @@
 #include "Enemy.h"
 #include<cmath>
 #include<numbers>
-#include"MathUtl.h"
-#include"Player.h"
+#include"../MathUtl.h"
+#include"../Player.h"
 
 using namespace KamataEngine;
 
@@ -66,6 +66,9 @@ void Enemy::UpdateAABB() {
 }
 
 void Enemy::OnCollision(Player* player) {
-	(void)player;
-	isAlive_ = false;
+	// Only die when hit by player's attack (not by mere body contact)
+	if (player && player->IsAttacking()) {
+		isAlive_ = false;
+	}
+	// otherwise ignore collision (player bump does not kill enemy)
 }

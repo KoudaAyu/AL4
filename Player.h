@@ -164,6 +164,9 @@ public:
 	// カメラコントローラの参照を渡す（カメラシェイクを呼ぶため）
 	void SetCameraController(CameraController* controller) { cameraController_ = controller; }
 
+	// HP accessor
+	int GetHP() const { return hp_; }
+
 private:
 	// ワールド変換データ
 	WorldTransform worldTransform_;
@@ -277,7 +280,7 @@ private:
 
 	// attack hitbox
 	static inline const float kAttackReach = 1.0f; // 前方への到達距離
-	static inline const float kAttackWidth = 1.2f; // 当たり判定の幅(横)
+	volatile static inline const float kAttackWidth = 1.2f; // 当たり判定の幅(横)
 	static inline const float kAttackHeight = 0.8f; // 当たり判定の高さ
 
 	// 攻撃時の短距離ダッシュ設定
@@ -313,5 +316,14 @@ private:
 	bool isDying_ = false;
 	float deathDelayTimer_ = 0.0f;
 	static inline const float kDeathDelay = 0.5f; // seconds: 一瞬静止する時間
+
+	// --- HP ---
+	static inline const int kMaxHP = 3;
+	int hp_ = kMaxHP;
+
+	// --- Invincibility (i-frames) ---
+	bool invincible_ = false;
+	float invincibleTimer_ = 0.0f;
+	static inline const float kInvincibleDuration = 1.0f; // seconds of invincibility after taking damage
 
 };

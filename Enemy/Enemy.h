@@ -1,8 +1,8 @@
 #pragma once
 
-#include"AABB.h"
-#include "KamataEngine.h"
 
+#include "KamataEngine.h"
+#include "../AABB.h"
 class Player;
 
 class Enemy {
