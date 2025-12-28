@@ -97,6 +97,21 @@ void GameScene::Initialize() {
 
 	player_ = new Player();
 	Vector3 playerPosition = {4.0f, 4.0f, 0.0f};
+	// If the map contains a map-chip with value 2 (reserved for player spawn), use its position as the player spawn.
+	if (mapChipField_) {
+		uint32_t vh = mapChipField_->GetNumBlockVertical();
+		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
+		bool found = false;
+		for (uint32_t y = 0; y < vh && !found; ++y) {
+			for (uint32_t x = 0; x < wh; ++x) {
+				if (mapChipField_->GetMapChipTypeByIndex(x, y) == MapChipType::kReserved2) {
+					playerPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					found = true;
+					break;
+				}
+			}
+		}
+	}
 	player_->Initialize(&camera_, playerPosition);
 	player_->SetMapChipField(mapChipField_);
 
@@ -690,6 +705,21 @@ void GameScene::Reset() {
 		player_ = nullptr;
 	}
 	Vector3 playerPosition = {4.0f, 4.0f, 0.0f};
+	// Recompute spawn position from map chip 2 if available
+	if (mapChipField_) {
+		uint32_t vh = mapChipField_->GetNumBlockVertical();
+		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
+		bool found = false;
+		for (uint32_t y = 0; y < vh && !found; ++y) {
+			for (uint32_t x = 0; x < wh; ++x) {
+				if (mapChipField_->GetMapChipTypeByIndex(x, y) == MapChipType::kReserved2) {
+					playerPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					found = true;
+					break;
+				}
+			}
+		}
+	}
 	player_ = new Player();
 	player_->Initialize(&camera_, playerPosition);
 	player_->SetMapChipField(mapChipField_);
@@ -800,6 +830,5 @@ void GameScene::Reset() {
 	phase_ = Phase::kCountdown;
 	countdownTime_ = countdownStart_;
 
-	
 	victoryTimer_ = 0.0f;
 }
