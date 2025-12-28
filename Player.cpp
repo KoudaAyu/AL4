@@ -125,7 +125,7 @@ void Player::Initialize(Camera* camera, const Vector3& position) {
     worldTransform_.Initialize();
     worldTransform_.translation_ = position;
     worldTransform_.rotation_.y = std::numbers::pi_v<float> / 2.0f;
-	worldTransform_.scale_ = {0.5f, 0.5f, 0.5f};
+	worldTransform_.scale_ = {0.3f, 0.3f, 0.3f};
 
     UpdateAABB();
 

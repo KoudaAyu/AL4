@@ -6,6 +6,7 @@
 #include <2d/Sprite.h>
 #include "KeyInput.h"
 #include "Spike.h"
+#include <algorithm>
 using namespace KamataEngine;
 
 GameScene::GameScene() {}
@@ -713,9 +714,34 @@ void GameScene::CheckAllCollisions() {
     // Spike とプレイヤーの当たり判定（Spike 側で AABB を提供）
     for (Spike* s : spikes_) {
         if (!s) continue;
-        if (IsCollisionAABBAABB(player_->GetAABB(), s->GetAABB())) {
+        AABB pA = player_->GetAABB();
+        AABB sA = s->GetAABB();
+        if (IsCollisionAABBAABB(pA, sA)) {
+            // compute penetration depths
+            float overlapX = std::min<float>(pA.max.x, sA.max.x) - std::max<float>(pA.min.x, sA.min.x);
+            float overlapY = std::min<float>(pA.max.y, sA.max.y) - std::max<float>(pA.min.y, sA.min.y);
+
+            // centers
+            Vector3 pCenter = {(pA.min.x + pA.max.x) * 0.5f, (pA.min.y + pA.max.y) * 0.5f, 0.0f};
+            Vector3 sCenter = {(sA.min.x + sA.max.x) * 0.5f, (sA.min.y + sA.max.y) * 0.5f, 0.0f};
+
+            // Separate along smallest penetration axis
+            KamataEngine::WorldTransform& pwt = player_->GetWorldTransform();
+            if (overlapX < overlapY) {
+                float dir = (pCenter.x < sCenter.x) ? -1.0f : 1.0f;
+                pwt.translation_.x += dir * overlapX;
+                player_->velocity_.x = 0.0f;
+            } else {
+                float dir = (pCenter.y < sCenter.y) ? -1.0f : 1.0f;
+                pwt.translation_.y += dir * overlapY;
+                player_->velocity_.y = 0.0f;
+            }
+
+            // Update player's AABB after correction
+            player_->UpdateAABB();
+
+            // Apply damage / feedback
             player_->OnCollision(nullptr);
-            // Only start shake if player is not in dying pause
             if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(1.5f, 0.3f);
             break;
         }
