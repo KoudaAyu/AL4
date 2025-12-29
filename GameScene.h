@@ -50,8 +50,8 @@ public:
 
 	bool IsFinished() { return finished_; }
 
-	// Returns true when the player has entered the death phase (player died)
-	bool IsPlayerDead() const { return phase_ == Phase::kDeath; }
+	// Returns true when the player has entered the death sequence and the death animation finished
+	bool IsPlayerDead() const { return readyForGameOver_; }
 
 private:
 	bool finished_ = false;
@@ -83,6 +83,9 @@ private:
 
 	// Particle関係
 	DeathParticle* deathParticle_ = nullptr;
+
+	// Flag indicating death animation finished and ready to go to GameOver
+	bool readyForGameOver_ = false;
 
 	
 	std::vector<Enemy*> enemies_;

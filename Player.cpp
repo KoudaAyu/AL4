@@ -77,7 +77,7 @@ static float GetHorizontalInputIntensity(float stickX, bool keyRight, bool keyLe
 
 static bool IsPressingTowardWall(const XINPUT_STATE& state, WallSide side) {
 	float stickX = NormalizeLeftStickX(state.Gamepad.sThumbLX);
-	// Accept both arrow keys and A/D keys for horizontal input
+
 	bool keyLeft = Input::GetInstance()->PushKey(DIK_LEFT) || Input::GetInstance()->PushKey(DIK_A);
 	bool keyRight = Input::GetInstance()->PushKey(DIK_RIGHT) || Input::GetInstance()->PushKey(DIK_D);
 
@@ -91,7 +91,7 @@ static bool IsPressingTowardWall(const XINPUT_STATE& state, WallSide side) {
 	}
 }
 
-} // anonymous namespace
+} 
 
 Player::Player() {}
 
@@ -124,7 +124,7 @@ void Player::Initialize(Camera* camera, const Vector3& position) {
 
 	UpdateAABB();
 
-	// Reset HP on initialize
+	
 	hp_ = kMaxHP;
 	isAlive_ = true;
 	isDying_ = false;
@@ -238,11 +238,11 @@ void Player::Update() {
 		return;
 	}
 
-	// If in dying delay state, count down and finalize death when timer elapses
+
 	if (isDying_) {
-		// freeze player: ensure no movement
+		
 		velocity_ = {0.0f, 0.0f, 0.0f};
-		// decrement timer
+		
 		deathDelayTimer_ -= 1.0f / 60.0f;
 		if (deathDelayTimer_ <= 0.0f) {
 			isAlive_ = false;
@@ -251,7 +251,7 @@ void Player::Update() {
 		return;
 	}
 
-	// Invincibility timer update
+
 	if (invincible_) {
 		invincibleTimer_ -= 1.0f / 60.0f;
 		if (invincibleTimer_ <= 0.0f) {
@@ -512,7 +512,7 @@ void Player::SwitchingTheGrounding(CollisionMapInfo& info) {
 			// 二段ジャンプのリセット
 			jumpCount_ = 0;
 
-			// Reset wall-jump count when landing
+			
 			wallJumpCount_ = 0;
 		}
 	}
@@ -840,35 +840,35 @@ void Player::OnCollision(Enemy* enemy) {
 		return;
 	}
 
-	// If already dying or dead, ignore further collisions
+
 	if (isDying_ || !isAlive_)
 		return;
 
-	// If currently invincible, ignore damage
+
 	if (invincible_)
 		return;
 
 	(void)enemy;
-	// Reduce HP and trigger damage feedback
+	
 	hp_ = std::max(0, hp_ - 1);
 
 	DebugText::GetInstance()->ConsolePrintf("Player damaged. HP=%d\n", hp_);
 
-	// Start invincibility frames
+
 	invincible_ = true;
 	invincibleTimer_ = kInvincibleDuration;
 
-	// Rumble and camera shake
+	
 	StartRumble(0.8f, 0.8f, 150);
 	if (cameraController_)
 		cameraController_->StartShake(0.8f, 0.12f);
 
-	// If HP reaches zero, start dying delay instead of instant death
+	
 	if (hp_ <= 0) {
 		isDying_ = true;
 		deathDelayTimer_ = kDeathDelay;
 
-		// Freeze motion and inputs
+		
 		velocity_ = {0.0f, 0.0f, 0.0f};
 	}
 }

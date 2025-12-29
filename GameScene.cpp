@@ -88,7 +88,8 @@ void GameScene::Initialize() {
 	model_ = Model::Create();
 	textureHandle_ = TextureManager::Load("uvChecker.png");
 
-	blockModel_ = Model::Create();
+	// Use Block.obj for map chip blocks
+	blockModel_ = Model::CreateFromOBJ("Block");
 #ifdef _DEBUG
 	assert(textureHandle_);
 #endif
@@ -96,7 +97,6 @@ void GameScene::Initialize() {
 	camera_.farZ = 3000.0f;
 	camera_.UpdateProjectionMatrix();
 	camera_.TransferMatrix();
-
 
 	mapChipField_ = new MapChipField();
 	mapChipField_->LoadMapChipCsv("Resources/Debug/Map/Block.csv");
@@ -123,14 +123,14 @@ void GameScene::Initialize() {
 
 	heartTextureHandle_ = TextureManager::Load("Sprite/PlayerHP.png");
 	if (heartTextureHandle_ != 0u && player_) {
-		// create initial hearts equal to player's HP
+	
 		int hp = player_->GetHP();
 		const float heartSize = 32.0f;
 		const float heartMarginX = 20.0f;
 		const float heartSpacing = 8.0f;
 		for (int i = 0; i < hp; ++i) {
 			float x = heartMarginX + i * (heartSize + heartSpacing);
-			float y = static_cast<float>(kWindowHeight) - 20.0f; // pivot will be bottom-aligned
+			float y = static_cast<float>(kWindowHeight) - 20.0f;
 			KamataEngine::Sprite* s = KamataEngine::Sprite::Create(heartTextureHandle_, KamataEngine::Vector2{x, y}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
 			if (s) s->SetSize(KamataEngine::Vector2{heartSize, heartSize});
 			heartSprites_.push_back(s);
@@ -193,12 +193,12 @@ void GameScene::Initialize() {
 					enemy->Initialize(&camera_, enemyPosition);
 					enemies_.push_back(enemy);
 				} else if (t == MapChipType::kEnemySpawnShield) {
-					// We use CSV value '4' mapped to kEnemySpawnShield to indicate shield enemy spawn
+				
 					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
 					FrontShieldEnemy* fse = new FrontShieldEnemy();
-					// Use overload where FrontShieldEnemy creates/owns its own model
+					
 					fse->Initialize(&camera_, enemyPosition);
-					// optional: adjust threshold for variety
+					
 					fse->SetFrontDotThreshold(0.6f);
 					enemies_.push_back(fse);
 				}
@@ -230,9 +230,8 @@ void GameScene::Initialize() {
 	skydome_->SetCamera(&camera_);
 
 	// Particle関係
-	deathParticle_ = new DeathParticle();
-	deathParticle_->Initialize(model_, &camera_, playerPosition);
-
+	
+	readyForGameOver_ = false;
 
 	hudTextureHandle_ = TextureManager::Load("Debug/Goal.png");
 	if (hudTextureHandle_ != 0u) {
@@ -565,8 +564,12 @@ void GameScene::Update() {
 		}
 
 		// Particle関係
-		if (deathParticle_) {
+		if (phase_ == Phase::kDeath && deathParticle_) {
 			deathParticle_->Update();
+			
+			if (deathParticle_->IsFinished()) {
+				readyForGameOver_ = true;
+			}
 		}
 
 #ifndef _DEBUG
@@ -609,7 +612,7 @@ void GameScene::Draw() {
 	}
 
 
-	// Draw spikes (always visible, even during death)
+
 	if (!spikes_.empty()) {
 		for (Spike* s : spikes_) {
 			if (s) s->Draw(&camera_);
@@ -631,7 +634,7 @@ void GameScene::Draw() {
 	}
 
 	// Particle関係
-	if (deathParticle_) {
+	if (phase_ == Phase::kDeath && deathParticle_) {
 		deathParticle_->Draw();
 	}
 
@@ -646,7 +649,7 @@ void GameScene::Draw() {
 		if (uiMidSprite_) uiMidSprite_->Draw();
 		if (uiRightSprite_) uiRightSprite_->Draw();
 		if (phase_ == Phase::kCountdown && countdownSprite_) countdownSprite_->Draw();
-		// Draw heart sprites (show during all phases, including countdown)
+		
 		for (KamataEngine::Sprite* s : heartSprites_) {
 			if (s) s->Draw();
 		}
@@ -717,15 +720,15 @@ void GameScene::CheckAllCollisions() {
         AABB pA = player_->GetAABB();
         AABB sA = s->GetAABB();
         if (IsCollisionAABBAABB(pA, sA)) {
-            // compute penetration depths
+           
             float overlapX = std::min<float>(pA.max.x, sA.max.x) - std::max<float>(pA.min.x, sA.min.x);
             float overlapY = std::min<float>(pA.max.y, sA.max.y) - std::max<float>(pA.min.y, sA.min.y);
 
-            // centers
+          
             Vector3 pCenter = {(pA.min.x + pA.max.x) * 0.5f, (pA.min.y + pA.max.y) * 0.5f, 0.0f};
             Vector3 sCenter = {(sA.min.x + sA.max.x) * 0.5f, (sA.min.y + sA.max.y) * 0.5f, 0.0f};
 
-            // Separate along smallest penetration axis
+         
             KamataEngine::WorldTransform& pwt = player_->GetWorldTransform();
             if (overlapX < overlapY) {
                 float dir = (pCenter.x < sCenter.x) ? -1.0f : 1.0f;
@@ -737,10 +740,10 @@ void GameScene::CheckAllCollisions() {
                 player_->velocity_.y = 0.0f;
             }
 
-            // Update player's AABB after correction
+
             player_->UpdateAABB();
 
-            // Apply damage / feedback
+           
             player_->OnCollision(nullptr);
             if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(1.5f, 0.3f);
             break;
@@ -754,8 +757,9 @@ void GameScene::ChangePhase() {
 	case Phase::kPlay:
 
 		if (!player_->isAlive()) {
+		
 			phase_ = Phase::kDeath;
-			const Vector3& deathPos = player_->GetPosition();
+			const Vector3 deathPos = player_->GetPosition();
 
 			if (deathParticle_) {
 				delete deathParticle_;
@@ -764,6 +768,8 @@ void GameScene::ChangePhase() {
 
 			deathParticle_ = new DeathParticle();
 			deathParticle_->Initialize(model_, &camera_, deathPos);
+			
+			readyForGameOver_ = false;
 		}
 
 		break;

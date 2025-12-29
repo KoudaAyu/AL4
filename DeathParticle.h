@@ -15,6 +15,9 @@ public:
 
 	void emitOctagonalParticles();
 
+	// Return true when particle has finished its life
+	bool IsFinished() const { return isFinish_; }
+
 private:
 	// Particleの数
 	static inline const uint32_t kNumParticles = 8;
