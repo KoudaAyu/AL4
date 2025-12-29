@@ -196,7 +196,9 @@ private:
 	//加速量
 	static inline const float kAcceleration = 0.05f;
 
-	static inline const float kAttenuation = 0.05f;
+	// 速度減衰（慣性制御）
+	// 値を増やして慣性を減らす（入力停止時にすばやく速度を落とす）
+	static inline const float kAttenuation = 0.25f; 
 
 	//横移動の最大速度
 	static inline const float kLimitRunSpeed = 0.5f;
@@ -237,38 +239,31 @@ private:
 	static inline const float kBlank = 0.1f * 2.0f;
 
 	// 着地時の速度減衰率
-	static inline const float kAttenuationLanding = 0.1f;
+	static inline const float kAttenuationLanding = 0.35f; 
 
 	// 着地時の速度減衰率
-	static inline const float kAttenuationWall = 0.1f;
+	static inline const float kAttenuationWall = 0.2f;
 
 	// --- 壁けり関連 ---
 	bool isWallSliding_ = false;
 	float wallJumpCooldown_ = 0.0f; // 同一入力で連続発動しないためのクールダウン
 
-	// Tuned to be Mario-like: smaller vertical and controlled horizontal
 	static inline const float kWallJumpHorizontalSpeed = 0.6f; // 壁から離れるX速度
 	static inline const float kWallJumpVerticalSpeed = 1.4f;   // 壁けり時のY速度 (reduced)
 
-	// Secondary (weaker) speeds for second wall-jump
 	static inline const float kWallJumpHorizontalSpeed2 = 0.3f; // second jump horizontal
 	static inline const float kWallJumpVerticalSpeed2 = 0.9f; // second jump vertical
 
 	static inline const float kWallSlideMaxFallSpeed = 3.0f;   // 壁滑り中の最大落下速度
-	// Short cooldown to allow quick re-kick
 	static inline const float kWallJumpCooldownTime = 0.1f;    // クールダウン時間(秒) (reduced)
-	// horizontal damping factor applied immediately after wall jump to reduce overshoot
-	static inline const float kWallJumpHorizontalDamp = 0.6f; // multiply velocity_.x by this after jump
+	static inline const float kWallJumpHorizontalDamp = 0.6f; 
 
-	// Allow up to two wall jumps in air
 	int wallJumpCount_ = 0;
 	static inline const int kMaxWallJumps = 2;
 
-	// Track last wall side touched to allow resetting wall jump count when contacting a new wall
 	WallSide lastWallSide_ = WallSide::kNone;
 
-	// Grace time after contacting wall to allow immediate wall-jump (prevents small fall)
-	static inline const float kWallContactGraceTime = 0.1f; // seconds
+	static inline const float kWallContactGraceTime = 0.1f; 
 	float wallContactGraceTimer_ = 0.0f;
 
 	bool isAlive_ = true; 	
@@ -321,9 +316,8 @@ private:
 	static inline const int kMaxHP = 3;
 	int hp_ = kMaxHP;
 
-	// --- Invincibility (i-frames) ---
 	bool invincible_ = false;
 	float invincibleTimer_ = 0.0f;
-	static inline const float kInvincibleDuration = 1.0f; // seconds of invincibility after taking damage
+	static inline const float kInvincibleDuration = 1.0f;
 
 };
