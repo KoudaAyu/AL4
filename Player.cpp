@@ -433,6 +433,25 @@ void Player::mapChipCollisionCheck(CollisionMapInfo& info) {
 void Player::JudgmentResult(const CollisionMapInfo& info) {
 	// 移動
 	worldTransform_.translation_ += info.movement_;
+
+	// マップの移動可能領域に基づいて X をクランプする（左端より外に行けないようにする）
+	if (mapChipField_) {
+		Rect area = mapChipField_->GetMovableArea();
+		float halfWidth = kWidth * 0.5f;
+		float minX = area.left + halfWidth;
+		float maxX = area.right - halfWidth;
+		if (minX > maxX) {
+			// マップが小さすぎる場合の保険
+			minX = maxX = (area.left + area.right) * 0.5f;
+		}
+		if (worldTransform_.translation_.x < minX) {
+			worldTransform_.translation_.x = minX;
+			velocity_.x = 0.0f;
+		} else if (worldTransform_.translation_.x > maxX) {
+			worldTransform_.translation_.x = maxX;
+			velocity_.x = 0.0f;
+		}
+	}
 }
 
 // 天井に接触している場合
