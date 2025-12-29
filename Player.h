@@ -248,10 +248,11 @@ private:
 	float wallJumpCooldown_ = 0.0f; // 同一入力で連続発動しないためのクールダウン
 
 	static inline const float kWallJumpHorizontalSpeed = 0.6f; // 壁から離れるX速度
-	static inline const float kWallJumpVerticalSpeed = 1.4f;   // 壁けり時のY速度 (reduced)
+	// Reduced vertical speeds so wall-jump reaches lower height than double jump
+	static inline const float kWallJumpVerticalSpeed = 0.55f;   // 壁けり時のY速度 (reduced)
 
 	static inline const float kWallJumpHorizontalSpeed2 = 0.3f; // second jump horizontal
-	static inline const float kWallJumpVerticalSpeed2 = 0.9f; // second jump vertical
+	static inline const float kWallJumpVerticalSpeed2 = 0.45f; // second jump vertical
 
 	static inline const float kWallSlideMaxFallSpeed = 3.0f;   // 壁滑り中の最大落下速度
 	static inline const float kWallJumpCooldownTime = 0.1f;    // クールダウン時間(秒) (reduced)
