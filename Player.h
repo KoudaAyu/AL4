@@ -195,12 +195,20 @@ private:
 
 	//加速量
 	static inline const float kAcceleration = 0.04f; 
+	// 空中での横移動加速度（地上より弱め）
+	static inline const float kAirAcceleration = 0.02f;
+	// 空中での最大横移動速度（地上より少し低め）
+	static inline const float kAirLimitRunSpeed = 0.45f;
+
 	// 速度減衰（慣性制御）
 	// 値を増やして慣性を減らす（入力停止時にすばやく速度を落とす）
 	static inline const float kAttenuation = 0.25f; 
 
 	//横移動の最大速度
 	static inline const float kLimitRunSpeed = 0.5f;
+
+	// ジャンプ直後の横方向ダンピング（地上からジャンプしたときの横慣性を抑える）
+	static inline const float kJumpHorizontalDamp = 0.7f;
 
 	// 旋回開始の角度
 	float turnFirstRotationY_ = 0.0f;

@@ -194,12 +194,46 @@ void Player::HandleMovementInput() {
 			velocity_.x *= (1.0f - kAttenuation);
 		}
 
-		// ジャンプ入力: キーボードの上キーまたはSPACEキーまたはXboxコントローラのAボタン
-		if (Input::GetInstance()->PushKey(DIK_UP) || Input::GetInstance()->PushKey(DIK_SPACE) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A)) {
-			velocity_.y += kJumpAcceleration;
-		}
+		// ジャンプ入力はライズエッジ側で処理するため、ここで直接加算は行わない
 
 	} else {
+		// 空中の横移動制御を追加（地上より弱い加速度で左右移動を可能にする）
+		if (moveRight || moveLeft) {
+			float inputIntensityRight = (keyRight) ? 1.0f : std::max(0.0f, stickX);
+			float inputIntensityLeft = (keyLeft) ? 1.0f : std::max(0.0f, -stickX);
+
+			float accelX = 0.0f;
+			if (inputIntensityRight > 0.0f) {
+				// 反対方向への速度を少し緩和して方向転換を行う
+				if (velocity_.x < 0.0f) {
+					velocity_.x *= 0.8f;
+				}
+				if (lrDirection_ != LRDirection::kRight) {
+					lrDirection_ = LRDirection::kRight;
+					turnFirstRotationY_ = worldTransform_.rotation_.y;
+					turnTimer_ = kTimeTurn;
+				}
+				accelX += kAirAcceleration * inputIntensityRight;
+			} else if (inputIntensityLeft > 0.0f) {
+				if (velocity_.x > 0.0f) {
+					velocity_.x *= 0.8f;
+				}
+				if (lrDirection_ != LRDirection::kLeft) {
+					lrDirection_ = LRDirection::kLeft;
+					turnFirstRotationY_ = worldTransform_.rotation_.y;
+					turnTimer_ = kTimeTurn;
+				}
+				accelX -= kAirAcceleration * inputIntensityLeft;
+			}
+
+			velocity_.x += accelX;
+			// 空中では地上より少し低い最大速度に制限
+			velocity_.x = std::clamp(velocity_.x, -kAirLimitRunSpeed, kAirLimitRunSpeed);
+		} else {
+			// 空中では減衰を弱める（空中の慣性を残す）
+			velocity_.x *= (1.0f - kAttenuation * 0.2f);
+		}
+
 		// 常に重力を加える（空中）
 		velocity_.y += -kGravityAcceleration;
 
@@ -218,9 +252,32 @@ void Player::HandleMovementInput() {
 	prevAButtonPressed_ = gamepadA;
 
 	if ((keyboardRising || gamepadRising) && (onGround_ || jumpCount_ < kMaxJumps)) {
+#ifdef _DEBUG
+		// デバッグ出力: ジャンプ発生時の情報を表示
+		{
+			float beforeVY = velocity_.y;
+			DebugText::GetInstance()->ConsolePrintf("JumpTrigger onGround=%s jumpCount=%d beforeVY=%.3f posY=%.3f\n",
+                onGround_ ? "true" : "false", jumpCount_, beforeVY, worldTransform_.translation_.y);
+			if (mapChipField_) {
+				// 各コーナー下のマップチップタイプを表示
+				for (int i = 0; i < static_cast<int>(kNumCorners); ++i) {
+					Vector3 cornerPos = CornerPosition(worldTransform_.translation_, static_cast<Player::Corner>(i));
+					IndexSet idx = mapChipField_->GetMapChipIndexSetByPosition(cornerPos - Vector3{0.0f, 0.05f, 0.0f});
+					MapChipType type = mapChipField_->GetMapChipTypeByIndex(idx.xIndex, idx.yIndex);
+					DebugText::GetInstance()->ConsolePrintf(" corner=%d idx=(%d,%d) type=%d\n", i, idx.xIndex, idx.yIndex, static_cast<int>(type));
+				}
+			}
+		}
+#endif
+
 		if (onGround_) {
-			// 地上ジャンプは上向き速度を固定で与える（現在の落下速度に依存させない）
+			// 地上ジャンプは前フレームの垂直速度を消してから固定上向き速度を与える
+			velocity_.y = 0.0f;
 			velocity_.y = kJumpVelocityGround;
+			// 地上からジャンプした瞬間は横方向の慣性を抑える
+			velocity_.x *= kJumpHorizontalDamp;
+			// ただし空中での上限に収める
+			velocity_.x = std::clamp(velocity_.x, -kAirLimitRunSpeed, kAirLimitRunSpeed);
 		} else {
 			// 二段ジャンプも固定上向き速度を設定して高さを安定させる
 			velocity_.y = kJumpVelocityAir;
@@ -229,6 +286,10 @@ void Player::HandleMovementInput() {
 		velocity_.y = std::min(velocity_.y, kJumpVelocityGround);
 		jumpCount_++;
 		onGround_ = false;
+
+#ifdef _DEBUG
+		DebugText::GetInstance()->ConsolePrintf(" -> afterVY=%.3f jumpCount=%d\n", velocity_.y, jumpCount_);
+#endif
 	}
 }
 
@@ -482,34 +543,22 @@ void Player::SwitchingTheGrounding(CollisionMapInfo& info) {
 		if (velocity_.y > 0.0f) {
 			onGround_ = false;
 		} else {
-			std::array<Vector3, kNumCorners> positionNew;
-			for (uint32_t i = 0; i < positionNew.size(); ++i) {
-				positionNew[i] = CornerPosition(worldTransform_.translation_ + info.movement_, static_cast<Corner>(i));
-			}
-
-			MapChipType mapChipType;
+			// 改良: 底面を複数点サンプリングして接地判定を安定化
+			constexpr float kGroundCheckOffsetY = 0.1f; // わずかに下を見る
+			constexpr int kSampleCount = 3;
+			std::array<float, kSampleCount> sampleXOffsets = { -kWidth * 0.45f, 0.0f, kWidth * 0.45f };
 
 			bool hit = false;
-
-			IndexSet indexSet;
-
-			indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kLeftTop]);
-
-			constexpr float kGroundCheckOffsetY = 0.1f; // わずかに下を見る
-
-			// 左下点
-			indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kLeftBottom] - Vector3{0.0f, kGroundCheckOffsetY, 0.0f});
-			mapChipType = mapChipField_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
-			if (mapChipType == MapChipType::kBlock) {
-				hit = true;
+			for (int i = 0; i < kSampleCount; ++i) {
+				Vector3 samplePos = worldTransform_.translation_ + info.movement_ + Vector3{ sampleXOffsets[i], -kGroundCheckOffsetY, 0.0f };
+				IndexSet indexSet = mapChipField_->GetMapChipIndexSetByPosition(samplePos);
+				MapChipType mapChipType = mapChipField_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
+				if (mapChipType == MapChipType::kBlock) {
+					hit = true;
+					break;
+				}
 			}
 
-			// 右下点
-			indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kRightBottom] - Vector3{0.0f, kGroundCheckOffsetY, 0.0f});
-			mapChipType = mapChipField_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
-			if (mapChipType == MapChipType::kBlock) {
-				hit = true;
-			}
 			// 落下開始
 			if (!hit) {
 				onGround_ = false;
