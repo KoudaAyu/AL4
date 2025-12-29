@@ -194,8 +194,7 @@ private:
 	uint32_t textureHandle_ = 0u;
 
 	//加速量
-	static inline const float kAcceleration = 0.05f;
-
+	static inline const float kAcceleration = 0.04f; 
 	// 速度減衰（慣性制御）
 	// 値を増やして慣性を減らす（入力停止時にすばやく速度を落とす）
 	static inline const float kAttenuation = 0.25f; 
@@ -216,17 +215,17 @@ private:
 	bool onGround_ = true;
 
 	// 重力加速度(下方向)
-	static inline const float kGravityAcceleration = 0.1f;
+	static inline const float kGravityAcceleration = 0.05f;
 
 	// 最大落下速度(下方向)
-	static inline const float kLimitFallSpeed = 12.0f;
+	static inline const float kLimitFallSpeed = 5.0f;
 
 
 	// ジャンプ用の上向き速度（地上からの一段目）
 	// 固定値で上向き速度を設定することで、二段ジャンプの高さが入力時の落下速度に依存しないようにする
-	static inline const float kJumpVelocityGround = 1.0f; // 調整可能: 一段目の上向き速度
+	static inline const float kJumpVelocityGround = 0.7f; 
 	// 空中での二段ジャンプ時の上向き速度（地上ジャンプよりやや小さめに）
-	static inline const float kJumpVelocityAir = 0.8f; // 調整可能: 二段目の上向き速度
+	static inline const float kJumpVelocityAir = 0.6f; 
 
 	// 最大落下速度(上方向)
 	static inline const float kJumpAcceleration = 1.0f;
