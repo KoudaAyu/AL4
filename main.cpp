@@ -5,12 +5,16 @@
 #include "GameScene.h"
 #include "TitleScene.h"
 #include "SelectScene.h"
+#include "GameOverScene.h"
+#include "GameClearScene.h"
 
 using namespace KamataEngine;
 
 TitleScene* titleScene = nullptr;
 SelectScene* selectScene = nullptr;
 GameScene* gameScene = nullptr;
+GameOverScene* gameOverScene = nullptr;
+GameClearScene* gameClearScene = nullptr;
 
 enum class Scene {
 
@@ -18,6 +22,8 @@ enum class Scene {
 	kTitle,
 	kSelect,
 	kGame,
+	kGameOver,
+	kGameClear,
 };
 
 Scene scene = Scene::kUnknown;
@@ -91,6 +97,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	delete titleScene;
 	delete selectScene;
 	delete gameScene;
+	delete gameOverScene;
+	delete gameClearScene;
 
 	KamataEngine::Finalize();
 
@@ -119,10 +127,41 @@ void ChangeScene() {
 		}
 		break;
 	case Scene::kGame:
-		if (gameScene && gameScene->IsFinished()) {
+		if (gameScene) {
+			// If player died, go to GameOver
+			if (gameScene->IsPlayerDead()) {
+				scene = Scene::kGameOver;
+				delete gameScene;
+				gameScene = nullptr;
+				gameOverScene = new GameOverScene();
+				gameOverScene->Initialize();
+				return;
+			}
+
+			// Victory finished -> go to GameClear
+			if (gameScene->IsFinished()) {
+				scene = Scene::kGameClear;
+				delete gameScene;
+				gameScene = nullptr;
+				gameClearScene = new GameClearScene();
+				gameClearScene->Initialize();
+			}
+		}
+		break;
+	case Scene::kGameOver:
+		if (gameOverScene && gameOverScene->IsFinished()) {
 			scene = Scene::kTitle;
-			delete gameScene;
-			gameScene = nullptr;
+			delete gameOverScene;
+			gameOverScene = nullptr;
+			titleScene = new TitleScene();
+			titleScene->Initialize();
+		}
+		break;
+	case Scene::kGameClear:
+		if (gameClearScene && gameClearScene->IsFinished()) {
+			scene = Scene::kTitle;
+			delete gameClearScene;
+			gameClearScene = nullptr;
 			titleScene = new TitleScene();
 			titleScene->Initialize();
 		}
@@ -141,6 +180,12 @@ void UpdateScene() {
 	case Scene::kGame:
 		if (gameScene) gameScene->Update();
 		break;
+	case Scene::kGameOver:
+		if (gameOverScene) gameOverScene->Update();
+		break;
+	case Scene::kGameClear:
+		if (gameClearScene) gameClearScene->Update();
+		break;
 	}
 }
 
@@ -155,6 +200,12 @@ void DrawScene() {
 		break;
 	case Scene::kGame:
 		if (gameScene) gameScene->Draw();
+		break;
+	case Scene::kGameOver:
+		if (gameOverScene) gameOverScene->Draw();
+		break;
+	case Scene::kGameClear:
+		if (gameClearScene) gameClearScene->Draw();
 		break;
 	}
 }

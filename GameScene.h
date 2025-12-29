@@ -50,6 +50,9 @@ public:
 
 	bool IsFinished() { return finished_; }
 
+	// Returns true when the player has entered the death phase (player died)
+	bool IsPlayerDead() const { return phase_ == Phase::kDeath; }
+
 private:
 	bool finished_ = false;
 

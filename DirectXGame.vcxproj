@@ -160,6 +160,8 @@
     <ClCompile Include="Enemy\Enemy.cpp" />
     <ClCompile Include="Fade.cpp" />
     <ClCompile Include="FrontShieldEnemy.cpp" />
+    <ClCompile Include="GameClearScene.cpp" />
+    <ClCompile Include="GameOverScene.cpp" />
     <ClCompile Include="GameScene.cpp" />
     <ClCompile Include="KeyInput.cpp" />
     <ClCompile Include="main.cpp" />
@@ -275,6 +277,8 @@
     <ClInclude Include="Enemy\Enemy.h" />
     <ClInclude Include="Fade.h" />
     <ClInclude Include="FrontShieldEnemy.h" />
+    <ClInclude Include="GameClearScene.h" />
+    <ClInclude Include="GameOverScene.h" />
     <ClInclude Include="GameScene.h" />
     <ClInclude Include="KeyInput.h" />
     <ClInclude Include="MapChipField.h" />
