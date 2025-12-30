@@ -225,6 +225,10 @@ private:
 	// 重力加速度(下方向)
 	static inline const float kGravityAcceleration = 0.05f;
 
+	// Grounding debounce: how many consecutive misses before leaving ground
+	static inline const int kGroundMissThreshold = 2;
+	int groundMissCount_ = 0;
+
 	// 最大落下速度(下方向)
 	static inline const float kLimitFallSpeed = 5.0f;
 

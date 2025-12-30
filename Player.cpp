@@ -187,8 +187,18 @@ void Player::HandleMovementInput() {
 				acceleration.x -= kAcceleration * inputIntensityLeft;
 			}
 
+#ifdef _DEBUG
+			// Debug: show input intensities and computed acceleration
+			DebugText::GetInstance()->ConsolePrintf("MovementInput onGround=%s inputR=%.3f inputL=%.3f accelX=%.3f velBefore=%.3f\n",
+					onGround_ ? "true" : "false", inputIntensityRight, inputIntensityLeft, acceleration.x, velocity_.x);
+#endif
+
 			velocity_.x += acceleration.x;
 			velocity_.x = std::clamp(velocity_.x, -kLimitRunSpeed, kLimitRunSpeed);
+
+#ifdef _DEBUG
+			DebugText::GetInstance()->ConsolePrintf(" -> velAfter=%.3f\n", velocity_.x);
+#endif
 		} else {
 			// 地上での減衰
 			velocity_.x *= (1.0f - kAttenuation);
@@ -226,9 +236,18 @@ void Player::HandleMovementInput() {
 				accelX -= kAirAcceleration * inputIntensityLeft;
 			}
 
+#ifdef _DEBUG
+			DebugText::GetInstance()->ConsolePrintf("AirInput onGround=%s inputR=%.3f inputL=%.3f accelX=%.3f velBefore=%.3f\n",
+					onGround_ ? "true" : "false", inputIntensityRight, inputIntensityLeft, accelX, velocity_.x);
+#endif
+
 			velocity_.x += accelX;
 			// 空中では地上より少し低い最大速度に制限
 			velocity_.x = std::clamp(velocity_.x, -kAirLimitRunSpeed, kAirLimitRunSpeed);
+
+#ifdef _DEBUG
+			DebugText::GetInstance()->ConsolePrintf(" -> velAfter=%.3f\n", velocity_.x);
+#endif
 		} else {
 			// 空中では減衰を弱める（空中の慣性を残す）
 			velocity_.x *= (1.0f - kAttenuation * 0.2f);
@@ -345,11 +364,9 @@ void Player::Update() {
 
 	switch (behavior_) {
 	case Behavior::kRoot:
+	case Behavior::kAttack:
 	default:
 		BehaviorRootUpdate();
-		break;
-	case Behavior::kAttack:
-		BehaviorAttackUpdate();
 		break;
 	}
 
@@ -449,6 +466,11 @@ void Player::mapChipCollisionCheck(CollisionMapInfo& info) {
 	// 軸分離解決: まずXのみ、次にXを反映した一時座標でYを解決
 	Vector3 originalPos = worldTransform_.translation_;
 
+#ifdef _DEBUG
+	DebugText::GetInstance()->ConsolePrintf("mapChipCollisionCheck: originalPos=(%.3f,%.3f) movement=(%.3f,%.3f)\n",
+		originalPos.x, originalPos.y, info.movement_.x, info.movement_.y);
+#endif
+
 	// --- X軸 ---
 	CollisionMapInfo xInfo; // 局所的に使用
 	xInfo.movement_ = {info.movement_.x, 0.0f, 0.0f};
@@ -458,6 +480,11 @@ void Player::mapChipCollisionCheck(CollisionMapInfo& info) {
 	float dx = xInfo.movement_.x;
 	info.isWallContact_ = xInfo.isWallContact_;
 	info.wallSide_ = xInfo.wallSide_;
+
+	// --- debug ---
+#ifdef _DEBUG
+	DebugText::GetInstance()->ConsolePrintf(" map X result: dx=%.3f isWallContact=%s wallSide=%d\n", dx, info.isWallContact_ ? "true" : "false", static_cast<int>(info.wallSide_));
+#endif
 
 	if (info.isWallContact_) {
 		if (lastWallSide_ != info.wallSide_) {
@@ -483,6 +510,10 @@ void Player::mapChipCollisionCheck(CollisionMapInfo& info) {
 	info.isCeilingCollision_ = yInfo.isCeilingCollision_;
 	info.isLanding_ = yInfo.isLanding_;
 
+#ifdef _DEBUG
+	DebugText::GetInstance()->ConsolePrintf(" map Y result: dy=%.3f isCeiling=%s isLanding=%s\n", dy, info.isCeilingCollision_ ? "true" : "false", info.isLanding_ ? "true" : "false");
+#endif
+
 	// 一時変更を戻す
 	worldTransform_.translation_ = originalPos;
 
@@ -493,7 +524,16 @@ void Player::mapChipCollisionCheck(CollisionMapInfo& info) {
 // 判定結果を反映して移動
 void Player::JudgmentResult(const CollisionMapInfo& info) {
 	// 移動
+#ifdef _DEBUG
+	DebugText::GetInstance()->ConsolePrintf("JudgmentResult: beforePos=(%.3f,%.3f) movement=(%.3f,%.3f)\n",
+		worldTransform_.translation_.x, worldTransform_.translation_.y, info.movement_.x, info.movement_.y);
+#endif
+
 	worldTransform_.translation_ += info.movement_;
+
+#ifdef _DEBUG
+	DebugText::GetInstance()->ConsolePrintf("JudgmentResult: afterPos=(%.3f,%.3f)\n", worldTransform_.translation_.x, worldTransform_.translation_.y);
+#endif
 
 	// マップの移動可能領域に基づいて X をクランプする（左端より外に行けないようにする）
 	if (mapChipField_) {
@@ -506,9 +546,15 @@ void Player::JudgmentResult(const CollisionMapInfo& info) {
 			minX = maxX = (area.left + area.right) * 0.5f;
 		}
 		if (worldTransform_.translation_.x < minX) {
+#ifdef _DEBUG
+			DebugText::GetInstance()->ConsolePrintf("JudgmentResult: clamped left from %.3f to %.3f\n", worldTransform_.translation_.x, minX);
+#endif
 			worldTransform_.translation_.x = minX;
 			velocity_.x = 0.0f;
 		} else if (worldTransform_.translation_.x > maxX) {
+#ifdef _DEBUG
+			DebugText::GetInstance()->ConsolePrintf("JudgmentResult: clamped right from %.3f to %.3f\n", worldTransform_.translation_.x, maxX);
+#endif
 			worldTransform_.translation_.x = maxX;
 			velocity_.x = 0.0f;
 		}
@@ -542,26 +588,72 @@ void Player::SwitchingTheGrounding(CollisionMapInfo& info) {
 		// ジャンプ開始
 		if (velocity_.y > 0.0f) {
 			onGround_ = false;
+			groundMissCount_ = 0;
+#ifdef _DEBUG
+			DebugText::GetInstance()->ConsolePrintf("SwitchingTheGrounding: left ground because vy=%.3f\n", velocity_.y);
+#endif
 		} else {
 			// 改良: 底面を複数点サンプリングして接地判定を安定化
-			constexpr float kGroundCheckOffsetY = 0.1f; // わずかに下を見る
+			constexpr float kGroundCheckExtra = 0.02f; // bottomから少し下をサンプリング
 			constexpr int kSampleCount = 3;
 			std::array<float, kSampleCount> sampleXOffsets = { -kWidth * 0.45f, 0.0f, kWidth * 0.45f };
 
 			bool hit = false;
-			for (int i = 0; i < kSampleCount; ++i) {
-				Vector3 samplePos = worldTransform_.translation_ + info.movement_ + Vector3{ sampleXOffsets[i], -kGroundCheckOffsetY, 0.0f };
-				IndexSet indexSet = mapChipField_->GetMapChipIndexSetByPosition(samplePos);
-				MapChipType mapChipType = mapChipField_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
-				if (mapChipType == MapChipType::kBlock) {
+			// まずセンター下を必須チェック（小さな浮遊足場上で端だけ外れるのを防ぐ）
+			Vector3 centerSamplePos = worldTransform_.translation_ + Vector3{ 0.0f, - (kHeight * 0.5f) - kGroundCheckExtra, 0.0f };
+			IndexSet centerIdx = mapChipField_->GetMapChipIndexSetByPosition(centerSamplePos);
+			MapChipType centerType = mapChipField_->GetMapChipTypeByIndex(centerIdx.xIndex, centerIdx.yIndex);
+#ifdef _DEBUG
+			DebugText::GetInstance()->ConsolePrintf("GroundSample center pos=(%.3f,%.3f) idx=(%d,%d) type=%d\n", centerSamplePos.x, centerSamplePos.y, centerIdx.xIndex, centerIdx.yIndex, static_cast<int>(centerType));
+#endif
+			if (centerType == MapChipType::kBlock) {
+				hit = true; // 中心に足場があれば地面あり
+				// 追加で左右を確認して安定化（あればより確実）
+				for (int i = 0; i < kSampleCount; ++i) {
+					if (i == 1) continue; // centerは既に見た
+					Vector3 samplePos = worldTransform_.translation_ + Vector3{ sampleXOffsets[i], - (kHeight * 0.5f) - kGroundCheckExtra, 0.0f };
+					IndexSet idx = mapChipField_->GetMapChipIndexSetByPosition(samplePos);
+					MapChipType type = mapChipField_->GetMapChipTypeByIndex(idx.xIndex, idx.yIndex);
+#ifdef _DEBUG
+					DebugText::GetInstance()->ConsolePrintf("GroundSample i=%d pos=(%.3f,%.3f) idx=(%d,%d) type=%d\n", i, samplePos.x, samplePos.y, idx.xIndex, idx.yIndex, static_cast<int>(type));
+#endif
+					// 無くても問題なし（中心があれば十分）
+				}
+			} else {
+				// 中心に地面がないなら周辺もチェックして、2点以上当たっていれば地面ありとみなす
+				int hits = 0;
+				for (int i = 0; i < kSampleCount; ++i) {
+					Vector3 samplePos = worldTransform_.translation_ + Vector3{ sampleXOffsets[i], - (kHeight * 0.5f) - kGroundCheckExtra, 0.0f };
+					IndexSet idx = mapChipField_->GetMapChipIndexSetByPosition(samplePos);
+					MapChipType type = mapChipField_->GetMapChipTypeByIndex(idx.xIndex, idx.yIndex);
+#ifdef _DEBUG
+					DebugText::GetInstance()->ConsolePrintf("GroundSample i=%d pos=(%.3f,%.3f) idx=(%d,%d) type=%d\n", i, samplePos.x, samplePos.y, idx.xIndex, idx.yIndex, static_cast<int>(type));
+#endif
+					if (type == MapChipType::kBlock) {
+						hits++;
+					}
+				}
+				if (hits >= 2) {
 					hit = true;
-					break;
 				}
 			}
 
-			// 落下開始
 			if (!hit) {
-				onGround_ = false;
+				// miss -> カウントを増やし、閾値超えたら離地扱い
+				groundMissCount_++;
+#ifdef _DEBUG
+				DebugText::GetInstance()->ConsolePrintf("SwitchingTheGrounding: ground miss count=%d\n", groundMissCount_);
+#endif
+				if (groundMissCount_ >= kGroundMissThreshold) {
+					onGround_ = false;
+					groundMissCount_ = 0;
+#ifdef _DEBUG
+					DebugText::GetInstance()->ConsolePrintf("SwitchingTheGrounding: leaving ground after misses\n");
+#endif
+				}
+			} else {
+				// hit -> リセット
+				groundMissCount_ = 0;
 			}
 		}
 
@@ -579,6 +671,10 @@ void Player::SwitchingTheGrounding(CollisionMapInfo& info) {
 
 			// 二段ジャンプのリセット
 			jumpCount_ = 0;
+
+#ifdef _DEBUG
+			DebugText::GetInstance()->ConsolePrintf("SwitchingTheGrounding: landed via isLanding_=true dy=%.3f\n", info.movement_.y);
+#endif
 
 			
 			wallJumpCount_ = 0;
@@ -623,10 +719,17 @@ void Player::HandleMapCollisionUp(CollisionMapInfo& info) {
 		// 現在の左上点のタイルと比較して、上方向への遷移を検出
 		indexSetNow = mapChipField_->GetMapChipIndexSetByPosition(CornerPosition(worldTransform_.translation_, kLeftTop));
 		indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kLeftTop]);
+#ifdef _DEBUG
+		DebugText::GetInstance()->ConsolePrintf("HandleMapCollisionUp: indexNow=(%d,%d) indexNew=(%d,%d)\n", indexSetNow.xIndex, indexSetNow.yIndex, indexSet.xIndex, indexSet.yIndex);
+#endif
 		if (indexSetNow.yIndex != indexSet.yIndex) {
 
 			// めり込み先ブロックの範囲矩形
 			Rects rects = mapChipField_->GetRectByIndex(indexSet.xIndex, indexSet.yIndex);
+
+#ifdef _DEBUG
+			DebugText::GetInstance()->ConsolePrintf(" HandleMapCollisionUp: rect top=%.3f bottom=%.3f\n", rects.top, rects.bottom);
+#endif
 
 			info.movement_.y = std::max(0.0f, rects.bottom - worldTransform_.translation_.y - (kHeight * 0.5f + kBlank));
 
@@ -637,55 +740,32 @@ void Player::HandleMapCollisionUp(CollisionMapInfo& info) {
 }
 
 void Player::HandleMapCollisionDown(CollisionMapInfo& info) {
+	std::vector<Corner> corners = {kLeftBottom, kRightBottom};
 
-	std::array<Vector3, kNumCorners> positionNew;
-	for (uint32_t i = 0; i < positionNew.size(); ++i) {
-		positionNew[i] = CornerPosition(worldTransform_.translation_ + info.movement_, static_cast<Corner>(i));
-	}
+	for (Corner corner : corners) {
+		// 移動後の予測座標でチェック
+		Vector3 pos = CornerPosition(worldTransform_.translation_ + info.movement_, corner);
 
-	// 上方向に動いているなら処理しない
-	if (info.movement_.y >= 0) {
-		return;
-	}
+		// 座標からインデックスを取得
+		IndexSet index = mapChipField_->GetMapChipIndexSetByPosition(pos);
+		MapChipType type = mapChipField_->GetMapChipTypeByIndex(index.xIndex, index.yIndex);
 
-	MapChipType mapChipType;
-	bool hit = false;
-	IndexSet indexSet;
+		if (type == MapChipType::kBlock) {
+			// ★ここがポイント：ブロックの「実際の座標」を取得する
+			Rects rect = mapChipField_->GetRectByIndex(index.xIndex, index.yIndex);
 
-	// 左下点の座標
-	indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kLeftBottom]);
-	mapChipType = mapChipField_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
-	if (mapChipType == MapChipType::kBlock) {
-		hit = true;
-	}
+			// ブロックの天面(rect.top)にプレイヤーの足元を合わせる
+			// プレイヤーの足元のY座標は (translation_.y - kHeight / 2.0f)
+			float footY = worldTransform_.translation_.y - (kHeight / 2.0f);
 
-	// 右下点の座標
-	indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kRightBottom]);
-	mapChipType = mapChipField_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
-	if (mapChipType == MapChipType::kBlock) {
-		hit = true;
-	}
+			// めり込んでいる分を補正量として計算
+			// 足元が rect.top より下にある場合、その差分を押し戻す
+			float pushUp = rect.top - footY;
 
-	if (hit) {
-		// めり込みを排除する方向に移動量を設定する
-		indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kLeftBottom]);
-
-		// 現在の左下点のタイルと比較して、下方向への遷移を検出
-		IndexSet indexSetNow = mapChipField_->GetMapChipIndexSetByPosition(CornerPosition(worldTransform_.translation_, kLeftBottom));
-
-		// 「別のマスに移動した」かつ「実際に下方向に動いている」ときだけ着地判定
-		if (indexSetNow.yIndex != indexSet.yIndex && info.movement_.y < 0.0f) {
-
-			// めり込み先ブロックの範囲矩形
-			Rects rects = mapChipField_->GetRectByIndex(indexSet.xIndex, indexSet.yIndex);
-
-			// 修正後の移動量
-			info.movement_.y = std::min(0.0f, rects.top - worldTransform_.translation_.y + (kHeight * 0.5f + kBlank));
-
-			// 実際に地面に“ほぼ接触している”場合だけ着地扱いにする
-			if (std::abs(info.movement_.y) < 0.05f) {
-				info.isLanding_ = true;
-			}
+			info.movement_.y = pushUp;
+			velocity_.y = 0.0f;
+			info.isLanding_ = true;
+			return;
 		}
 	}
 }
@@ -878,7 +958,7 @@ void Player::HandleWallJump(const CollisionMapInfo& info) {
 
 		isWallSliding_ = false;
 
-		// 壁ジャンプはジャンプ回数を1にする（空中での二段ジャンプを一回許可）
+		// 壁ジャンプはジャンプ回数を1にする（空中での二段ジャンプを一回許可）-
 		jumpCount_ = 1;
 
 		// プレイヤーの入力に応じて微調整を許可（操作性向上）
@@ -969,6 +1049,7 @@ void Player::EmergencyAvoidance() {
 
 	if (isDodging_) {
 		dodgeTimer_ -= 1.0f / 60.0f;
+		// dodge duration
 		if (dodgeTimer_ <= 0.0f) {
 			isDodging_ = false;
 
