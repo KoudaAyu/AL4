@@ -142,13 +142,10 @@ public:
 
 	//攻撃行動更新
 	void BehaviorAttackUpdate();
-	
-	// 攻撃ヒットボックスが有効かどうか（ダッシュ切り有効フレームのみtrue）
-	bool IsAttackActive() const { return attackActive_; }
 
-	
+
 	LRDirection GetLRDirection() const { return lrDirection_; }
-	
+
 	// Attack accessors
 	bool IsAttacking() const { return behavior_ == Behavior::kAttack; }
 	AABB GetAttackAABB() const;
@@ -296,9 +293,6 @@ private:
 	// 攻撃時の短距離ダッシュ設定
 	static inline const float kAttackDashSpeed = 1.5f; // 攻撃開始時のダッシュ速度
 	static inline const int kAttackDashFrames = 6;     // ダッシュが続くフレーム数
-	// ダッシュ切りの当たり判定有効フラグ
-	bool attackActive_ = false;
-
 	// 攻撃クールタイム
 	float attackCooldown_ = 0.0f;
 	static inline const float kAttackCooldownTime = 1.0f; // seconds (debug)

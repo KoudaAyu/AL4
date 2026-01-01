@@ -66,8 +66,9 @@ void Enemy::UpdateAABB() {
 }
 
 void Enemy::OnCollision(Player* player) {
-    // Die only when player is attacking
-    if (player && player->IsAttacking()) {
-        isAlive_ = false;
-    }
+	// Only die when hit by player's attack (not by mere body contact)
+	if (player && player->IsAttacking()) {
+		isAlive_ = false;
+	}
+	// otherwise ignore collision (player bump does not kill enemy)
 }

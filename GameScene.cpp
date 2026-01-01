@@ -6,6 +6,7 @@
 #include <2d/Sprite.h>
 #include "KeyInput.h"
 #include "Spike.h"
+#include "Goal.h"
 #include <algorithm>
 using namespace KamataEngine;
 
@@ -74,6 +75,10 @@ GameScene::~GameScene() {
 		delete s;
 	}
 	spikes_.clear();
+	for (Goal* g : goals_) {
+		delete g;
+	}
+	goals_.clear();
 }
 
 void GameScene::Initialize() {
@@ -123,7 +128,7 @@ void GameScene::Initialize() {
 
 	heartTextureHandle_ = TextureManager::Load("Sprite/PlayerHP.png");
 	if (heartTextureHandle_ != 0u && player_) {
-	
+		
 		int hp = player_->GetHP();
 		const float heartSize = 32.0f;
 		const float heartMarginX = 20.0f;
@@ -141,6 +146,7 @@ void GameScene::Initialize() {
 	if (mapChipField_) {
 		uint32_t vh = mapChipField_->GetNumBlockVertical();
 		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
+		bool goalSpawned = false;
 		for (uint32_t y = 0; y < vh; ++y) {
 			for (uint32_t x = 0; x < wh; ++x) {
 				MapChipType t = mapChipField_->GetMapChipTypeByIndex(x, y);
@@ -162,8 +168,17 @@ void GameScene::Initialize() {
 					s->SetPosition(pos);
 					s->Initialize();
 					spikes_.push_back(s);
+				} else if (t == MapChipType::kGoal && !goalSpawned) {
+					Goal* g = new Goal();
+					Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
+					g->SetPosition(pos);
+					g->Initialize();
+					goals_.push_back(g);
+					goalSpawned = true;
 				}
 			}
+			// early exit once goal is spawned
+			if (goalSpawned) break;
 		}
 	}
 
@@ -193,7 +208,7 @@ void GameScene::Initialize() {
 					enemy->Initialize(&camera_, enemyPosition);
 					enemies_.push_back(enemy);
 				} else if (t == MapChipType::kEnemySpawnShield) {
-				
+					
 					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
 					FrontShieldEnemy* fse = new FrontShieldEnemy();
 					
@@ -352,7 +367,7 @@ void GameScene::Update() {
 		
 		countdownTime_ -= 1.0f / 60.0f;
 		if (countdownTime_ <= 0.0f) {
-		
+			
 			phase_ = Phase::kPlay;
 		
 			return;
@@ -422,6 +437,9 @@ void GameScene::Update() {
 				if (s) s->Update(1.0f / 60.0f);
 			}
 		}
+		for (Goal* g : goals_) {
+			if (g) g->Update(1.0f / 60.0f);
+		}
 
 		player_->Update();
 
@@ -457,7 +475,7 @@ void GameScene::Update() {
 			if (!anyAlive) {
 				
 				if (victoryTimer_ <= 0.0f) {
-				
+					
 					victoryTimer_ = 0.6f;
 				}
 
@@ -618,6 +636,9 @@ void GameScene::Draw() {
 			if (s) s->Draw(&camera_);
 		}
 	}
+	for (Goal* g : goals_) {
+		if (g) g->Draw(&camera_);
+	}
 
 	// デス中はプレイヤーの描画を抑制してエフェクトを見やすくする
 	if (phase_ != Phase::kDeath) {
@@ -697,36 +718,38 @@ void GameScene::CheckAllCollisions() {
         if (!enemy || !enemy->isAlive())
             continue;
 
-        if (player_->IsAttacking() && player_->IsAttackActive()) {
+        if (player_->IsAttacking()) {
             AABB attackBox = player_->GetAttackAABB();
-            if (IsCollisionAABB2D(attackBox, enemy->GetAABB())) {
+            if (IsCollisionAABBAABB(attackBox, enemy->GetAABB())) {
                 enemy->OnCollision(player_);
                 if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(1.0f, 0.15f);
                 continue;
             }
         }
 
-        if (IsCollisionAABB2D(player_->GetAABB(), enemy->GetAABB())) {
+        if (IsCollisionAABBAABB(player_->GetAABB(), enemy->GetAABB())) {
             player_->OnCollision(enemy);
             enemy->OnCollision(player_);
         }
     }
+
+#pragma endregion
 
     // Spike とプレイヤーの当たり判定（Spike 側で AABB を提供）
     for (Spike* s : spikes_) {
         if (!s) continue;
         AABB pA = player_->GetAABB();
         AABB sA = s->GetAABB();
-        if (IsCollisionAABB2D(pA, sA)) {
-            
+        if (IsCollisionAABBAABB(pA, sA)) {
+           
             float overlapX = std::min<float>(pA.max.x, sA.max.x) - std::max<float>(pA.min.x, sA.min.x);
             float overlapY = std::min<float>(pA.max.y, sA.max.y) - std::max<float>(pA.min.y, sA.min.y);
 
-            
+          
             Vector3 pCenter = {(pA.min.x + pA.max.x) * 0.5f, (pA.min.y + pA.max.y) * 0.5f, 0.0f};
             Vector3 sCenter = {(sA.min.x + sA.max.x) * 0.5f, (sA.min.y + sA.max.y) * 0.5f, 0.0f};
 
-            
+         
             KamataEngine::WorldTransform& pwt = player_->GetWorldTransform();
             if (overlapX < overlapY) {
                 float dir = (pCenter.x < sCenter.x) ? -1.0f : 1.0f;
@@ -741,10 +764,19 @@ void GameScene::CheckAllCollisions() {
 
             player_->UpdateAABB();
 
-            
+           
             player_->OnCollision(nullptr);
             if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(1.5f, 0.3f);
             break;
+        }
+    }
+
+    // Goal とプレイヤーの当たり判定
+    for (Goal* g : goals_) {
+        if (!g) continue;
+        if (IsCollisionAABBAABB(player_->GetAABB(), g->GetAABB())) {
+            finished_ = true; // trigger GameClear
+            return;
         }
     }
 }
@@ -755,7 +787,7 @@ void GameScene::ChangePhase() {
 	case Phase::kPlay:
 
 		if (!player_->isAlive()) {
-		
+			
 			phase_ = Phase::kDeath;
 			const Vector3 deathPos = player_->GetPosition();
 
@@ -822,10 +854,15 @@ void GameScene::Reset() {
 		delete s;
 	}
 	spikes_.clear();
+	for (Goal* g : goals_) {
+		delete g;
+	}
+	goals_.clear();
 
 	if (mapChipField_) {
 		uint32_t vh = mapChipField_->GetNumBlockVertical();
 		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
+		bool goalSpawned = false;
 		for (uint32_t y = 0; y < vh; ++y) {
 			for (uint32_t x = 0; x < wh; ++x) {
 				MapChipType t = mapChipField_->GetMapChipTypeByIndex(x, y);
@@ -846,8 +883,17 @@ void GameScene::Reset() {
 					s->SetPosition(pos);
 					s->Initialize();
 					spikes_.push_back(s);
+				} else if (t == MapChipType::kGoal && !goalSpawned) {
+					Goal* g = new Goal();
+					Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
+					g->SetPosition(pos);
+					g->Initialize();
+					goals_.push_back(g);
+					goalSpawned = true;
 				}
 			}
+			// early exit once goal is spawned
+			if (goalSpawned) break;
 		}
 	}
 

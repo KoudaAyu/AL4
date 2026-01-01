@@ -389,10 +389,7 @@ void Player::Update() {
 
 	// クールタイム終了かつ未攻撃中なら攻撃受付（Eキー or RT立ち上がり）
 	if (attackCooldown_ <= 0.0f && !IsAttacking() && (eTriggered || rtRising)) {
-		// 次フレーム待たず即座に攻撃状態へ遷移
 		behaviorRequest_ = Behavior::kAttack;
-		behavior_ = Behavior::kAttack;
-		BehaviorAttackInitialize();
 	}
 	// 現在のRT状態を保存（次フレームとの比較用）
 	prevRightTriggerPressed_ = rtPressed;
@@ -1085,8 +1082,6 @@ void Player::BehaviorAttackInitialize() {
 	attackParameter_ = 0;
 	// 攻撃クールタイム開始
 	attackCooldown_ = kAttackCooldownTime;
-	// 攻撃開始時はヒットボックス有効
-	attackActive_ = true;
 }
 
 void Player::BehaviorRootUpdate() {}
@@ -1106,14 +1101,11 @@ void Player::BehaviorAttackUpdate() {
 	if (attackParameter_ <= kAttackDashFrames) {
 		// 攻撃開始フレームは強制的にダッシュ速度を与える
 		velocity_.x = dir * kAttackDashSpeed;
-		attackActive_ = true;
 	} else {
 		// ダッシュ終了後は急速に減衰させて停止に持っていく
 		velocity_.x *= 0.5f;
 		// 安全にクランプ
 		velocity_.x = std::clamp(velocity_.x, -kLimitRunSpeed, kLimitRunSpeed);
-		// ヒットボックスを無効化（演出は続くが当たりは消す）
-		attackActive_ = false;
 	}
 
 	// 縦方向は通常の物理挙動に任せる。
@@ -1126,21 +1118,14 @@ AABB Player::GetAttackAABB() const {
 
 	float dir = (lrDirection_ == LRDirection::kRight) ? 1.0f : -1.0f;
 
-	// 基本幅 + 到達距離
-	float baseWidth = kAttackWidth + kAttackReach;
-	// 余韻対策: わずかな前方パッドと現在速度に基づく微延長
-	float forwardPad = 0.2f;
-	float velExtend = std::clamp(std::fabs(velocity_.x) * 0.5f, 0.0f, 0.3f);
-	float fullWidth = baseWidth + forwardPad + velExtend;
-
-	float halfAttackWidth = fullWidth * 0.5f;
+	float halfAttackWidth = kAttackWidth * 0.5f;
 	float halfAttackHeight = kAttackHeight * 0.5f;
 
 	Vector3 attackCenter = center;
 	attackCenter.x += dir * (kWidth * 0.5f + halfAttackWidth);
 
 	AABB hitbox;
-	hitbox.min = {attackCenter.x - halfAttackWidth, attackCenter.y - halfAttackHeight, attackCenter.z - 2.0f};
-	hitbox.max = {attackCenter.x + halfAttackWidth, attackCenter.y + halfAttackHeight, attackCenter.z + 2.0f};
+	hitbox.min = {attackCenter.x - halfAttackWidth, attackCenter.y - halfAttackHeight, attackCenter.z - 1.0f};
+	hitbox.max = {attackCenter.x + halfAttackWidth, attackCenter.y + halfAttackHeight, attackCenter.z + 1.0f};
 	return hitbox;
 }

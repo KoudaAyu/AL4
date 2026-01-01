@@ -10,6 +10,7 @@ enum class MapChipType {
 	kEnemySpawn = 3,       // 3: 敵 スポーン場所
 	kEnemySpawnShield = 4, // 4: シールド持ち敵 スポーン場所
 	kSpike = 5, //5: 棘
+	kGoal = 6,  //6: ゴール
 };
 
 struct MapChipData {

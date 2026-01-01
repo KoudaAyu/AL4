@@ -23,18 +23,3 @@ bool IsCollisionAABBAABB(const AABB& aabb1, const AABB& aabb2) {
 
 	return false;
 }
-
-bool IsCollisionAABB2D(const AABB& aabb1, const AABB& aabb2) {
-    // x/y のみで判定（Zは無視）
-    float minX1 = (std::min)(aabb1.min.x, aabb1.max.x);
-    float maxX1 = (std::max)(aabb1.min.x, aabb1.max.x);
-    float minY1 = (std::min)(aabb1.min.y, aabb1.max.y);
-    float maxY1 = (std::max)(aabb1.min.y, aabb1.max.y);
-
-    float minX2 = (std::min)(aabb2.min.x, aabb2.max.x);
-    float maxX2 = (std::max)(aabb2.min.x, aabb2.max.x);
-    float minY2 = (std::min)(aabb2.min.y, aabb2.max.y);
-    float maxY2 = (std::max)(aabb2.min.y, aabb2.max.y);
-
-    return (minX1 <= maxX2 && maxX1 >= minX2) && (minY1 <= maxY2 && maxY1 >= minY2);
-}

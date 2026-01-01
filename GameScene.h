@@ -12,6 +12,7 @@
 
 class MapChipField_;
 class Spike; 
+class Goal; // forward declaration
 
 class GameScene {
 public:
@@ -91,6 +92,7 @@ private:
 	std::vector<Enemy*> enemies_;
 	
 	std::vector<Spike*> spikes_;
+	std::vector<Goal*> goals_; // goal objects
 	Player* player_ = nullptr;
 
 	std::vector<std::vector<KamataEngine::WorldTransform*>> worldTransformBlocks_;
