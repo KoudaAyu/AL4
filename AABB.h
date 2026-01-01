@@ -7,3 +7,6 @@ struct AABB {
 };
 
 bool IsCollisionAABBAABB(const AABB& aabb1, const AABB& aabb2);
+
+// 2D用のAABB当たり判定（Z軸は無視）
+bool IsCollisionAABB2D(const AABB& aabb1, const AABB& aabb2);

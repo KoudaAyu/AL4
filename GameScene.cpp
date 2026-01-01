@@ -697,38 +697,36 @@ void GameScene::CheckAllCollisions() {
         if (!enemy || !enemy->isAlive())
             continue;
 
-        if (player_->IsAttacking()) {
+        if (player_->IsAttacking() && player_->IsAttackActive()) {
             AABB attackBox = player_->GetAttackAABB();
-            if (IsCollisionAABBAABB(attackBox, enemy->GetAABB())) {
+            if (IsCollisionAABB2D(attackBox, enemy->GetAABB())) {
                 enemy->OnCollision(player_);
                 if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(1.0f, 0.15f);
                 continue;
             }
         }
 
-        if (IsCollisionAABBAABB(player_->GetAABB(), enemy->GetAABB())) {
+        if (IsCollisionAABB2D(player_->GetAABB(), enemy->GetAABB())) {
             player_->OnCollision(enemy);
             enemy->OnCollision(player_);
         }
     }
-
-#pragma endregion
 
     // Spike とプレイヤーの当たり判定（Spike 側で AABB を提供）
     for (Spike* s : spikes_) {
         if (!s) continue;
         AABB pA = player_->GetAABB();
         AABB sA = s->GetAABB();
-        if (IsCollisionAABBAABB(pA, sA)) {
-           
+        if (IsCollisionAABB2D(pA, sA)) {
+            
             float overlapX = std::min<float>(pA.max.x, sA.max.x) - std::max<float>(pA.min.x, sA.min.x);
             float overlapY = std::min<float>(pA.max.y, sA.max.y) - std::max<float>(pA.min.y, sA.min.y);
 
-          
+            
             Vector3 pCenter = {(pA.min.x + pA.max.x) * 0.5f, (pA.min.y + pA.max.y) * 0.5f, 0.0f};
             Vector3 sCenter = {(sA.min.x + sA.max.x) * 0.5f, (sA.min.y + sA.max.y) * 0.5f, 0.0f};
 
-         
+            
             KamataEngine::WorldTransform& pwt = player_->GetWorldTransform();
             if (overlapX < overlapY) {
                 float dir = (pCenter.x < sCenter.x) ? -1.0f : 1.0f;
@@ -743,7 +741,7 @@ void GameScene::CheckAllCollisions() {
 
             player_->UpdateAABB();
 
-           
+            
             player_->OnCollision(nullptr);
             if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(1.5f, 0.3f);
             break;

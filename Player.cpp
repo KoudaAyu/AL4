@@ -339,6 +339,11 @@ void Player::Update() {
 			invincibleTimer_ = 0.0f;
 		}
 	}
+	// 攻撃クールタイム減算
+	if (attackCooldown_ > 0.0f) {
+		attackCooldown_ -= 1.0f / 60.0f;
+		if (attackCooldown_ < 0.0f) attackCooldown_ = 0.0f;
+	}
 
 #ifdef _DEBUG
 	ImGui::Begin("Debug");
@@ -364,7 +369,11 @@ void Player::Update() {
 
 	switch (behavior_) {
 	case Behavior::kRoot:
+		BehaviorRootUpdate();
+		break;
 	case Behavior::kAttack:
+		BehaviorAttackUpdate();
+		break;
 	default:
 		BehaviorRootUpdate();
 		break;
@@ -376,10 +385,14 @@ void Player::Update() {
 	// Attack input: E key (keyboard) or RT (Xbox) rising edge
 	bool eTriggered = Input::GetInstance()->TriggerKey(DIK_E);
 	bool rtPressed = (state.Gamepad.bRightTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
+	bool rtRising = rtPressed && !prevRightTriggerPressed_;
 
-	// Eキー押下（トリガー）またはRTの立ち上がりで攻撃
-	if (eTriggered || (rtPressed && !prevRightTriggerPressed_)) {
+	// クールタイム終了かつ未攻撃中なら攻撃受付（Eキー or RT立ち上がり）
+	if (attackCooldown_ <= 0.0f && !IsAttacking() && (eTriggered || rtRising)) {
+		// 次フレーム待たず即座に攻撃状態へ遷移
 		behaviorRequest_ = Behavior::kAttack;
+		behavior_ = Behavior::kAttack;
+		BehaviorAttackInitialize();
 	}
 	// 現在のRT状態を保存（次フレームとの比較用）
 	prevRightTriggerPressed_ = rtPressed;
@@ -758,7 +771,7 @@ void Player::HandleMapCollisionDown(CollisionMapInfo& info) {
 			// プレイヤーの足元のY座標は (translation_.y - kHeight / 2.0f)
 			float footY = worldTransform_.translation_.y - (kHeight / 2.0f);
 
-			// めり込んでいる分を補正量として計算
+			// めり込みしている分を補正量として計算
 			// 足元が rect.top より下にある場合、その差分を押し戻す
 			float pushUp = rect.top - footY;
 
@@ -1070,6 +1083,10 @@ void Player::BehaviorRootInitialize() {}
 void Player::BehaviorAttackInitialize() {
 	// カウンターの初期化
 	attackParameter_ = 0;
+	// 攻撃クールタイム開始
+	attackCooldown_ = kAttackCooldownTime;
+	// 攻撃開始時はヒットボックス有効
+	attackActive_ = true;
 }
 
 void Player::BehaviorRootUpdate() {}
@@ -1089,11 +1106,14 @@ void Player::BehaviorAttackUpdate() {
 	if (attackParameter_ <= kAttackDashFrames) {
 		// 攻撃開始フレームは強制的にダッシュ速度を与える
 		velocity_.x = dir * kAttackDashSpeed;
+		attackActive_ = true;
 	} else {
 		// ダッシュ終了後は急速に減衰させて停止に持っていく
 		velocity_.x *= 0.5f;
 		// 安全にクランプ
 		velocity_.x = std::clamp(velocity_.x, -kLimitRunSpeed, kLimitRunSpeed);
+		// ヒットボックスを無効化（演出は続くが当たりは消す）
+		attackActive_ = false;
 	}
 
 	// 縦方向は通常の物理挙動に任せる。
@@ -1106,14 +1126,21 @@ AABB Player::GetAttackAABB() const {
 
 	float dir = (lrDirection_ == LRDirection::kRight) ? 1.0f : -1.0f;
 
-	float halfAttackWidth = kAttackWidth * 0.5f;
+	// 基本幅 + 到達距離
+	float baseWidth = kAttackWidth + kAttackReach;
+	// 余韻対策: わずかな前方パッドと現在速度に基づく微延長
+	float forwardPad = 0.2f;
+	float velExtend = std::clamp(std::fabs(velocity_.x) * 0.5f, 0.0f, 0.3f);
+	float fullWidth = baseWidth + forwardPad + velExtend;
+
+	float halfAttackWidth = fullWidth * 0.5f;
 	float halfAttackHeight = kAttackHeight * 0.5f;
 
 	Vector3 attackCenter = center;
 	attackCenter.x += dir * (kWidth * 0.5f + halfAttackWidth);
 
 	AABB hitbox;
-	hitbox.min = {attackCenter.x - halfAttackWidth, attackCenter.y - halfAttackHeight, attackCenter.z - 1.0f};
-	hitbox.max = {attackCenter.x + halfAttackWidth, attackCenter.y + halfAttackHeight, attackCenter.z + 1.0f};
+	hitbox.min = {attackCenter.x - halfAttackWidth, attackCenter.y - halfAttackHeight, attackCenter.z - 2.0f};
+	hitbox.max = {attackCenter.x + halfAttackWidth, attackCenter.y + halfAttackHeight, attackCenter.z + 2.0f};
 	return hitbox;
 }
