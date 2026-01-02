@@ -122,6 +122,14 @@ void Player::Initialize(Camera* camera, const Vector3& position) {
 	worldTransform_.rotation_.y = std::numbers::pi_v<float> / 2.0f;
 	worldTransform_.scale_ = {0.3f, 0.3f, 0.3f};
 
+	// 攻撃エフェクトの初期化（プレイヤーと同じ回転・位置、スケールは拡大）
+	attackWorldTransform_.Initialize();
+	attackWorldTransform_.scale_ = {worldTransform_.scale_.x * kAttackEffectScale,
+									 worldTransform_.scale_.y * kAttackEffectScale,
+									 worldTransform_.scale_.z * kAttackEffectScale};
+	attackWorldTransform_.rotation_ = worldTransform_.rotation_;
+	attackWorldTransform_.translation_ = worldTransform_.translation_;
+
 	UpdateAABB();
 
 	
@@ -345,6 +353,12 @@ void Player::Update() {
 		if (attackCooldown_ < 0.0f) attackCooldown_ = 0.0f;
 	}
 
+	// 攻撃入力バッファ減算
+	if (attackInputBufferTimer_ > 0.0f) {
+		attackInputBufferTimer_ -= 1.0f / 60.0f;
+		if (attackInputBufferTimer_ < 0.0f) attackInputBufferTimer_ = 0.0f;
+	}
+
 #ifdef _DEBUG
 	ImGui::Begin("Debug");
 	ImGui::SliderFloat3("velocity", &velocity_.x, -10.0f, 10.0f);
@@ -387,14 +401,23 @@ void Player::Update() {
 	bool rtPressed = (state.Gamepad.bRightTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
 	bool rtRising = rtPressed && !prevRightTriggerPressed_;
 
-	// クールタイム終了かつ未攻撃中なら攻撃受付（Eキー or RT立ち上がり）
-	if (attackCooldown_ <= 0.0f && !IsAttacking() && (eTriggered || rtRising)) {
+	// 入力が来たらバッファに蓄える
+	if (eTriggered || rtRising) {
+		attackInputBufferTimer_ = kAttackInputBufferTime;
+	}
+
+	// クールタイム終了かつ未攻撃中、かつバッファが残っていれば攻撃開始
+	if (attackCooldown_ <= 0.0f && !IsAttacking() && attackInputBufferTimer_ > 0.0f) {
 		behaviorRequest_ = Behavior::kAttack;
+		attackInputBufferTimer_ = 0.0f; // 消費
 	}
 	// 現在のRT状態を保存（次フレームとの比較用）
 	prevRightTriggerPressed_ = rtPressed;
 
-	EmergencyAvoidance();
+	// 攻撃が要求されているフレームは回避を抑制（入力競合対策）
+	if (behaviorRequest_ != Behavior::kAttack) {
+		EmergencyAvoidance();
+	}
 
 	// 衝突情報を初期化
 	CollisionMapInfo collisionInfo;
@@ -443,6 +466,13 @@ void Player::Update() {
 	// 8. 行列計算
 	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
 	worldTransform_.TransferMatrix();
+
+	// 攻撃中は攻撃エフェクトのワールド変換も更新
+	if (behavior_ == Behavior::kAttack) {
+		UpdateAttackEffectTransform();
+		attackWorldTransform_.matWorld_ = MakeAffineMatrix(attackWorldTransform_.scale_, attackWorldTransform_.rotation_, attackWorldTransform_.translation_);
+		attackWorldTransform_.TransferMatrix();
+	}
 }
 
 void Player::Draw() {
@@ -453,9 +483,9 @@ void Player::Draw() {
 		model_->Draw(worldTransform_, *camera_);
 	}
 
+	// 攻撃時に攻撃エフェクトをプレイヤーの前方に描画
 	if (attackModel_ && behavior_ == Behavior::kAttack) {
-
-		attackModel_->Draw(worldTransform_, *camera_, textureHandle_);
+		attackModel_->Draw(attackWorldTransform_, *camera_, textureHandle_);
 	}
 }
 
@@ -616,7 +646,7 @@ void Player::SwitchingTheGrounding(CollisionMapInfo& info) {
 #ifdef _DEBUG
 			DebugText::GetInstance()->ConsolePrintf("GroundSample center pos=(%.3f,%.3f) idx=(%d,%d) type=%d\n", centerSamplePos.x, centerSamplePos.y, centerIdx.xIndex, centerIdx.yIndex, static_cast<int>(centerType));
 #endif
-			if (centerType == MapChipType::kBlock) {
+			if (centerType == MapChipType::kBlock || centerType == MapChipType::kIce) {
 				hit = true; // 中心に足場があれば地面あり
 				// 追加で左右を確認して安定化（あればより確実）
 				for (int i = 0; i < kSampleCount; ++i) {
@@ -639,7 +669,7 @@ void Player::SwitchingTheGrounding(CollisionMapInfo& info) {
 #ifdef _DEBUG
 					DebugText::GetInstance()->ConsolePrintf("GroundSample i=%d pos=(%.3f,%.3f) idx=(%d,%d) type=%d\n", i, samplePos.x, samplePos.y, idx.xIndex, idx.yIndex, static_cast<int>(type));
 #endif
-					if (type == MapChipType::kBlock) {
+					if (type == MapChipType::kBlock || type == MapChipType::kIce) {
 						hits++;
 					}
 				}
@@ -711,14 +741,14 @@ void Player::HandleMapCollisionUp(CollisionMapInfo& info) {
 	indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kLeftTop]);
 
 	mapChipType = mapChipField_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
-	if (mapChipType == MapChipType::kBlock) {
+	if (mapChipType == MapChipType::kBlock || mapChipType == MapChipType::kIce) {
 		hit = true;
 	}
 
 	// 右上点の座標
 	indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kRightTop]);
 	mapChipType = mapChipField_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
-	if (mapChipType == MapChipType::kBlock) {
+	if (mapChipType == MapChipType::kBlock || mapChipType == MapChipType::kIce) {
 		hit = true;
 	}
 
@@ -760,7 +790,7 @@ void Player::HandleMapCollisionDown(CollisionMapInfo& info) {
 		IndexSet index = mapChipField_->GetMapChipIndexSetByPosition(pos);
 		MapChipType type = mapChipField_->GetMapChipTypeByIndex(index.xIndex, index.yIndex);
 
-		if (type == MapChipType::kBlock) {
+		if (type == MapChipType::kBlock || type == MapChipType::kIce) {
 			// ★ここがポイント：ブロックの「実際の座標」を取得する
 			Rects rect = mapChipField_->GetRectByIndex(index.xIndex, index.yIndex);
 
@@ -798,14 +828,14 @@ void Player::HandleMapCollisionLeft(CollisionMapInfo& info) {
 	// 左上点の座標
 	indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kLeftTop]);
 	mapChipType = mapChipField_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
-	if (mapChipType == MapChipType::kBlock) {
+	if (mapChipType == MapChipType::kBlock || mapChipType == MapChipType::kIce) {
 		hit = true;
 	}
 
 	// 左下点の座標
 	indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kLeftBottom]);
 	mapChipType = mapChipField_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
-	if (mapChipType == MapChipType::kBlock) {
+	if (mapChipType == MapChipType::kBlock || mapChipType == MapChipType::kIce) {
 		hit = true;
 	}
 
@@ -850,14 +880,14 @@ void Player::HandleMapCollisionRight(CollisionMapInfo& info) {
 	// 右上点の座標
 	indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kRightTop]);
 	mapChipType = mapChipField_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
-	if (mapChipType == MapChipType::kBlock) {
+	if (mapChipType == MapChipType::kBlock || mapChipType == MapChipType::kIce) {
 		hit = true;
 	}
 
 	// 右下点の座標
 	indexSet = mapChipField_->GetMapChipIndexSetByPosition(positionNew[kRightBottom]);
 	mapChipType = mapChipField_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
-	if (mapChipType == MapChipType::kBlock) {
+	if (mapChipType == MapChipType::kBlock || mapChipType == MapChipType::kIce) {
 		hit = true;
 	}
 
@@ -1047,7 +1077,7 @@ void Player::UpdateAABB() {
 }
 
 void Player::EmergencyAvoidance() {
-	bool dodgePressed = Input::GetInstance()->TriggerKey(DIK_E);
+	bool dodgePressed = Input::GetInstance()->TriggerKey(DIK_Q);
 	if (dodgePressed && !isDodging_ && dodgeCooldown_ <= 0.0f && behavior_ != Behavior::kAttack) {
 
 		float dir = (lrDirection_ == LRDirection::kRight) ? 1.0f : -1.0f;
@@ -1084,6 +1114,9 @@ void Player::BehaviorAttackInitialize() {
 	attackParameter_ = 0;
 	// 攻撃クールタイム開始
 	attackCooldown_ = kAttackCooldownTime;
+
+	// 攻撃開始時点のエフェクトの初期位置更新
+	UpdateAttackEffectTransform();
 }
 
 void Player::BehaviorRootUpdate() {}
@@ -1110,7 +1143,27 @@ void Player::BehaviorAttackUpdate() {
 		velocity_.x = std::clamp(velocity_.x, -kLimitRunSpeed, kLimitRunSpeed);
 	}
 
+	// 攻撃エフェクト追従
+	UpdateAttackEffectTransform();
+
 	// 縦方向は通常の物理挙動に任せる。
+}
+
+void Player::UpdateAttackEffectTransform() {
+	// プレイヤーの進行方向前にエフェクトを配置
+	float dirSign = (lrDirection_ == LRDirection::kRight) ? 1.0f : -1.0f;
+
+	// 前方オフセット（プレイヤー幅の半分 + 攻撃幅の半分より少し前に）
+	const float forwardOffset = (kWidth * 0.5f) + (kAttackWidth * 0.5f) * 0.8f;
+
+	attackWorldTransform_.scale_ = {worldTransform_.scale_.x * kAttackEffectScale,
+									 worldTransform_.scale_.y * kAttackEffectScale,
+									 worldTransform_.scale_.z * kAttackEffectScale};
+	attackWorldTransform_.rotation_ = worldTransform_.rotation_;
+	attackWorldTransform_.translation_ = worldTransform_.translation_;
+	attackWorldTransform_.translation_.x += dirSign * forwardOffset;
+	// カメラに少し近づけるバイアス（Z軸）
+	attackWorldTransform_.translation_.z += kAttackEffectZBias;
 }
 
 // 新しい関数: プレイヤーの攻撃用AABBを返す
@@ -1130,7 +1183,7 @@ AABB Player::GetAttackAABB() const {
 	hitbox.min = {attackCenter.x - halfAttackWidth, attackCenter.y - halfAttackHeight, attackCenter.z - 1.0f};
 	hitbox.max = {attackCenter.x + halfAttackWidth, attackCenter.y + halfAttackHeight, attackCenter.z + 1.0f};
 	return hitbox;
-}
+	}
 
 void Player::ConsumeKey() {
     keyCount_ += 1;

@@ -71,6 +71,7 @@ private:
 
 	KamataEngine::Model* model_ = nullptr;      // デバック用
 	KamataEngine::Model* blockModel_ = nullptr; // ブロック用
+	KamataEngine::Model* iceModel_ = nullptr;   // 氷ブロック用
 	Skydome* skydome_ = nullptr;                // スカイドームクラス
 	KamataEngine::Camera camera_;
 

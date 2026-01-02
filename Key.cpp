@@ -36,7 +36,7 @@ Key::~Key() {
 void Key::OnPicked(Player* player) {
     if (state_ != State::kIdle) return;
 
-    // If player is far, skip rotating and start attracting immediately
+  
     if (player) {
         Vector3 p = player->GetPosition();
         float dx = p.x - position_.x;
@@ -67,16 +67,16 @@ void Key::Update(float delta) {
         frame_ = (frame_ + 1) % 4;
     }
 
-    // state machine for pickup
+   
     switch (state_) {
     case State::kIdle:
-        // idle bobbing or simple animation could be added here
+      
         break;
     case State::kRotating: {
         stateTimer_ += delta;
-        // rotate around Z
+     
         worldTransform_.rotation_.z += kRotateSpeed * delta;
-        // Check if player moved far while rotating; if so, skip to attracting
+       
         if (targetPlayer_) {
             Vector3 p = targetPlayer_->GetPosition();
             float dx = p.x - position_.x;
@@ -90,7 +90,7 @@ void Key::Update(float delta) {
         }
         if (stateTimer_ >= kRotateDuration) {
             state_ = State::kAttracting;
-            // reset timer for attraction
+          
             stateTimer_ = 0.0f;
         }
         break;
@@ -101,15 +101,15 @@ void Key::Update(float delta) {
             collected_ = true;
             break;
         }
-        // move towards player
+       
         Vector3 playerPos = targetPlayer_->GetPosition();
-        // keep same z
+      
         playerPos.z = 0.0f;
         Vector3 dir = {playerPos.x - position_.x, playerPos.y - position_.y, 0.0f};
         float dist = std::sqrt(dir.x * dir.x + dir.y * dir.y);
         if (dist > 0.0001f) {
             dir.x /= dist; dir.y /= dist;
-            // distance-based speed multiplier
+           
             float multiplier = 1.0f;
             if (dist > kNearDistanceThreshold) {
                 multiplier += (dist - kNearDistanceThreshold) * kDistanceSpeedFactor;
@@ -121,15 +121,15 @@ void Key::Update(float delta) {
             position_.y += dir.y * move;
         }
 
-        // scale down as it approaches
+    
         float scaleFactor = 1.0f;
-        // when within 2 units start shrinking
+     
         float startShrinkDist = 2.0f;
         float t = 1.0f - std::clamp(dist / startShrinkDist, 0.0f, 1.0f);
-        scaleFactor = 1.0f - 0.9f * t; // shrink to 10%
+        scaleFactor = 1.0f - 0.9f * t; 
         worldTransform_.scale_ = {initialScale_.x * scaleFactor, initialScale_.y * scaleFactor, initialScale_.z * scaleFactor};
 
-        // rotate faster while attracting
+      
         worldTransform_.rotation_.z += kRotateSpeed * 2.0f * delta;
 
         if (dist <= kCollectDistance) {
@@ -139,7 +139,7 @@ void Key::Update(float delta) {
         break;
     }
     case State::kCollected:
-        // nothing to do; GameScene should remove the key when consumed
+     
         break;
     }
 

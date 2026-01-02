@@ -150,6 +150,9 @@ public:
 	bool IsAttacking() const { return behavior_ == Behavior::kAttack; }
 	AABB GetAttackAABB() const;
 
+	// 攻撃エフェクトのワールド変換を更新
+	void UpdateAttackEffectTransform();
+
 public:
 	KamataEngine::WorldTransform& GetWorldTransform() { return worldTransform_; }
 	KamataEngine::Vector3 GetPosition() const { return worldTransform_.translation_; }
@@ -178,6 +181,7 @@ private:
 	Model* model_ = nullptr;
 
 	Model* attackModel_ = nullptr;
+	WorldTransform attackWorldTransform_;
 
 	// Player が自身で生成した Model を所有しているか
 	bool ownsModel_ = false;
@@ -338,6 +342,15 @@ private:
 	bool invincible_ = false;
 	float invincibleTimer_ = 0.0f;
 	static inline const float kInvincibleDuration = 1.0f;
+
+	// 攻撃エフェクトの拡大率
+	static inline const float kAttackEffectScale = 6.0f;
+	// 攻撃エフェクトのZバイアス（カメラに少し近づけて奥の敵と重なった時の非表示を回避）
+	static inline const float kAttackEffectZBias = -0.15f;
+
+	// 攻撃入力のバッファ（クールタイム明け直後の入力取りこぼし回避）
+	float attackInputBufferTimer_ = 0.0f;
+	static inline const float kAttackInputBufferTime = 0.18f; // seconds
 
 	// collected keys
 	int keyCount_ = 0;

@@ -39,7 +39,7 @@ GameScene::~GameScene() {
 	worldTransformBlocks_.clear();
 
 	delete skydome_;
-
+	
 
 	if (hudSprite_) {
 		delete hudSprite_;
@@ -86,6 +86,9 @@ GameScene::~GameScene() {
 		delete k;
 	}
 	keys_.clear();
+
+	// delete ice model
+	delete iceModel_;
 }
 
 void GameScene::Initialize() {
@@ -102,6 +105,8 @@ void GameScene::Initialize() {
 
 	// Use Block.obj for map chip blocks
 	blockModel_ = Model::CreateFromOBJ("Block");
+	// Load Ice.obj for map chip type 8
+	iceModel_ = Model::CreateFromOBJ("Ice");
 #ifdef _DEBUG
 	assert(textureHandle_);
 #endif
@@ -657,7 +662,15 @@ void GameScene::Draw() {
 			if (!wt) {
 				continue;
 			}
-			blockModel_->Draw(*wt, camera_);
+			// Decide which model to draw based on map chip type at this transform's grid
+			// We need grid indices; they are not stored in WT, so derive by position
+			IndexSet idx = mapChipField_->GetMapChipIndexSetByPosition(wt->translation_);
+			MapChipType t = mapChipField_->GetMapChipTypeByIndex(idx.xIndex, idx.yIndex);
+			if (t == MapChipType::kIce && iceModel_) {
+				iceModel_->Draw(*wt, camera_);
+			} else {
+				blockModel_->Draw(*wt, camera_);
+			}
 		}
 	}
 
@@ -703,7 +716,8 @@ void GameScene::GenerateBlocks() {
 
 	for (uint32_t i = 0; i < numBlockVirtical; ++i) {
 		for (uint32_t j = 0; j < numBlockHorizontal; ++j) {
-			if (mapChipField_->GetMapChipTypeByIndex(j, i) == MapChipType::kBlock) {
+			MapChipType t = mapChipField_->GetMapChipTypeByIndex(j, i);
+			if (t == MapChipType::kBlock || t == MapChipType::kIce) {
 				WorldTransform* worldTransform = new WorldTransform();
 				worldTransform->Initialize();
 				worldTransform->translation_ = mapChipField_->GetMapChipPositionByIndex(j, i);

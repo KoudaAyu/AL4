@@ -12,6 +12,7 @@ enum class MapChipType {
 	kSpike = 5, //5: 棘
 	kGoal = 6,  //6: ゴール
 	kKey = 7,   //7: 鍵
+	kIce = 8,   //8: 氷ブロック（Blockと同じ挙動、モデルのみIce）
 };
 
 struct MapChipData {
