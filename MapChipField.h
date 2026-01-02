@@ -84,6 +84,17 @@ public:
 	/// <returns>CameraController::Rect と同等の構造体 (left,right,top,bottom)</returns>
 	Rect GetMovableArea() const;
 
+	/// <summary>
+	/// 指定インデックスに対応する摩擦係数を取得する
+	/// 返り値は 0.0f (滑りやすい/氷) から 1.0f (摩擦が高い/普通のブロック) を想定
+	/// </summary>
+	float GetFrictionCoefficientByIndex(uint32_t xIndex, uint32_t yIndex);
+
+	/// <summary>
+	/// 指定ワールド座標の下にあるマップチップの摩擦係数を取得する
+	/// </summary>
+	float GetFrictionCoefficientByPosition(const KamataEngine::Vector3& position);
+
 public:
 	uint32_t GetNumBlockHorizontal() const { return numBlockHorizontal_; }
 	uint32_t GetNumBlockVertical() const { return numBlockVertical_; }

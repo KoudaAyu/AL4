@@ -161,3 +161,23 @@ Rect MapChipField::GetMovableArea() const {
 	r.bottom = bottom;
 	return r;
 }
+
+float MapChipField::GetFrictionCoefficientByIndex(uint32_t xIndex, uint32_t yIndex) {
+	MapChipType type = GetMapChipTypeByIndex(xIndex, yIndex);
+	switch (type) {
+	case MapChipType::kIce:
+		// Ice: very low friction
+		return 0.05f;
+	case MapChipType::kBlock:
+		// Block: high friction
+		return 0.9f;
+	default:
+		// Default: treat as high friction
+		return 0.9f;
+	}
+}
+
+float MapChipField::GetFrictionCoefficientByPosition(const KamataEngine::Vector3& position) {
+	IndexSet idx = GetMapChipIndexSetByPosition(position);
+	return GetFrictionCoefficientByIndex(idx.xIndex, idx.yIndex);
+}

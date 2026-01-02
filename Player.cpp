@@ -141,98 +141,111 @@ void Player::Initialize(Camera* camera, const Vector3& position) {
 // 移動処理
 void Player::HandleMovementInput() {
 
-	Input::GetInstance()->GetJoystickState(0, state);
+    Input::GetInstance()->GetJoystickState(0, state);
 
-	if (isDodging_) {
+    if (isDodging_) {
 
-		if (!onGround_) {
-			velocity_.y += -kGravityAcceleration;
-			velocity_.y = std::max(velocity_.y, -kLimitFallSpeed);
-		}
-		return;
-	}
+        if (!onGround_) {
+            velocity_.y += -kGravityAcceleration;
+            velocity_.y = std::max(velocity_.y, -kLimitFallSpeed);
+        }
+        return;
+    }
 
-	float stickX = NormalizeLeftStickX(state.Gamepad.sThumbLX);
+    float stickX = NormalizeLeftStickX(state.Gamepad.sThumbLX);
 
-	bool keyRight = Input::GetInstance()->PushKey(DIK_RIGHT) || Input::GetInstance()->PushKey(DIK_D);
-	bool keyLeft = Input::GetInstance()->PushKey(DIK_LEFT) || Input::GetInstance()->PushKey(DIK_A);
+    bool keyRight = Input::GetInstance()->PushKey(DIK_RIGHT) || Input::GetInstance()->PushKey(DIK_D);
+    bool keyLeft = Input::GetInstance()->PushKey(DIK_LEFT) || Input::GetInstance()->PushKey(DIK_A);
 
-	bool moveRight = keyRight || (stickX > 0.0f);
-	bool moveLeft = keyLeft || (stickX < 0.0f);
+    bool moveRight = keyRight || (stickX > 0.0f);
+    bool moveLeft = keyLeft || (stickX < 0.0f);
 
-	if (onGround_) {
-		if (moveRight || moveLeft) {
-			Vector3 acceleration = {};
+    // Obtain ground friction (1.0f default) if available
+    float groundFriction = 0.9f;
+    if (mapChipField_) {
+        Vector3 samplePos = worldTransform_.translation_ + Vector3{0.0f, -(kHeight * 0.5f) - 0.02f, 0.0f};
+        groundFriction = mapChipField_->GetFrictionCoefficientByPosition(samplePos);
+        onIce_ = (groundFriction < 0.1f);
+    }
 
-			float inputIntensityRight = (keyRight) ? 1.0f : std::max(0.0f, stickX);
-			float inputIntensityLeft = (keyLeft) ? 1.0f : std::max(0.0f, -stickX);
+    if (onGround_) {
+        if (moveRight || moveLeft) {
+            Vector3 acceleration = {};
 
-			if (inputIntensityRight > 0.0f) {
-				if (velocity_.x < 0.0f) {
-					velocity_.x *= (onIce_ ? 0.8f : 0.3f);
+            float inputIntensityRight = (keyRight) ? 1.0f : std::max(0.0f, stickX);
+            float inputIntensityLeft = (keyLeft) ? 1.0f : std::max(0.0f, -stickX);
 
-					if (std::fabs(velocity_.x) < 0.01f)
-						velocity_.x = 0.0f;
-				}
-				if (lrDirection_ != LRDirection::kRight) {
-					lrDirection_ = LRDirection::kRight;
-					turnFirstRotationY_ = worldTransform_.rotation_.y;
-					turnTimer_ = kTimeTurn;
-				}
-				acceleration.x += (onIce_ ? (kAcceleration * 0.6f) : kAcceleration) * inputIntensityRight;
-			} else if (inputIntensityLeft > 0.0f) {
-				if (velocity_.x > 0.0f) {
-					velocity_.x *= (onIce_ ? 0.8f : 0.3f);
-					if (std::fabs(velocity_.x) < 0.01f)
-						velocity_.x = 0.0f;
-				}
-				if (lrDirection_ != LRDirection::kLeft) {
-					lrDirection_ = LRDirection::kLeft;
-					turnFirstRotationY_ = worldTransform_.rotation_.y;
-					turnTimer_ = kTimeTurn;
-				}
-				acceleration.x -= (onIce_ ? (kAcceleration * 0.6f) : kAcceleration) * inputIntensityLeft;
-			}
+            if (inputIntensityRight > 0.0f) {
+                if (velocity_.x < 0.0f) {
+                    // use friction to determine how much to damp when reversing
+                    float reverseDamp = onIce_ ? 0.8f : (1.0f - groundFriction * 0.7f);
+                    velocity_.x *= reverseDamp;
 
-			velocity_.x += acceleration.x;
-			velocity_.x = std::clamp(velocity_.x, -kLimitRunSpeed, kLimitRunSpeed);
-		} else {
-			// 地上での減衰（氷上では減衰大幅に弱め）
-			float atten = onIce_ ? (kAttenuation * 0.15f) : kAttenuation;
-			velocity_.x *= (1.0f - atten);
-		}
+                    if (std::fabs(velocity_.x) < 0.01f)
+                        velocity_.x = 0.0f;
+                }
+                if (lrDirection_ != LRDirection::kRight) {
+                    lrDirection_ = LRDirection::kRight;
+                    turnFirstRotationY_ = worldTransform_.rotation_.y;
+                    turnTimer_ = kTimeTurn;
+                }
+                acceleration.x += (onIce_ ? (kAcceleration * 0.6f) : kAcceleration) * inputIntensityRight;
+            } else if (inputIntensityLeft > 0.0f) {
+                if (velocity_.x > 0.0f) {
+                    float reverseDamp = onIce_ ? 0.8f : (1.0f - groundFriction * 0.7f);
+                    velocity_.x *= reverseDamp;
+                    if (std::fabs(velocity_.x) < 0.01f)
+                        velocity_.x = 0.0f;
+                }
+                if (lrDirection_ != LRDirection::kLeft) {
+                    lrDirection_ = LRDirection::kLeft;
+                    turnFirstRotationY_ = worldTransform_.rotation_.y;
+                    turnTimer_ = kTimeTurn;
+                }
+                acceleration.x -= (onIce_ ? (kAcceleration * 0.6f) : kAcceleration) * inputIntensityLeft;
+            }
 
-		// ジャンプ入力はライズエッジ側で処理するため、ここで直接加算は行わない
+            velocity_.x += acceleration.x;
+            velocity_.x = std::clamp(velocity_.x, -kLimitRunSpeed, kLimitRunSpeed);
+        } else {
+            // 地上での減衰（氷上では減衰大幅に弱め）
+            // Use groundFriction to scale attenuation: higher friction -> stronger attenuation
+            float baseAtten = kAttenuation;
+            float atten = (onIce_) ? (kAttenuation * 0.15f) : (baseAtten * (1.0f + (1.0f - groundFriction)));
+            velocity_.x *= (1.0f - atten);
+        }
 
-	} else {
-		// 空中の横移動制御は変更なし
-		if (moveRight || moveLeft) {
-			float inputIntensityRight = (keyRight) ? 1.0f : std::max(0.0f, stickX);
-			float inputIntensityLeft = (keyLeft) ? 1.0f : std::max(0.0f, -stickX);
+        // ジャンプ入力はライズエッジ側で処理するため、ここで直接加算は行わない
 
-			float accelX = 0.0f;
-			if (inputIntensityRight > 0.0f) {
-				// 反対方向への速度を少し緩和して方向転換を行う
-				if (velocity_.x < 0.0f) {
-					velocity_.x *= 0.8f;
-				}
-				if (lrDirection_ != LRDirection::kRight) {
-					lrDirection_ = LRDirection::kRight;
-					turnFirstRotationY_ = worldTransform_.rotation_.y;
-					turnTimer_ = kTimeTurn;
-				}
-				accelX += kAirAcceleration * inputIntensityRight;
-			} else if (inputIntensityLeft > 0.0f) {
-				if (velocity_.x > 0.0f) {
-					velocity_.x *= 0.8f;
-				}
-				if (lrDirection_ != LRDirection::kLeft) {
-					lrDirection_ = LRDirection::kLeft;
-					turnFirstRotationY_ = worldTransform_.rotation_.y;
-					turnTimer_ = kTimeTurn;
-				}
-				accelX -= kAirAcceleration * inputIntensityLeft;
-			}
+    } else {
+        // 空中の横移動制御は変更なし
+        if (moveRight || moveLeft) {
+            float inputIntensityRight = (keyRight) ? 1.0f : std::max(0.0f, stickX);
+            float inputIntensityLeft = (keyLeft) ? 1.0f : std::max(0.0f, -stickX);
+
+            float accelX = 0.0f;
+            if (inputIntensityRight > 0.0f) {
+                // 反対方向への速度を少し緩和して方向転換を行う
+                if (velocity_.x < 0.0f) {
+                    velocity_.x *= 0.8f;
+                }
+                if (lrDirection_ != LRDirection::kRight) {
+                    lrDirection_ = LRDirection::kRight;
+                    turnFirstRotationY_ = worldTransform_.rotation_.y;
+                    turnTimer_ = kTimeTurn;
+                }
+                accelX += kAirAcceleration * inputIntensityRight;
+            } else if (inputIntensityLeft > 0.0f) {
+                if (velocity_.x > 0.0f) {
+                    velocity_.x *= 0.8f;
+                }
+                if (lrDirection_ != LRDirection::kLeft) {
+                    lrDirection_ = LRDirection::kLeft;
+                    turnFirstRotationY_ = worldTransform_.rotation_.y;
+                    turnTimer_ = kTimeTurn;
+                }
+                accelX -= kAirAcceleration * inputIntensityLeft;
+            }
 
 #ifdef _DEBUG
 			DebugText::GetInstance()->ConsolePrintf("AirInput onGround=%s inputR=%.3f inputL=%.3f accelX=%.3f velBefore=%.3f\n",
@@ -246,20 +259,21 @@ void Player::HandleMovementInput() {
 #ifdef _DEBUG
 			DebugText::GetInstance()->ConsolePrintf(" -> velAfter=%.3f\n", velocity_.x);
 #endif
-		} else {
-			// 空中では減衰を弱める（空中の慣性を残す）
-			velocity_.x *= (1.0f - kAttenuation * 0.2f);
-		}
+        } else {
+            // 空中では減衰を弱める（空中の慣性を残す）
+            velocity_.x *= (1.0f - kAttenuation * 0.2f);
+        }
 
-		// 常に重力を加える（空中）
-		velocity_.y += -kGravityAcceleration;
+        // 常に重力を加える（空中）
+        velocity_.y += -kGravityAcceleration;
 
-		// 落下速度の上限を設ける
-		if (velocity_.y < -kLimitFallSpeed) {
-			velocity_.y = -kLimitFallSpeed;
-		}
-	}
+        // 落下速度の上限を設ける
+        if (velocity_.y < -kLimitFallSpeed) {
+            velocity_.y = -kLimitFallSpeed;
+        }
+    }
 
+    
 		bool keyJumpDown = Input::GetInstance()->PushKey(DIK_UP) || Input::GetInstance()->PushKey(DIK_SPACE);
 	bool keyboardRising = keyJumpDown && !prevJumpKeyPressed_;
 	prevJumpKeyPressed_ = keyJumpDown;
