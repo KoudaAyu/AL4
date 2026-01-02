@@ -916,6 +916,8 @@ void Player::UpdateWallSlide(const CollisionMapInfo& info) {
 	ImGui::Text("isWallContact: %s", info.isWallContact_ ? "true" : "false");
 	ImGui::Text("isWallSliding: %s", isWallSliding_ ? "true" : "false");
 	ImGui::Text("velocityY: %.3f", velocity_.y);
+	const char* facing = (lrDirection_ == LRDirection::kRight) ? "Right" : "Left";
+	ImGui::Text("playerFacing: %s", facing);
 	ImGui::End();
 #endif
 

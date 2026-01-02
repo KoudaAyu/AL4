@@ -464,33 +464,6 @@ void GameScene::Update() {
 		CheckAllCollisions();
 
 		
-		{
-			bool anyAlive = false;
-			for (Enemy* enemy : enemies_) {
-				if (enemy && enemy->isAlive()) {
-					anyAlive = true;
-					break;
-				}
-			}
-			if (!anyAlive) {
-				
-				if (victoryTimer_ <= 0.0f) {
-					
-					victoryTimer_ = 0.6f;
-				}
-
-				
-				if (!player_->IsAttacking()) {
-					victoryTimer_ -= 1.0f / 60.0f;
-					if (victoryTimer_ <= 0.0f) {
-						finished_ = true;
-						return;
-					}
-				}
-			}
-		}
-
-	
 		if (hudSprite_) {
 			
 			const float hudMargin = 20.0f;
