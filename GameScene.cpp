@@ -794,17 +794,25 @@ void GameScene::CheckAllCollisions() {
             it = keys_.erase(it);
             continue;
         }
-        if (IsCollisionAABBAABB(player_->GetAABB(), k->GetAABB())) {
-			
-			// consume the key immediately on collision
+
+		// If key already finished its collection animation, give it to player and remove
+		if (k->IsCollected()) {
 			player_->ConsumeKey();
-			k->PlayPickupSound();
-			// delete key instance and remove from vector
 			delete k;
 			it = keys_.erase(it);
-		} else {
-			++it;
+			continue;
 		}
+
+		// If player is colliding with key, start pickup animation (if not already started)
+		if (IsCollisionAABBAABB(player_->GetAABB(), k->GetAABB())) {
+			if (!k->IsPicked()) {
+				k->OnPicked(player_);
+				k->PlayGetSound();
+				if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(1.0f, 0.15f);
+			}
+		}
+
+		++it;
     }
 }
 

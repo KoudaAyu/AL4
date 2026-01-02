@@ -2,6 +2,10 @@
 
 #include "KamataEngine.h"
 #include "MathUtl.h"
+#include "Player.h"
+
+#include <algorithm>
+#include <cmath>
 
 using namespace KamataEngine;
 
@@ -16,7 +20,7 @@ void Key::Initialize() {
     worldTransform_.translation_ = position_;
     worldTransform_.translation_.z = 0.0f;
     worldTransform_.rotation_ = {0, 0, 0};
-    worldTransform_.scale_ = {0.6f, 0.6f, 0.6f};
+    worldTransform_.scale_ = initialScale_;
 
     worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
     worldTransform_.TransferMatrix();
@@ -29,6 +33,31 @@ Key::~Key() {
     }
 }
 
+void Key::OnPicked(Player* player) {
+    if (state_ != State::kIdle) return;
+
+    // If player is far, skip rotating and start attracting immediately
+    if (player) {
+        Vector3 p = player->GetPosition();
+        float dx = p.x - position_.x;
+        float dy = p.y - position_.y;
+        float dist = std::sqrt(dx * dx + dy * dy);
+        if (dist > kRotateSkipDistance) {
+            state_ = State::kAttracting;
+            targetPlayer_ = player;
+            stateTimer_ = 0.0f;
+            return;
+        }
+    }
+
+    state_ = State::kRotating;
+    stateTimer_ = 0.0f;
+    targetPlayer_ = player;
+}
+
+bool Key::IsPicked() const { return state_ != State::kIdle; }
+bool Key::IsCollected() const { return collected_; }
+
 void Key::Update(float delta) {
     const float frameTime = 0.15f;
     static float acc = 0.0f;
@@ -36,6 +65,82 @@ void Key::Update(float delta) {
     if (acc >= frameTime) {
         acc = 0.0f;
         frame_ = (frame_ + 1) % 4;
+    }
+
+    // state machine for pickup
+    switch (state_) {
+    case State::kIdle:
+        // idle bobbing or simple animation could be added here
+        break;
+    case State::kRotating: {
+        stateTimer_ += delta;
+        // rotate around Z
+        worldTransform_.rotation_.z += kRotateSpeed * delta;
+        // Check if player moved far while rotating; if so, skip to attracting
+        if (targetPlayer_) {
+            Vector3 p = targetPlayer_->GetPosition();
+            float dx = p.x - position_.x;
+            float dy = p.y - position_.y;
+            float dist = std::sqrt(dx * dx + dy * dy);
+            if (dist > kRotateSkipDistance) {
+                state_ = State::kAttracting;
+                stateTimer_ = 0.0f;
+                break;
+            }
+        }
+        if (stateTimer_ >= kRotateDuration) {
+            state_ = State::kAttracting;
+            // reset timer for attraction
+            stateTimer_ = 0.0f;
+        }
+        break;
+    }
+    case State::kAttracting: {
+        if (!targetPlayer_) {
+            state_ = State::kCollected;
+            collected_ = true;
+            break;
+        }
+        // move towards player
+        Vector3 playerPos = targetPlayer_->GetPosition();
+        // keep same z
+        playerPos.z = 0.0f;
+        Vector3 dir = {playerPos.x - position_.x, playerPos.y - position_.y, 0.0f};
+        float dist = std::sqrt(dir.x * dir.x + dir.y * dir.y);
+        if (dist > 0.0001f) {
+            dir.x /= dist; dir.y /= dist;
+            // distance-based speed multiplier
+            float multiplier = 1.0f;
+            if (dist > kNearDistanceThreshold) {
+                multiplier += (dist - kNearDistanceThreshold) * kDistanceSpeedFactor;
+                multiplier = (std::min)(multiplier, kMaxAttractMultiplier);
+            }
+            float move = kAttractSpeed * multiplier * delta;
+            if (move > dist) move = dist;
+            position_.x += dir.x * move;
+            position_.y += dir.y * move;
+        }
+
+        // scale down as it approaches
+        float scaleFactor = 1.0f;
+        // when within 2 units start shrinking
+        float startShrinkDist = 2.0f;
+        float t = 1.0f - std::clamp(dist / startShrinkDist, 0.0f, 1.0f);
+        scaleFactor = 1.0f - 0.9f * t; // shrink to 10%
+        worldTransform_.scale_ = {initialScale_.x * scaleFactor, initialScale_.y * scaleFactor, initialScale_.z * scaleFactor};
+
+        // rotate faster while attracting
+        worldTransform_.rotation_.z += kRotateSpeed * 2.0f * delta;
+
+        if (dist <= kCollectDistance) {
+            state_ = State::kCollected;
+            collected_ = true;
+        }
+        break;
+    }
+    case State::kCollected:
+        // nothing to do; GameScene should remove the key when consumed
+        break;
     }
 
     worldTransform_.translation_ = position_;
@@ -48,6 +153,9 @@ void Key::Update(float delta) {
 void Key::Draw(KamataEngine::Camera* camera) {
     if (!model_) return;
     if (!camera) return;
+
+    // Only draw if not yet fully collected
+    if (state_ == State::kCollected && collected_) return;
 
     worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
     worldTransform_.TransferMatrix();
@@ -69,6 +177,6 @@ AABB Key::GetAABB() const {
     return aabb;
 }
 
-void Key::PlayPickupSound() {
+void Key::PlayGetSound() {
     KamataEngine::Audio::GetInstance()->PlayWave(soundDataHandle, false);
 }
