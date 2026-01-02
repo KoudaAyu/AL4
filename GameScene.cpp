@@ -796,8 +796,14 @@ void GameScene::CheckAllCollisions() {
     for (Goal* g : goals_) {
         if (!g) continue;
         if (IsCollisionAABBAABB(player_->GetAABB(), g->GetAABB())) {
-            finished_ = true; // trigger GameClear
-            return;
+            // require all keys to be collected before clearing
+            if (keys_.empty()) {
+                finished_ = true; // trigger GameClear
+                return;
+            } else {
+                // Inform (debug) that keys remain; do not clear yet
+                DebugText::GetInstance()->ConsolePrintf("GameScene: goal reached but keys remain\n");
+            }
         }
     }
 
