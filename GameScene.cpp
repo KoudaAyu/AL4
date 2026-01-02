@@ -798,6 +798,7 @@ void GameScene::CheckAllCollisions() {
 			
 			// consume the key immediately on collision
 			player_->ConsumeKey();
+			k->PlayPickupSound();
 			// delete key instance and remove from vector
 			delete k;
 			it = keys_.erase(it);

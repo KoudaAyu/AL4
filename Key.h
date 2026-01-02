@@ -19,6 +19,9 @@ public:
 
     bool HasModel() const { return model_ != nullptr; }
 
+    // Play pickup sound
+    void PlayPickupSound();
+
 private:
     KamataEngine::Vector3 position_{0.0f, 0.0f, 0.0f};
     int frame_ = 0; // animation frame (kept for consistency with Spike)
@@ -27,4 +30,7 @@ private:
     bool ownsModel_ = false;
 
     KamataEngine::WorldTransform worldTransform_{};
+
+    // sound
+    uint32_t soundDataHandle = KamataEngine::Audio::GetInstance()->LoadWave("Audio/SE/Key_Get.wav");
 };

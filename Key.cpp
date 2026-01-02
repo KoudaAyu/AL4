@@ -68,3 +68,7 @@ AABB Key::GetAABB() const {
     aabb.max = {center.x + half.x, center.y + half.y, center.z + half.z};
     return aabb;
 }
+
+void Key::PlayPickupSound() {
+    KamataEngine::Audio::GetInstance()->PlayWave(soundDataHandle, false);
+}
