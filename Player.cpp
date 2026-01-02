@@ -1131,3 +1131,8 @@ AABB Player::GetAttackAABB() const {
 	hitbox.max = {attackCenter.x + halfAttackWidth, attackCenter.y + halfAttackHeight, attackCenter.z + 1.0f};
 	return hitbox;
 }
+
+void Player::ConsumeKey() {
+    keyCount_ += 1;
+    DebugText::GetInstance()->ConsolePrintf("Player: consumed key. total keys=%d\n", keyCount_);
+}

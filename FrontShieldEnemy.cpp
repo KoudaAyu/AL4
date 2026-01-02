@@ -27,13 +27,15 @@ void FrontShieldEnemy::OnCollision(Player* player) {
 
     if (player->GetLRDirection() == Player::LRDirection::kLeft && lrDirection_ == FrontShieldEnemy::LRDirection::kRight) {
         // プレイヤーが左向きで敵も左向きの場合、衝突を無効化
+        Audio::GetInstance()->PlayWave(soundDataHandle, false);
         return;
     }
 
     if (player->GetLRDirection() == Player::LRDirection::kRight && lrDirection_ == FrontShieldEnemy::LRDirection::kLeft) {
         // プレイヤーが右向きで敵も右向きの場合、衝突を無効化
+        Audio::GetInstance()->PlayWave(soundDataHandle, false);
         return;
-	}
+    }
 
     Enemy::OnCollision(player);
 }

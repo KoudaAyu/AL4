@@ -1,35 +1,35 @@
-#include "Spike.h"
+#include "Key.h"
 
 #include "KamataEngine.h"
 #include "MathUtl.h"
 
 using namespace KamataEngine;
 
-void Spike::Initialize() {
+void Key::Initialize() {
     frame_ = 0;
 
-    // Load fixed spike model
-    model_ = KamataEngine::Model::CreateFromOBJ("thorn", true);
+    // Load key model
+    model_ = KamataEngine::Model::CreateFromOBJ("Key", true);
     ownsModel_ = (model_ != nullptr);
 
     worldTransform_.Initialize();
     worldTransform_.translation_ = position_;
     worldTransform_.translation_.z = 0.0f;
     worldTransform_.rotation_ = {0, 0, 0};
-    worldTransform_.scale_ = {0.8f, 0.8f, 0.8f};
+    worldTransform_.scale_ = {0.6f, 0.6f, 0.6f};
 
     worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
     worldTransform_.TransferMatrix();
 }
 
-Spike::~Spike() {
+Key::~Key() {
     if (ownsModel_ && model_) {
         delete model_;
         model_ = nullptr;
     }
 }
 
-void Spike::Update(float delta) {
+void Key::Update(float delta) {
     const float frameTime = 0.15f;
     static float acc = 0.0f;
     acc += delta;
@@ -45,7 +45,7 @@ void Spike::Update(float delta) {
     worldTransform_.TransferMatrix();
 }
 
-void Spike::Draw(KamataEngine::Camera* camera) {
+void Key::Draw(KamataEngine::Camera* camera) {
     if (!model_) return;
     if (!camera) return;
 
@@ -55,10 +55,10 @@ void Spike::Draw(KamataEngine::Camera* camera) {
     model_->Draw(worldTransform_, *camera);
 }
 
-AABB Spike::GetAABB() const {
-    static constexpr float kWidth = 0.8f * 2.0f;
-    static constexpr float kHeight = 0.8f * 2.0f;
-    static constexpr float kDepth = 0.8f * 2.0f;
+AABB Key::GetAABB() const {
+    static constexpr float kWidth = 0.6f * 2.0f;
+    static constexpr float kHeight = 0.6f * 2.0f;
+    static constexpr float kDepth = 0.6f * 2.0f;
 
     Vector3 center = position_;
     Vector3 half = {kWidth * 0.5f, kHeight * 0.5f, kDepth * 0.5f};

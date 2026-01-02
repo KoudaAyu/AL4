@@ -31,4 +31,6 @@ private:
 	LRDirection lrDirection_ = LRDirection::kLeft;
 
 	float frontDotThreshold_ = 0.5f;
+
+	uint32_t soundDataHandle = KamataEngine::Audio::GetInstance()->LoadWave("Audio/SE/FrontShieldEnemy_Alive.wav");
 };

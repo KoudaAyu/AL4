@@ -167,6 +167,10 @@ public:
 	// HP accessor
 	int GetHP() const { return hp_; }
 
+	// Key management
+	void ConsumeKey(); // called when player picks up a key
+	int GetKeyCount() const { return keyCount_; }
+
 private:
 	// ワールド変換データ
 	WorldTransform worldTransform_;
@@ -335,4 +339,6 @@ private:
 	float invincibleTimer_ = 0.0f;
 	static inline const float kInvincibleDuration = 1.0f;
 
+	// collected keys
+	int keyCount_ = 0;
 };

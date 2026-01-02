@@ -7,6 +7,7 @@
 #include "KeyInput.h"
 #include "Spike.h"
 #include "Goal.h"
+#include "Key.h"
 #include <algorithm>
 using namespace KamataEngine;
 
@@ -79,6 +80,12 @@ GameScene::~GameScene() {
 		delete g;
 	}
 	goals_.clear();
+
+	// delete keys
+	for (Key* k : keys_) {
+		delete k;
+	}
+	keys_.clear();
 }
 
 void GameScene::Initialize() {
@@ -177,12 +184,27 @@ void GameScene::Initialize() {
 					goalSpawned = true;
 				}
 			}
-			// early exit once goal is spawned
-			if (goalSpawned) break;
+			// Do not break here; continue scanning to spawn all spikes and enemies
 		}
 	}
 
-	
+	// spawn keys
+	if (mapChipField_) {
+		uint32_t vh = mapChipField_->GetNumBlockVertical();
+		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
+		for (uint32_t y = 0; y < vh; ++y) {
+			for (uint32_t x = 0; x < wh; ++x) {
+				if (mapChipField_->GetMapChipTypeByIndex(x, y) == MapChipType::kKey) {
+					Key* k = new Key();
+					Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
+					k->SetPosition(pos);
+					k->Initialize();
+					keys_.push_back(k);
+				}
+			}
+		}
+	}
+
 	if (!spikes_.empty()) {
 		DebugText::GetInstance()->ConsolePrintf("GameScene: created %u spikes\n", static_cast<uint32_t>(spikes_.size()));
 		for (uint32_t i = 0; i < spikes_.size(); ++i) {
@@ -456,6 +478,13 @@ void GameScene::Update() {
 			}
 		}
 
+		// Update keys
+		if (!keys_.empty()) {
+            for (Key* k : keys_) {
+                if (k) k->Update(1.0f / 60.0f);
+            }
+        }
+
 #ifndef _DEBUG
 		cameraController_->Update();
 		camera_.UpdateMatrix();
@@ -613,6 +642,11 @@ void GameScene::Draw() {
 		if (g) g->Draw(&camera_);
 	}
 
+	// Draw keys
+    for (Key* k : keys_) {
+        if (k) k->Draw(&camera_);
+    }
+
 	// デス中はプレイヤーの描画を抑制してエフェクトを見やすくする
 	if (phase_ != Phase::kDeath) {
 		player_->Draw();
@@ -752,6 +786,25 @@ void GameScene::CheckAllCollisions() {
             return;
         }
     }
+
+	// Key とプレイヤーの当たり判定
+	for (auto it = keys_.begin(); it != keys_.end();) {
+        Key* k = *it;
+        if (!k) {
+            it = keys_.erase(it);
+            continue;
+        }
+        if (IsCollisionAABBAABB(player_->GetAABB(), k->GetAABB())) {
+			
+			// consume the key immediately on collision
+			player_->ConsumeKey();
+			// delete key instance and remove from vector
+			delete k;
+			it = keys_.erase(it);
+		} else {
+			++it;
+		}
+    }
 }
 
 void GameScene::ChangePhase() {
@@ -865,8 +918,19 @@ void GameScene::Reset() {
 					goalSpawned = true;
 				}
 			}
-			// early exit once goal is spawned
-			if (goalSpawned) break;
+		}
+
+		// spawn keys
+		for (uint32_t y = 0; y < vh; ++y) {
+			for (uint32_t x = 0; x < wh; ++x) {
+				if (mapChipField_->GetMapChipTypeByIndex(x, y) == MapChipType::kKey) {
+					Key* k = new Key();
+					Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
+					k->SetPosition(pos);
+					k->Initialize();
+					keys_.push_back(k);
+				}
+			}
 		}
 	}
 

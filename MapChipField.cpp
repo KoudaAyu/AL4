@@ -15,7 +15,8 @@ std::map<std::string, MapChipType> mapChipTable = {
     {"3", MapChipType::kEnemySpawn},
     {"4", MapChipType::kEnemySpawnShield},
     {"5", MapChipType::kSpike},
-    {"6", MapChipType::kGoal}, // add goal parsing
+    {"6", MapChipType::kGoal}, 
+    {"7", MapChipType::kKey},
 };
 }
 
