@@ -169,7 +169,7 @@ void Player::HandleMovementInput() {
 
 			if (inputIntensityRight > 0.0f) {
 				if (velocity_.x < 0.0f) {
-					velocity_.x *= 0.3f;
+					velocity_.x *= (onIce_ ? 0.8f : 0.3f);
 
 					if (std::fabs(velocity_.x) < 0.01f)
 						velocity_.x = 0.0f;
@@ -179,11 +179,10 @@ void Player::HandleMovementInput() {
 					turnFirstRotationY_ = worldTransform_.rotation_.y;
 					turnTimer_ = kTimeTurn;
 				}
-				acceleration.x += kAcceleration * inputIntensityRight;
+				acceleration.x += (onIce_ ? (kAcceleration * 0.6f) : kAcceleration) * inputIntensityRight;
 			} else if (inputIntensityLeft > 0.0f) {
 				if (velocity_.x > 0.0f) {
-					
-					velocity_.x *= 0.3f;
+					velocity_.x *= (onIce_ ? 0.8f : 0.3f);
 					if (std::fabs(velocity_.x) < 0.01f)
 						velocity_.x = 0.0f;
 				}
@@ -192,30 +191,21 @@ void Player::HandleMovementInput() {
 					turnFirstRotationY_ = worldTransform_.rotation_.y;
 					turnTimer_ = kTimeTurn;
 				}
-				acceleration.x -= kAcceleration * inputIntensityLeft;
+				acceleration.x -= (onIce_ ? (kAcceleration * 0.6f) : kAcceleration) * inputIntensityLeft;
 			}
-
-#ifdef _DEBUG
-			// Debug: show input intensities and computed acceleration
-			DebugText::GetInstance()->ConsolePrintf("MovementInput onGround=%s inputR=%.3f inputL=%.3f accelX=%.3f velBefore=%.3f\n",
-					onGround_ ? "true" : "false", inputIntensityRight, inputIntensityLeft, acceleration.x, velocity_.x);
-#endif
 
 			velocity_.x += acceleration.x;
 			velocity_.x = std::clamp(velocity_.x, -kLimitRunSpeed, kLimitRunSpeed);
-
-#ifdef _DEBUG
-			DebugText::GetInstance()->ConsolePrintf(" -> velAfter=%.3f\n", velocity_.x);
-#endif
 		} else {
-			// 地上での減衰
-			velocity_.x *= (1.0f - kAttenuation);
+			// 地上での減衰（氷上では減衰大幅に弱め）
+			float atten = onIce_ ? (kAttenuation * 0.15f) : kAttenuation;
+			velocity_.x *= (1.0f - atten);
 		}
 
 		// ジャンプ入力はライズエッジ側で処理するため、ここで直接加算は行わない
 
 	} else {
-		// 空中の横移動制御を追加（地上より弱い加速度で左右移動を可能にする）
+		// 空中の横移動制御は変更なし
 		if (moveRight || moveLeft) {
 			float inputIntensityRight = (keyRight) ? 1.0f : std::max(0.0f, stickX);
 			float inputIntensityLeft = (keyLeft) ? 1.0f : std::max(0.0f, -stickX);
@@ -703,8 +693,9 @@ void Player::SwitchingTheGrounding(CollisionMapInfo& info) {
 			// 着地状態に切り替える
 			onGround_ = true;
 
-			// 着地時にX座標を減衰
-			velocity_.x *= (1.0f - kAttenuationLanding);
+			// 着地時にX座標を減衰（氷上では弱め）
+			float atten = onIce_ ? kAttenuationLanding * 0.3f : kAttenuationLanding;
+			velocity_.x *= (1.0f - atten);
 
 			// Y座標をゼロにする
 			velocity_.y = 0.0f;
@@ -712,11 +703,16 @@ void Player::SwitchingTheGrounding(CollisionMapInfo& info) {
 			// 二段ジャンプのリセット
 			jumpCount_ = 0;
 
+			// ここで現在足元のタイルが Ice かどうかを更新
+			Vector3 centerSamplePos = worldTransform_.translation_ + Vector3{ 0.0f, - (kHeight * 0.5f) - 0.02f, 0.0f };
+			IndexSet centerIdx = mapChipField_->GetMapChipIndexSetByPosition(centerSamplePos);
+			MapChipType centerType = mapChipField_->GetMapChipTypeByIndex(centerIdx.xIndex, centerIdx.yIndex);
+			onIce_ = (centerType == MapChipType::kIce);
+
 #ifdef _DEBUG
-			DebugText::GetInstance()->ConsolePrintf("SwitchingTheGrounding: landed via isLanding_=true dy=%.3f\n", info.movement_.y);
+			DebugText::GetInstance()->ConsolePrintf("SwitchingTheGrounding: landed via isLanding_=true dy=%.3f onIce=%s\n", info.movement_.y, onIce_ ? "true" : "false");
 #endif
 
-			
 			wallJumpCount_ = 0;
 		}
 	}

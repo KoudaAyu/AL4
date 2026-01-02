@@ -354,4 +354,6 @@ private:
 
 	// collected keys
 	int keyCount_ = 0;
+
+	bool onIce_ = false; // 現在接地しているタイルがIceかどうか
 };

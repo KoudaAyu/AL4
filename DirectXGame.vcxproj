@@ -164,6 +164,7 @@
     <ClCompile Include="GameOverScene.cpp" />
     <ClCompile Include="GameScene.cpp" />
     <ClCompile Include="Goal.cpp" />
+    <ClCompile Include="Ice.cpp" />
     <ClCompile Include="Key.cpp" />
     <ClCompile Include="KeyInput.cpp" />
     <ClCompile Include="main.cpp" />
@@ -283,6 +284,7 @@
     <ClInclude Include="GameOverScene.h" />
     <ClInclude Include="GameScene.h" />
     <ClInclude Include="Goal.h" />
+    <ClInclude Include="Ice.h" />
     <ClInclude Include="Key.h" />
     <ClInclude Include="KeyInput.h" />
     <ClInclude Include="MapChipField.h" />
