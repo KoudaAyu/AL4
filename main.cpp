@@ -124,9 +124,12 @@ void ChangeScene() {
 	case Scene::kSelect:
 		if (selectScene && selectScene->IsFinished()) {
 			scene = Scene::kGame;
+			// read chosen stage index and pass to GameScene
+			int chosen = selectScene->GetChosenStageIndex();
+			if (chosen < 0) chosen = 0;
 			delete selectScene;
 			selectScene = nullptr;
-			gameScene = new GameScene();
+			gameScene = new GameScene(chosen);
 			gameScene->Initialize();
 		}
 		break;

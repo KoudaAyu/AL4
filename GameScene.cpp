@@ -9,10 +9,13 @@
 #include "Goal.h"
 #include "Key.h"
 #include "Ladder.h"
+#include "Fade.h"
 #include <algorithm>
 using namespace KamataEngine;
 
-GameScene::GameScene() {}
+GameScene::GameScene() : GameScene(0) {}
+
+GameScene::GameScene(int startingStage) : readyForGameOver_(false), startingStage_(startingStage) {}
 
 GameScene::~GameScene() {
 #ifdef _DEBUG
@@ -129,7 +132,13 @@ void GameScene::Initialize() {
 	camera_.TransferMatrix();
 
 	mapChipField_ = new MapChipField();
-	mapChipField_->LoadMapChipCsv("Resources/Debug/Map/Block.csv");
+	
+	const char* mapFiles[] = {"Resources/Debug/Map/Block.csv", "Resources/Debug/Map/Block1.csv"};
+	const int numMapFiles = static_cast<int>(std::size(mapFiles));
+	int idx = startingStage_;
+	if (idx < 0) idx = 0;
+	if (idx >= numMapFiles) idx = numMapFiles - 1;
+	mapChipField_->LoadMapChipCsv(mapFiles[idx]);
 
 	player_ = new Player();
 	Vector3 playerPosition = {4.0f, 4.0f, 0.0f};
@@ -320,7 +329,7 @@ void GameScene::Initialize() {
 		
 		uiLeftSprite_ = KamataEngine::Sprite::Create(uiLeftTextureHandle_, KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
 		if (uiLeftSprite_) {
-			uiLeftSprite_->SetSize(KamataEngine::Vector2{150.0f, 30.0f});
+		 uiLeftSprite_->SetSize(KamataEngine::Vector2{150.0f, 30.0f});
 		}
 	}
 	
@@ -328,7 +337,7 @@ void GameScene::Initialize() {
 	if (uiMidTextureHandle_ != 0u) {
 		uiMidSprite_ = KamataEngine::Sprite::Create(uiMidTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 1.0f});
 		if (uiMidSprite_) {
-			uiMidSprite_->SetSize(KamataEngine::Vector2{200.0f, 30.0f});
+			 uiMidSprite_->SetSize(KamataEngine::Vector2{200.0f, 30.0f});
 		}
 	}
 	uiRightTextureHandle_ = TextureManager::Load("Debug/Jump.png");
@@ -336,7 +345,7 @@ void GameScene::Initialize() {
 		
 		uiRightSprite_ = KamataEngine::Sprite::Create(uiRightTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) - 50.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{1.0f, 1.0f});
 		if (uiRightSprite_) {
-			uiRightSprite_->SetSize(KamataEngine::Vector2{330.0f, 30.0f});
+			 uiRightSprite_->SetSize(KamataEngine::Vector2{330.0f, 30.0f});
 		}
 	}
 
@@ -379,6 +388,11 @@ void GameScene::Initialize() {
 	}
 
 	phase_ = Phase::kCountdown;
+
+	fade_ = new Fade();
+	fade_->Initialize();
+	
+	fade_->Start(Fade::Status::FadeIn, introFadeDuration_);
 }
 
 void GameScene::Update() {
@@ -389,7 +403,7 @@ void GameScene::Update() {
 		return;
 	}
 
-	// Tabでポーズ切り替え（プレイ中⇔ポーズのみ）
+	// Tabでポーズ切り替え（プレイ中⇔ポーズのみ）　
 	if (Input::GetInstance()->TriggerKey(DIK_TAB)) {
 		if (phase_ == Phase::kPlay) {
 			phase_ = Phase::kPause;
@@ -440,30 +454,40 @@ void GameScene::Update() {
 			pwt.TransferMatrix();
 		}
 
-		
-		countdownTime_ -= 1.0f / 60.0f;
-		if (countdownTime_ <= 0.0f) {
-			
-			phase_ = Phase::kPlay;
-		
-			return;
-		} else {
-			
-			int display = static_cast<int>(std::ceil(countdownTime_));
-			if (display < 0) display = 0;
-			if (display > 9) display = 9;
-			if (countdownTextureHandles_[display] != 0u) {
-				if (!countdownSprite_) {
-					countdownSprite_ = KamataEngine::Sprite::Create(countdownTextureHandles_[display], KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) / 2.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 0.5f});
-					if (countdownSprite_) countdownSprite_->SetSize(KamataEngine::Vector2{200.0f, 200.0f});
-				} else {
-					countdownSprite_->SetTextureHandle(countdownTextureHandles_[display]);
-				}
+		// Update fade and delay countdown progress until fade finished so intro fade completes before countdown ends
+		if (fade_) {
+			fade_->Update();
+			// Only advance countdown after fade completed (scene has brightened)
+			if (!fade_->IsFinished()) {
+				break; // skip countdown decrement this frame
 			}
 		}
 
-		break;
-	}
+		if (countdownTime_ <= 0.0f) {
+			
+ 			phase_ = Phase::kPlay;
+ 			
+ 			return;
+ 		} else {
+ 			
+ 			int display = static_cast<int>(std::ceil(countdownTime_));
+ 			if (display < 0) display = 0;
+ 			if (display > 9) display = 9;
+ 			if (countdownTextureHandles_[display] != 0u) {
+ 				if (!countdownSprite_) {
+ 					countdownSprite_ = KamataEngine::Sprite::Create(countdownTextureHandles_[display], KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) / 2.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 0.5f});
+ 					if (countdownSprite_) countdownSprite_->SetSize(KamataEngine::Vector2{200.0f, 200.0f});
+ 				} else {
+ 					countdownSprite_->SetTextureHandle(countdownTextureHandles_[display]);
+ 				}
+ 			}
+ 		}
+
+		// ensure countdown proceeds at real time now that fade has finished
+		countdownTime_ -= 1.0f / 60.0f;
+ 		
+ 		break;
+ 	}
 	case Phase::kPlay:
 
 #ifdef _DEBUG
@@ -768,7 +792,7 @@ void GameScene::Update() {
 #ifdef _DEBUG
 		// デバッグカメラのトグルは許可
 		if (Input::GetInstance()->TriggerKey(DIK_C)) {
-			isDebugCameraActive_ = !isDebugCameraActive_;
+		 isDebugCameraActive_ = !isDebugCameraActive_;
 		}
 		AxisIndicator::GetInstance()->SetVisible(true);
 		if (isDebugCameraActive_) {
@@ -863,8 +887,7 @@ void GameScene::Draw() {
 			if (!wt) {
 				continue;
 			}
-			// Decide which model to draw based on map chip type at this transform's grid
-			// We need grid indices; they are not stored in WT, so derive by position
+		
 			IndexSet idx = mapChipField_->GetMapChipIndexSetByPosition(wt->translation_);
 			MapChipType t = mapChipField_->GetMapChipTypeByIndex(idx.xIndex, idx.yIndex);
 			if (t == MapChipType::kIce && iceModel_) {
@@ -884,20 +907,24 @@ void GameScene::Draw() {
 
 	
 	if (hudSprite_ || uiLeftSprite_ || uiMidSprite_ || uiRightSprite_ || countdownSprite_ || pauseSprite_ || !hearts_.empty()) {
-		KamataEngine::DirectXCommon* dx = KamataEngine::DirectXCommon::GetInstance();
-		KamataEngine::Sprite::PreDraw(dx->GetCommandList());
-		if (hudSprite_) hudSprite_->Draw();
-		if (uiLeftSprite_) uiLeftSprite_->Draw();
-		if (uiMidSprite_) uiMidSprite_->Draw();
-		if (uiRightSprite_) uiRightSprite_->Draw();
-		if (phase_ == Phase::kCountdown && countdownSprite_) countdownSprite_->Draw();
-		if (phase_ == Phase::kPause && pauseSprite_) pauseSprite_->Draw();
+ 		KamataEngine::DirectXCommon* dx = KamataEngine::DirectXCommon::GetInstance();
+ 		KamataEngine::Sprite::PreDraw(dx->GetCommandList());
+ 		if (hudSprite_) hudSprite_->Draw();
+ 		if (uiLeftSprite_) uiLeftSprite_->Draw();
+ 		if (uiMidSprite_) uiMidSprite_->Draw();
+ 		if (uiRightSprite_) uiRightSprite_->Draw();
+ 		if (phase_ == Phase::kCountdown && countdownSprite_) countdownSprite_->Draw();
+ 		if (phase_ == Phase::kPause && pauseSprite_) pauseSprite_->Draw();
+ 		
+ 		for (auto& h : hearts_) {
+ 			if (h.sprite) h.sprite->Draw();
+ 		}
 		
-		for (auto& h : hearts_) {
-			if (h.sprite) h.sprite->Draw();
-		}
+		// draw fade overlay last so it covers the screen during intro
+		if (fade_) fade_->Draw();
+
 		KamataEngine::Sprite::PostDraw();
-	}
+ 	}
 }
 
 void GameScene::GenerateBlocks() {
@@ -964,7 +991,7 @@ void GameScene::CheckAllCollisions() {
         AABB pA = player_->GetAABB();
         AABB sA = s->GetAABB();
         if (IsCollisionAABBAABB(pA, sA)) {
-           
+          
             float overlapX = std::min<float>(pA.max.x, sA.max.x) - std::max<float>(pA.min.x, sA.min.x);
             float overlapY = std::min<float>(pA.max.y, sA.max.y) - std::max<float>(pA.min.y, sA.min.y);
 

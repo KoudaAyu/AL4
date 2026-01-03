@@ -28,6 +28,7 @@ public:
 
 public:
 	GameScene();
+	explicit GameScene(int startingStage);
 	~GameScene();
 
 	void Initialize();
@@ -60,6 +61,7 @@ public:
 
 private:
 	bool finished_ = false;
+	int startingStage_ = 0; // index of stage to load (set by SelectScene)
 
 	// ブロックの要素数
 	const uint32_t kNumBlockHorizontal = 20;
@@ -148,4 +150,8 @@ private:
 	uint32_t countdownTextureHandles_[10] = {0};
 	float countdownTime_ = 0.0f; 
 	float countdownStart_ = 3.0f; 
+
+	
+	class Fade* fade_ = nullptr;
+	float introFadeDuration_ = 1.0f; 
 };
