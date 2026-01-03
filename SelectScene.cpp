@@ -294,15 +294,15 @@ void SelectScene::Draw() {
         WorldTransform* swt = stageWorldTransforms_[i];
         if (!swt) continue;
         if (transitioning_) {
-          
+            
             float t = transitionProgress_;
-          
+            
             if (static_cast<int>(i) == chosenStage_) {
                 float s = LerpF(1.0f, 3.0f, t);
                 swt->scale_ = {s, s, s};
             } else {
-                float s = LerpF(1.0f, 0.4f, t);
-                swt->scale_ = {s, s, s};
+               
+                swt->scale_ = {1.0f, 1.0f, 1.0f};
             }
         } else {
             if (static_cast<int>(i) == highlightedStage_) {

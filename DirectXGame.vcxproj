@@ -158,6 +158,7 @@
     <ClCompile Include="CameraController.cpp" />
     <ClCompile Include="DeathParticle.cpp" />
     <ClCompile Include="Enemy\Enemy.cpp" />
+    <ClCompile Include="Enemy\ShooterEnemy.cpp" />
     <ClCompile Include="Fade.cpp" />
     <ClCompile Include="FrontShieldEnemy.cpp" />
     <ClCompile Include="GameClearScene.cpp" />
@@ -279,6 +280,7 @@
     <ClInclude Include="CameraController.h" />
     <ClInclude Include="DeathParticle.h" />
     <ClInclude Include="Enemy\Enemy.h" />
+    <ClInclude Include="Enemy\ShooterEnemy.h" />
     <ClInclude Include="Fade.h" />
     <ClInclude Include="FrontShieldEnemy.h" />
     <ClInclude Include="GameClearScene.h" />

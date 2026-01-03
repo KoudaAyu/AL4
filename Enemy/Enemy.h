@@ -10,8 +10,8 @@ public:
 	Enemy() = default;
 	virtual ~Enemy();
 	void Initialize(KamataEngine::Camera* camera, const KamataEngine::Vector3& pos);
-	void Update();
-	void Draw();
+	virtual void Update();
+	virtual void Draw();
 
 	void UpdateAABB();
 

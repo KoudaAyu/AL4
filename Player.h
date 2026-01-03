@@ -174,6 +174,11 @@ public:
 	void ConsumeKey(); // called when player picks up a key
 	int GetKeyCount() const { return keyCount_; }
 
+	// Apply temporary invincibility for given duration (seconds)
+	void ApplyInvincibility(float duration);
+	// Query invincibility state
+	bool IsInvincible() const { return invincible_; }
+
 private:
 	// ワールド変換データ
 	WorldTransform worldTransform_;

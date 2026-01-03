@@ -1296,3 +1296,8 @@ void Player::ConsumeKey() {
     keyCount_ += 1;
     DebugText::GetInstance()->ConsolePrintf("Player: consumed key. total keys=%d\n", keyCount_);
 }
+
+void Player::ApplyInvincibility(float duration) {
+    invincible_ = true;
+    invincibleTimer_ = duration;
+}

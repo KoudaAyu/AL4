@@ -11,6 +11,7 @@
 #include "Ladder.h"
 #include "Fade.h"
 #include <algorithm>
+#include "Enemy/ShooterEnemy.h"
 using namespace KamataEngine;
 
 GameScene::GameScene() : GameScene(0) {}
@@ -203,6 +204,13 @@ void GameScene::Initialize() {
 					fse->Initialize(&camera_, enemyPosition);
 					fse->SetFrontDotThreshold(0.6f);
 					enemies_.push_back(fse);
+				} else if (t == MapChipType::kShooter) {
+					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					ShooterEnemy* se = new ShooterEnemy();
+					se->Initialize(&camera_, enemyPosition);
+					se->SetBulletSpeed(0.2f);
+					se->SetFireInterval(2.0f);
+					enemies_.push_back(se);
 				} else if (t == MapChipType::kSpike) {
 					Spike* s = new Spike();
 					Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
@@ -253,32 +261,6 @@ void GameScene::Initialize() {
 				DebugText::GetInstance()->ConsolePrintf("  spike[%u] HasModel=%s pos=(%.2f,%.2f,%.2f)\n", i, s->HasModel() ? "true" : "false", s->GetPosition().x, s->GetPosition().y, s->GetPosition().z);
 			} else {
 				DebugText::GetInstance()->ConsolePrintf("  spike[%u] is null\n", i);
-			}
-		}
-	}
-
-	if (mapChipField_) {
-		uint32_t vh = mapChipField_->GetNumBlockVertical();
-		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
-		for (uint32_t y = 0; y < vh; ++y) {
-			for (uint32_t x = 0; x < wh; ++x) {
-				MapChipType t = mapChipField_->GetMapChipTypeByIndex(x, y);
-				if (t == MapChipType::kEnemySpawn) {
-					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
-					Enemy* enemy = new Enemy();
-					
-					enemy->Initialize(&camera_, enemyPosition);
-					enemies_.push_back(enemy);
-				} else if (t == MapChipType::kEnemySpawnShield) {
-					
-					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
-					FrontShieldEnemy* fse = new FrontShieldEnemy();
-					
-					fse->Initialize(&camera_, enemyPosition);
-					
-					fse->SetFrontDotThreshold(0.6f);
-					enemies_.push_back(fse);
-				}
 			}
 		}
 	}
@@ -436,7 +418,18 @@ void GameScene::Update() {
 
 		skydome_->Update();
 
-		
+		// update enemies during countdown so they appear behind fade
+		for (Enemy* enemy : enemies_) {
+			if (enemy) enemy->Update();
+		}
+		// Cull bullets against map while in countdown (safety)
+		if (mapChipField_) {
+			for (Enemy* e : enemies_) {
+				ShooterEnemy* se = dynamic_cast<ShooterEnemy*>(e);
+				if (se) se->CullBulletsByMap(mapChipField_);
+			}
+		}
+
 		for (auto& row : worldTransformBlocks_) {
 			for (WorldTransform* wt : row) {
 				if (!wt) continue;
@@ -446,29 +439,31 @@ void GameScene::Update() {
 			}
 		}
 
-		
 		if (player_) {
-			
 			KamataEngine::WorldTransform& pwt = player_->GetWorldTransform();
 			pwt.matWorld_ = MakeAffineMatrix(pwt.scale_, pwt.rotation_, pwt.translation_);
 			pwt.TransferMatrix();
 		}
 
-		// Update fade and delay countdown progress until fade finished so intro fade completes before countdown ends
 		if (fade_) {
 			fade_->Update();
-			// Only advance countdown after fade completed (scene has brightened)
 			if (!fade_->IsFinished()) {
-				break; // skip countdown decrement this frame
+				// keep countdown timer static until fade finished
+				break;
 			}
 		}
 
 		if (countdownTime_ <= 0.0f) {
 			
  			phase_ = Phase::kPlay;
- 			
- 			return;
- 		} else {
+			// enable shooter enemies to fire now that gameplay begins
+			for (Enemy* e : enemies_) {
+				ShooterEnemy* se = dynamic_cast<ShooterEnemy*>(e);
+				if (se) se->SetAllowShooting(true);
+			}
+			
+			return;
+		} else {
  			
  			int display = static_cast<int>(std::ceil(countdownTime_));
  			if (display < 0) display = 0;
@@ -529,6 +524,13 @@ void GameScene::Update() {
 		for (Enemy* enemy : enemies_) {
 			if (enemy)
 				enemy->Update();
+		}
+		// Cull bullets against map in play
+		if (mapChipField_) {
+			for (Enemy* e : enemies_) {
+				ShooterEnemy* se = dynamic_cast<ShooterEnemy*>(e);
+				if (se) se->CullBulletsByMap(mapChipField_);
+			}
 		}
 
 		
@@ -683,25 +685,16 @@ void GameScene::Update() {
 
 		// トグル
 		if (Input::GetInstance()->TriggerKey(DIK_C)) {
-			isDebugCameraActive_ = !isDebugCameraActive_;
+		 isDebugCameraActive_ = !isDebugCameraActive_;
 		}
-
-		// 軸インジケータの表示と対象カメラ設定
 		AxisIndicator::GetInstance()->SetVisible(true);
 		if (isDebugCameraActive_) {
 			AxisIndicator::GetInstance()->SetTargetCamera(&debugCamera_->GetCamera());
-		} else {
-			AxisIndicator::GetInstance()->SetTargetCamera(&camera_);
-		}
-
-		// デバッグカメラ有効時はデバッグカメラの行列をゲーム用カメラへコピー
-		if (isDebugCameraActive_) {
 			debugCamera_->Update();
 			camera_.matView = debugCamera_->GetCamera().matView;
 			camera_.matProjection = debugCamera_->GetCamera().matProjection;
 			camera_.TransferMatrix();
 		} else {
-			// 通常時はカメラコントローラがカメラを更新
 			cameraController_->Update();
 			camera_.UpdateMatrix();
 		}
@@ -713,6 +706,13 @@ void GameScene::Update() {
 		for (Enemy* enemy : enemies_) {
 			if (enemy)
 				enemy->Update();
+		}
+		// Cull bullets against map in death
+		if (mapChipField_) {
+			for (Enemy* e : enemies_) {
+				ShooterEnemy* se = dynamic_cast<ShooterEnemy*>(e);
+				if (se) se->CullBulletsByMap(mapChipField_);
+			}
 		}
 
 		// Particle関係
@@ -841,52 +841,49 @@ void GameScene::Update() {
 
 void GameScene::Draw() {
 
-	Model::PreDraw();
+    Model::PreDraw();
 
-	// 先にスカイドームを描画
-	if (skydome_) {
-		skydome_->Draw();
-	}
+    // 先にスカイドームを描画
+    if (skydome_) {
+        skydome_->Draw();
+    }
 
-	// Draw all enemies
-	if (phase_ != Phase::kCountdown) {
-		for (Enemy* enemy : enemies_) {
-			if (enemy && enemy->isAlive())
-				enemy->Draw();
-		}
-	}
+    // Draw all enemies unconditionally (visible under fade and during countdown)
+    for (Enemy* enemy : enemies_) {
+        if (enemy && enemy->isAlive()) {
+            enemy->Draw();
+        }
+    }
 
+    if (!spikes_.empty()) {
+        for (Spike* s : spikes_) {
+            if (s) s->Draw(&camera_);
+        }
+    }
+    for (Goal* g : goals_) {
+        if (g) g->Draw(&camera_);
+    }
 
+    // Draw keys
+    for (Key* k : keys_) {
+        if (k) k->Draw(&camera_);
+    }
 
-	if (!spikes_.empty()) {
-		for (Spike* s : spikes_) {
-			if (s) s->Draw(&camera_);
-		}
-	}
-	for (Goal* g : goals_) {
-		if (g) g->Draw(&camera_);
-	}
+    // Draw ladders here so they render on top of blocks
+    for (Ladder* l : ladders_) {
+        if (l) l->Draw(&camera_);
+    }
 
-	// Draw keys
-	for (Key* k : keys_) {
-		if (k) k->Draw(&camera_);
-	}
+    // デス中はプレイヤーの描画を抑制してエフェクトを見やすくする
+    if (phase_ != Phase::kDeath) {
+        player_->Draw();
+    }
 
-	// Draw ladders here so they render on top of blocks
-	for (Ladder* l : ladders_) {
-		if (l) l->Draw(&camera_);
-	}
-
-	// デス中はプレイヤーの描画を抑制してエフェクトを見やすくする
-	if (phase_ != Phase::kDeath) {
-		player_->Draw();
-	}
-
-	for (auto& row : worldTransformBlocks_) {
-		for (WorldTransform* wt : row) {
-			if (!wt) {
-				continue;
-			}
+    for (auto& row : worldTransformBlocks_) {
+        for (WorldTransform* wt : row) {
+            if (!wt) {
+                continue;
+            }
 		
 			IndexSet idx = mapChipField_->GetMapChipIndexSetByPosition(wt->translation_);
 			MapChipType t = mapChipField_->GetMapChipTypeByIndex(idx.xIndex, idx.yIndex);
@@ -895,36 +892,32 @@ void GameScene::Draw() {
 			} else {
 				blockModel_->Draw(*wt, camera_);
 			}
-		}
-	}
+        }
+    }
 
-	// Particle関係
-	if ((phase_ == Phase::kDeath || phase_ == Phase::kVictory) && deathParticle_) {
-		deathParticle_->Draw();
-	}
+    // Particle関係
+    if ((phase_ == Phase::kDeath || phase_ == Phase::kVictory) && deathParticle_) {
+        deathParticle_->Draw();
+    }
 
-	Model::PostDraw();
+    Model::PostDraw();
 
-	
-	if (hudSprite_ || uiLeftSprite_ || uiMidSprite_ || uiRightSprite_ || countdownSprite_ || pauseSprite_ || !hearts_.empty()) {
- 		KamataEngine::DirectXCommon* dx = KamataEngine::DirectXCommon::GetInstance();
- 		KamataEngine::Sprite::PreDraw(dx->GetCommandList());
- 		if (hudSprite_) hudSprite_->Draw();
- 		if (uiLeftSprite_) uiLeftSprite_->Draw();
- 		if (uiMidSprite_) uiMidSprite_->Draw();
- 		if (uiRightSprite_) uiRightSprite_->Draw();
- 		if (phase_ == Phase::kCountdown && countdownSprite_) countdownSprite_->Draw();
- 		if (phase_ == Phase::kPause && pauseSprite_) pauseSprite_->Draw();
- 		
- 		for (auto& h : hearts_) {
- 			if (h.sprite) h.sprite->Draw();
- 		}
-		
-		// draw fade overlay last so it covers the screen during intro
-		if (fade_) fade_->Draw();
-
-		KamataEngine::Sprite::PostDraw();
- 	}
+    if (hudSprite_ || uiLeftSprite_ || uiMidSprite_ || uiRightSprite_ || countdownSprite_ || pauseSprite_ || !hearts_.empty()) {
+        KamataEngine::DirectXCommon* dx = KamataEngine::DirectXCommon::GetInstance();
+        KamataEngine::Sprite::PreDraw(dx->GetCommandList());
+        if (hudSprite_) hudSprite_->Draw();
+        if (uiLeftSprite_) uiLeftSprite_->Draw();
+        if (uiMidSprite_) uiMidSprite_->Draw();
+        if (uiRightSprite_) uiRightSprite_->Draw();
+        if (phase_ == Phase::kCountdown && countdownSprite_) countdownSprite_->Draw();
+        if (phase_ == Phase::kPause && pauseSprite_) pauseSprite_->Draw();
+        for (auto& h : hearts_) {
+            if (h.sprite) h.sprite->Draw();
+        }
+        // draw fade overlay last so it covers the screen during intro
+        if (fade_) fade_->Draw();
+        KamataEngine::Sprite::PostDraw();
+    }
 }
 
 void GameScene::GenerateBlocks() {
@@ -962,6 +955,21 @@ void GameScene::CheckAllCollisions() {
     // 敵またはプレイヤーが死亡している場合は衝突判定をスキップ
     if (!player_ || !player_->isAlive()) {
         return;
+    }
+
+    // Check bullets hitting player (consume bullet and apply damage)
+    for (Enemy* e : enemies_) {
+        ShooterEnemy* se = dynamic_cast<ShooterEnemy*>(e);
+        if (!se) continue;
+        if (se->ConsumeBulletCollidingWithAABB(player_->GetAABB())) {
+            // only apply damage if player was not invincible
+            bool wasInvincible = player_->IsInvincible();
+            if (!wasInvincible) {
+                player_->OnCollision(nullptr);
+                if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(1.0f, 0.15f);
+            }
+            // continue checking other bullets/enemies
+        }
     }
 
     for (Enemy* enemy : enemies_) {
@@ -1014,9 +1022,41 @@ void GameScene::CheckAllCollisions() {
 
             player_->UpdateAABB();
 
-           
-            player_->OnCollision(nullptr);
-            if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(1.5f, 0.3f);
+            // Only apply damage and shake if player was not already invincible
+            bool wasInvincible = (player_) ? player_->IsInvincible() : false;
+            if (!wasInvincible) {
+                player_->OnCollision(nullptr);
+                // Extend invincibility for spike-specific escape window
+                if (player_) player_->ApplyInvincibility(1.25f);
+                // Single short, mild camera shake for spike hit
+                if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(0.4f, 0.08f);
+            }
+
+            // decide nudge direction based on spike/player centers (horizontal preference)
+            float nudgeDir = (pCenter.x < sCenter.x) ? -1.0f : 1.0f;
+
+            // Allow immediate horizontal escape using AD (or arrow keys).
+            bool keyRight = Input::GetInstance()->PushKey(DIK_RIGHT) || Input::GetInstance()->PushKey(DIK_D);
+            bool keyLeft = Input::GetInstance()->PushKey(DIK_LEFT) || Input::GetInstance()->PushKey(DIK_A);
+            if (keyRight) {
+                player_->velocity_.x = std::fabs(player_->velocity_.x) < 0.001f ? 0.35f : std::fabs(player_->velocity_.x);
+            } else if (keyLeft) {
+                player_->velocity_.x = - (std::fabs(player_->velocity_.x) < 0.001f ? 0.35f : std::fabs(player_->velocity_.x));
+            } else {
+                // small automatic nudge away from spike so player isn't stuck
+                player_->velocity_.x += nudgeDir * 0.18f;
+                // clamp to reasonable walk speed
+                if (player_->velocity_.x > 0.5f) player_->velocity_.x = 0.5f;
+                if (player_->velocity_.x < -0.5f) player_->velocity_.x = -0.5f;
+            }
+
+            // If we were pushed vertically into a step, also nudge the player's position slightly horizontally
+            if (overlapY >= overlapX) {
+                KamataEngine::WorldTransform& pwt2 = player_->GetWorldTransform();
+                pwt2.translation_.x += nudgeDir * 0.22f; // small position nudge to get off the edge
+                player_->UpdateAABB();
+            }
+
             break;
         }
     }
@@ -1036,7 +1076,7 @@ void GameScene::CheckAllCollisions() {
 		            if (deathParticle_) { delete deathParticle_; deathParticle_ = nullptr; }
 		            deathParticle_ = new DeathParticle();
 		            deathParticle_->Initialize(model_, &camera_, victoryPos);
-		            if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(0.8f, 0.2f);
+		             if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(0.8f, 0.2f);
 		        }
 		        return;
             } else {
@@ -1233,7 +1273,13 @@ void GameScene::Reset() {
 		cameraController_->Reset();
 	}
 
-	
+	// ensure shooters are disabled during countdown on reset
+	for (Enemy* e : enemies_) {
+		ShooterEnemy* se = dynamic_cast<ShooterEnemy*>(e);
+		if (se) se->SetAllowShooting(false);
+	}
+
+	// 
 	phase_ = Phase::kCountdown;
 	countdownTime_ = countdownStart_;
 

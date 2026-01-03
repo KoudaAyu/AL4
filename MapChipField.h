@@ -15,6 +15,7 @@ enum class MapChipType {
 	kIce = 8,   //8: 氷ブロック（Blockと同じ挙動、モデルのみIce）
 	kLadder = 9, //9: はしご（追加）
 	kStage = 10, //10: ステージノード（SelectScene でステージ選択用）
+	kShooter = 11, //11: 弾を発射する敵（Spikeのようにマップに置く）
 };
 
 struct MapChipData {
