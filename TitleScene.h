@@ -37,6 +37,8 @@ private:
 
 	// 3D title model
 	KamataEngine::Model* model_ = nullptr;
+	// model used for particles
+	KamataEngine::Model* particleModel_ = nullptr;
 	KamataEngine::Camera camera_;
 	KamataEngine::WorldTransform worldTransform_;
 
