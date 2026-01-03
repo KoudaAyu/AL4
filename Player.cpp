@@ -160,12 +160,110 @@ void Player::HandleMovementInput() {
     bool moveRight = keyRight || (stickX > 0.0f);
     bool moveLeft = keyLeft || (stickX < 0.0f);
 
-    // Obtain ground friction (1.0f default) if available
+    // 地面の摩擦係数を取得（デフォルトは1.0f相当）。利用可能なら取得
     float groundFriction = 0.9f;
     if (mapChipField_) {
         Vector3 samplePos = worldTransform_.translation_ + Vector3{0.0f, -(kHeight * 0.5f) - 0.02f, 0.0f};
         groundFriction = mapChipField_->GetFrictionCoefficientByPosition(samplePos);
         onIce_ = (groundFriction < 0.1f);
+    }
+
+    // ハシゴ判定: プレイヤー中心がハシゴタイルと重なるならハシゴ状態
+    bool ladderHere = false;
+    if (mapChipField_) {
+        IndexSet idxCenter = mapChipField_->GetMapChipIndexSetByPosition(worldTransform_.translation_);
+        MapChipType centerType = mapChipField_->GetMapChipTypeByIndex(idxCenter.xIndex, idxCenter.yIndex);
+        if (centerType == MapChipType::kLadder) ladderHere = true;
+        // 足元位置も確認し、少しずれていてもハシゴを掴めるようにする
+        Vector3 feetSample = worldTransform_.translation_ + Vector3{0.0f, - (kHeight * 0.5f) + 0.1f, 0.0f};
+        IndexSet idxFeet = mapChipField_->GetMapChipIndexSetByPosition(feetSample);
+        MapChipType feetType = mapChipField_->GetMapChipTypeByIndex(idxFeet.xIndex, idxFeet.yIndex);
+        if (feetType == MapChipType::kLadder) ladderHere = true;
+    }
+
+    // ハシゴ昇降入力
+    bool climbUp = Input::GetInstance()->PushKey(DIK_W);
+    bool climbDown = Input::GetInstance()->PushKey(DIK_S);
+
+    if (ladderHere && (climbUp || climbDown)) {
+        // ハシゴ状態へ移行
+        onLadder_ = true;
+    }
+
+    // ハシゴ上にいる場合、W/Sでの上下移動を処理し、重力や地上摩擦は無視
+    if (onLadder_) {
+        // 既存の縦方向速度をキャンセルし、昇降を適用
+        velocity_.y = 0.0f;
+        if (climbUp) {
+            velocity_.y = kClimbSpeed;
+        } else if (climbDown) {
+            velocity_.y = -kClimbSpeed;
+        } else {
+            velocity_.y = 0.0f;
+        }
+
+        // ハシゴ上では、強い減衰をかけつつ限定的に横方向の操作を許可
+        // ハシゴ昇降中も、ADキーまたはスティックによる限定的な横移動を許可
+        stickX = NormalizeLeftStickX(state.Gamepad.sThumbLX);
+         float horizInput = 0.0f;
+         // キーボード入力を優先的に最大値とし、そうでなければスティック値で滑らかに
+         if (keyRight)
+             horizInput = 1.0f;
+         else if (keyLeft)
+             horizInput = -1.0f;
+         else
+             horizInput = stickX; // stickX は [-1,1] の範囲
+
+        // ハシゴ上での目標横速度
+        float targetVx = std::clamp(horizInput, -1.0f, 1.0f) * kLadderHorizontalSpeed;
+        // 目標へ滑らかに補間（係数が小さいほど穏やか）
+        velocity_.x += (targetVx - velocity_.x) * kLadderHorizontalAccel;
+        // 入力がないときの微小減衰で、ゆっくり中央へ収束
+        if (std::fabs(horizInput) < 0.01f) {
+            velocity_.x *= 0.95f;
+        }
+
+        // プレイヤーがハシゴタイルから離れたら、ハシゴ状態を離脱することを検討
+        if (!ladderHere) {
+            if (mapChipField_) {
+                // プレイヤーの頭上ブロックを探索
+                Vector3 probePos = worldTransform_.translation_ + Vector3{0.0f, kHeight * 0.5f + 0.02f, 0.0f};
+                IndexSet probeIdx = mapChipField_->GetMapChipIndexSetByPosition(probePos);
+                MapChipType aboveType = mapChipField_->GetMapChipTypeByIndex(probeIdx.xIndex, probeIdx.yIndex);
+                if (aboveType == MapChipType::kBlock || aboveType == MapChipType::kIce) {
+                    // 許容誤差内ならプレイヤーの足元をブロック上面にスナップして、Wを離しても落下しないよう調整
+                    Rects rect = mapChipField_->GetRectByIndex(probeIdx.xIndex, probeIdx.yIndex);
+                    float desiredY = rect.top + (kHeight * 0.5f); // 足元が rect.top に一致するような translation_.y
+                    float tolerance = 0.5f; // わずかなオーバーシュートを許容
+                    if (worldTransform_.translation_.y <= desiredY + tolerance) {
+                        worldTransform_.translation_.y = desiredY;
+                        velocity_.y = 0.0f;
+                        onGround_ = true;
+                        onLadder_ = false;
+                    } else {
+                        // 上面よりも十分上にいる場合は、ハシゴを離脱して重力へ復帰
+                        onLadder_ = false;
+                    }
+                } else {
+                    // 頭上にブロックがない: ハシゴを離脱して重力へ復帰
+                    onLadder_ = false;
+                }
+            } else {
+                onLadder_ = false;
+            }
+        }
+
+        // ハシゴ上でジャンプ入力があれば、ハシゴ状態を離脱してジャンプを実行
+        bool jumpPressed = Input::GetInstance()->PushKey(DIK_UP) || Input::GetInstance()->PushKey(DIK_SPACE) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A);
+        if (jumpPressed) {
+            onLadder_ = false;
+            // 小さめのジャンプを実行
+            velocity_.y = kJumpVelocityGround;
+        }
+
+        // 早期リターンして通常の重力処理をスキップ
+        // 注意: この後の衝突と最終反映処理は継続
+        return;
     }
 
     if (onGround_) {
@@ -177,7 +275,7 @@ void Player::HandleMovementInput() {
 
             if (inputIntensityRight > 0.0f) {
                 if (velocity_.x < 0.0f) {
-                    // use friction to determine how much to damp when reversing
+                    // 反転時の減衰量を摩擦に応じて決定
                     float reverseDamp = onIce_ ? 0.8f : (1.0f - groundFriction * 0.7f);
                     velocity_.x *= reverseDamp;
 
@@ -209,7 +307,7 @@ void Player::HandleMovementInput() {
             velocity_.x = std::clamp(velocity_.x, -kLimitRunSpeed, kLimitRunSpeed);
         } else {
             // 地上での減衰（氷上では減衰大幅に弱め）
-            // Use groundFriction to scale attenuation: higher friction -> stronger attenuation
+            // 摩擦係数に応じて減衰量をスケール: 摩擦が高いほど強い減衰
             float baseAtten = kAttenuation;
             float atten = (onIce_) ? (kAttenuation * 0.15f) : (baseAtten * (1.0f + (1.0f - groundFriction)));
             velocity_.x *= (1.0f - atten);
@@ -338,7 +436,7 @@ void Player::Update() {
 		deathDelayTimer_ -= 1.0f / 60.0f;
 		if (deathDelayTimer_ <= 0.0f) {
 			isAlive_ = false;
-			isDying_ = false; // clear flag
+			isDying_ = false; // フラグをクリア
 		}
 		return;
 	}
@@ -400,7 +498,7 @@ void Player::Update() {
 	// 1. 移動入力
 	HandleMovementInput();
 
-	// Attack input: E key (keyboard) or RT (Xbox) rising edge
+	// 攻撃入力: Eキー（キーボード）またはRT（Xbox）の立ち上がり検知
 	bool eTriggered = Input::GetInstance()->TriggerKey(DIK_E);
 	bool rtPressed = (state.Gamepad.bRightTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
 	bool rtRising = rtPressed && !prevRightTriggerPressed_;
@@ -455,8 +553,8 @@ void Player::Update() {
 		float easeT = 1.0f - powf(1.0f - t, 3.0f);
 
 		float destinationRotationYTable[] = {
-		    std::numbers::pi_v<float> / 2.0f,       // Right
-		    std::numbers::pi_v<float> * 3.0f / 2.0f // Left
+		    std::numbers::pi_v<float> / 2.0f,       // 右向き
+		    std::numbers::pi_v<float> * 3.0f / 2.0f // 左向き
 		};
 		float destination = destinationRotationYTable[static_cast<uint32_t>(lrDirection_)];
 		worldTransform_.rotation_.y = turnFirstRotationY_ + (destination - turnFirstRotationY_) * easeT;
@@ -525,7 +623,6 @@ void Player::mapChipCollisionCheck(CollisionMapInfo& info) {
 	info.isWallContact_ = xInfo.isWallContact_;
 	info.wallSide_ = xInfo.wallSide_;
 
-	// --- debug ---
 #ifdef _DEBUG
 	DebugText::GetInstance()->ConsolePrintf(" map X result: dx=%.3f isWallContact=%s wallSide=%d\n", dx, info.isWallContact_ ? "true" : "false", static_cast<int>(info.wallSide_));
 #endif
@@ -683,7 +780,7 @@ void Player::SwitchingTheGrounding(CollisionMapInfo& info) {
 			}
 
 			if (!hit) {
-				// miss -> カウントを増やし、閾値超えたら離地扱い
+				// ミス -> カウントを増やし、閾値超えたら離地扱い
 				groundMissCount_++;
 #ifdef _DEBUG
 				DebugText::GetInstance()->ConsolePrintf("SwitchingTheGrounding: ground miss count=%d\n", groundMissCount_);
@@ -696,7 +793,7 @@ void Player::SwitchingTheGrounding(CollisionMapInfo& info) {
 #endif
 				}
 			} else {
-				// hit -> リセット
+				// ヒット -> リセット
 				groundMissCount_ = 0;
 			}
 		}
@@ -862,7 +959,7 @@ void Player::HandleMapCollisionLeft(CollisionMapInfo& info) {
 			Rects rects = mapChipField_->GetRectByIndex(indexSet.xIndex, indexSet.yIndex);
 
 			// 左壁の許容移動量（壁外側に押し戻さないクランプ）
-			float dxAllowed = (rects.right + kBlank) - (worldTransform_.translation_.x - kWidth * 0.5f); // 目標位置をブロックの右からkBlank分足す
+			float dxAllowed = (rects.right + kBlank) - (worldTransform_.translation_.x - kWidth * 0.5f);
 			info.movement_.x = std::min(0.0f, std::max(info.movement_.x, dxAllowed));
 
 			info.isWallContact_ = true;
@@ -913,7 +1010,7 @@ void Player::HandleMapCollisionRight(CollisionMapInfo& info) {
 			Rects rects = mapChipField_->GetRectByIndex(indexSet.xIndex, indexSet.yIndex);
 
 			// 右壁の許容移動量（壁外側に押し戻さないクランプ）
-			float dxAllowed = (rects.left - kBlank) - (worldTransform_.translation_.x + kWidth * 0.5f); // 目標位置をブロックの左からkBlank分引く
+			float dxAllowed = (rects.left - kBlank) - (worldTransform_.translation_.x + kWidth * 0.5f);
 			info.movement_.x = std::max(0.0f, std::min(info.movement_.x, dxAllowed));
 
 			info.isWallContact_ = true;
@@ -944,7 +1041,7 @@ void Player::UpdateWallSlide(const CollisionMapInfo& info) {
 			isWallSliding_ = true;
 			velocity_.y = std::max(velocity_.y, -kWallSlideMaxFallSpeed);
 
-			// 👇 壁を切り替えたら即ジャンプできるようにクールダウン解除
+			// 壁を切り替えたら即ジャンプできるようにクールダウン解除
 			if (prevWallSide != info.wallSide_) {
 				wallJumpCooldown_ = 0.0f;
 			}
@@ -976,7 +1073,7 @@ void Player::HandleWallJump(const CollisionMapInfo& info) {
 
 	// 入力緩和：ジャンプ押しっぱでも短時間なら再入力扱い
 	static float jumpBufferTimer = 0.0f;
-	// Support SPACE as jump as well
+	// SPACEもジャンプとして扱う
 	bool jumpPressed = Input::GetInstance()->PushKey(DIK_UP) || Input::GetInstance()->PushKey(DIK_SPACE) || (state.Gamepad.wButtons & XINPUT_GAMEPAD_A);
 	if (jumpPressed) {
 		jumpBufferTimer = 0.15f; // 0.15秒以内ならジャンプ受付
@@ -992,7 +1089,7 @@ void Player::HandleWallJump(const CollisionMapInfo& info) {
 		float horizSpeed = (wallJumpCount_ == 0) ? kWallJumpHorizontalSpeed : kWallJumpHorizontalSpeed2;
 		float vertSpeed = (wallJumpCount_ == 0) ? kWallJumpVerticalSpeed : kWallJumpVerticalSpeed2;
 
-		// 反対方向へ跳ねる
+		// 接触壁の反対方向へ跳ねる
 		if (info.wallSide_ == WallSide::kLeft) {
 			velocity_.x = +horizSpeed;
 			lrDirection_ = LRDirection::kRight;
@@ -1101,7 +1198,7 @@ void Player::EmergencyAvoidance() {
 
 	if (isDodging_) {
 		dodgeTimer_ -= 1.0f / 60.0f;
-		// dodge duration
+		// 回避の継続時間
 		if (dodgeTimer_ <= 0.0f) {
 			isDodging_ = false;
 

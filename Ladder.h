@@ -1,0 +1,30 @@
+#pragma once
+
+#include "KamataEngine.h"
+#include "AABB.h"
+
+class Ladder {
+public:
+    Ladder() = default;
+    ~Ladder();
+    Ladder(const KamataEngine::Vector3& pos) : position_(pos) {}
+
+    void Initialize();
+    void Update(float delta);
+    void Draw(KamataEngine::Camera* camera);
+
+    void SetPosition(const KamataEngine::Vector3& pos) { position_ = pos; worldTransform_.translation_ = pos; }
+    const KamataEngine::Vector3& GetPosition() const { return position_; }
+
+    bool HasModel() const { return model_ != nullptr; }
+
+    // Ladder の軸整列AABBを取得する
+    AABB GetAABB() const;
+
+private:
+    KamataEngine::Vector3 position_ = {0,0,0};
+
+    KamataEngine::Model* model_ = nullptr;
+    bool ownsModel_ = false;
+    KamataEngine::WorldTransform worldTransform_;
+};

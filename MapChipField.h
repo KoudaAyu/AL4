@@ -13,6 +13,7 @@ enum class MapChipType {
 	kGoal = 6,  //6: ゴール
 	kKey = 7,   //7: 鍵
 	kIce = 8,   //8: 氷ブロック（Blockと同じ挙動、モデルのみIce）
+	kLadder = 9, //9: はしご（追加）
 };
 
 struct MapChipData {

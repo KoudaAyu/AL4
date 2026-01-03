@@ -12,7 +12,7 @@ using namespace KamataEngine;
 void Key::Initialize() {
     frame_ = 0;
 
-    // Load key model
+    
     model_ = KamataEngine::Model::CreateFromOBJ("Key", true);
     ownsModel_ = (model_ != nullptr);
 
@@ -154,7 +154,7 @@ void Key::Draw(KamataEngine::Camera* camera) {
     if (!model_) return;
     if (!camera) return;
 
-    // Only draw if not yet fully collected
+  
     if (state_ == State::kCollected && collected_) return;
 
     worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);

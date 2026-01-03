@@ -230,8 +230,27 @@ private:
 	// 接地状態フラグ
 	bool onGround_ = true;
 
+	// Ladder state
+	bool onLadder_ = false;
+
+	// grace time to hold on ladder after releasing input to avoid instant fall at top
+	float ladderHoldTimer_ = 0.0f;
+	static inline const float kLadderHoldTime = 0.18f; // seconds
+
+	// remember ladder column when grabbing ladder to prevent climbing away
+	int lastLadderX_ = -1;
+	bool hasLastLadder_ = false;
+
 	// 重力加速度(下方向)
 	static inline const float kGravityAcceleration = 0.05f;
+
+	// はしご登り速度
+	static inline const float kClimbSpeed = 0.12f;
+
+	// はしご上での横移動速度許容
+	static inline const float kLadderHorizontalSpeed = 0.18f; // reduced for gentler movement
+	// はしご上での横移動の補間係数（0-1）。値が小さいほどゆっくり移動を反映する（緩め）
+	static inline const float kLadderHorizontalAccel = 0.06f; // smaller -> slower response (more 'Minecraft'-like)
 
 	// Grounding debounce: how many consecutive misses before leaving ground
 	static inline const int kGroundMissThreshold = 2;

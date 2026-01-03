@@ -128,7 +128,7 @@ void ChangeScene() {
 		break;
 	case Scene::kGame:
 		if (gameScene) {
-			// If player died, go to GameOver
+			// プレイヤーが死亡したらゲームオーバーへ遷移
 			if (gameScene->IsPlayerDead()) {
 				scene = Scene::kGameOver;
 				delete gameScene;
@@ -138,7 +138,7 @@ void ChangeScene() {
 				return;
 			}
 
-			// Victory finished -> go to GameClear
+			// クリア完了 -> ゲームクリアへ遷移
 			if (gameScene->IsFinished()) {
 				scene = Scene::kGameClear;
 				delete gameScene;

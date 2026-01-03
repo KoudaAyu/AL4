@@ -167,6 +167,7 @@
     <ClCompile Include="Ice.cpp" />
     <ClCompile Include="Key.cpp" />
     <ClCompile Include="KeyInput.cpp" />
+    <ClCompile Include="Ladder.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MapChipField.cpp" />
     <ClCompile Include="MathUtl.cpp" />
@@ -287,6 +288,7 @@
     <ClInclude Include="Ice.h" />
     <ClInclude Include="Key.h" />
     <ClInclude Include="KeyInput.h" />
+    <ClInclude Include="Ladder.h" />
     <ClInclude Include="MapChipField.h" />
     <ClInclude Include="MathUtl.h" />
     <ClInclude Include="Particle.h" />

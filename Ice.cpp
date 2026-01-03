@@ -37,7 +37,7 @@ void Ice::Draw(Camera* camera) {
 }
 
 AABB Ice::GetAABB() const {
-    // Spike と同程度のサイズを仮定してAABBを作成（必要なら調整）
+    // Spike と同程度のサイズを仮定してAABBを作成
     const float w = 2.0f; // tile width
     const float h = 2.0f; // tile height
     Vector3 half = {w * 0.5f, h * 0.5f, 1.0f};

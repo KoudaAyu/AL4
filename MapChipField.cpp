@@ -17,7 +17,8 @@ std::map<std::string, MapChipType> mapChipTable = {
     {"5", MapChipType::kSpike},
     {"6", MapChipType::kGoal}, 
     {"7", MapChipType::kKey},
-    {"8", MapChipType::kIce}, // Ice block
+    {"8", MapChipType::kIce},
+    {"9", MapChipType::kLadder},
 };
 }
 
@@ -82,6 +83,14 @@ void MapChipField::LoadMapChipCsv(const std::string& filename) {
 	// データ領域をリサイズ
 	ResetMapChipData();
 
+	// helper to trim whitespace
+	auto trim = [](std::string& s) {
+		// remove leading
+		while (!s.empty() && std::isspace(static_cast<unsigned char>(s.front()))) s.erase(s.begin());
+		// remove trailing
+		while (!s.empty() && std::isspace(static_cast<unsigned char>(s.back()))) s.pop_back();
+	};
+
 	// データを埋める（CSV は上から下へ）
 	for (uint32_t i = 0; i < numBlockVertical_; ++i) {
 		std::stringstream line_stream(lines[i]);
@@ -91,6 +100,8 @@ void MapChipField::LoadMapChipCsv(const std::string& filename) {
 				// 足りない要素はデフォルトのまま
 				break;
 			}
+
+			trim(word);
 
 			if (mapChipTable.contains(word)) {
 				mapChipData_.data[i][j] = mapChipTable[word];

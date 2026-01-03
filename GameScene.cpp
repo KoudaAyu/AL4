@@ -8,6 +8,7 @@
 #include "Spike.h"
 #include "Goal.h"
 #include "Key.h"
+#include "Ladder.h"
 #include <algorithm>
 using namespace KamataEngine;
 
@@ -86,6 +87,12 @@ GameScene::~GameScene() {
 		delete k;
 	}
 	keys_.clear();
+
+	// delete ladders
+	for (Ladder* l : ladders_) {
+		delete l;
+	}
+	ladders_.clear();
 
 	// delete ice model
 	delete iceModel_;
@@ -187,6 +194,12 @@ void GameScene::Initialize() {
 					g->Initialize();
 					goals_.push_back(g);
 					goalSpawned = true;
+				} else if (t == MapChipType::kLadder) {
+					Ladder* l = new Ladder();
+					Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
+					l->SetPosition(pos);
+					l->Initialize();
+					ladders_.push_back(l);
 				}
 			}
 			// Do not break here; continue scanning to spawn all spikes and enemies
@@ -464,6 +477,11 @@ void GameScene::Update() {
 				if (s) s->Update(1.0f / 60.0f);
 			}
 		}
+		if (!ladders_.empty()) {
+			for (Ladder* l : ladders_) {
+				if (l) l->Update(1.0f / 60.0f);
+			}
+		}
 		for (Goal* g : goals_) {
 			if (g) g->Update(1.0f / 60.0f);
 		}
@@ -648,9 +666,14 @@ void GameScene::Draw() {
 	}
 
 	// Draw keys
-    for (Key* k : keys_) {
-        if (k) k->Draw(&camera_);
-    }
+	for (Key* k : keys_) {
+		if (k) k->Draw(&camera_);
+	}
+
+	// Draw ladders here so they render on top of blocks
+	for (Ladder* l : ladders_) {
+		if (l) l->Draw(&camera_);
+	}
 
 	// デス中はプレイヤーの描画を抑制してエフェクトを見やすくする
 	if (phase_ != Phase::kDeath) {
@@ -914,6 +937,11 @@ void GameScene::Reset() {
 	}
 	goals_.clear();
 
+	for (Ladder* l : ladders_) {
+        delete l;
+    }
+    ladders_.clear();
+
 	if (mapChipField_) {
 		uint32_t vh = mapChipField_->GetNumBlockVertical();
 		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
@@ -945,6 +973,12 @@ void GameScene::Reset() {
 					g->Initialize();
 					goals_.push_back(g);
 					goalSpawned = true;
+				} else if (t == MapChipType::kLadder) {
+					Ladder* l = new Ladder();
+					Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
+					l->SetPosition(pos);
+					l->Initialize();
+					ladders_.push_back(l);
 				}
 			}
 		}
