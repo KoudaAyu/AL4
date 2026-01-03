@@ -47,12 +47,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #endif //  _DEBUG
 #ifdef _DEBUG
 	// デバッグビルドではセレクトシーンから開始
-	scene = Scene::kTitle;
+	scene = Scene::kGameOver;
 #else
 	scene = Scene::kTitle;
 #endif
 
-	
+	// 初期シーンに応じて生成
 	if (scene == Scene::kTitle) {
 		titleScene = new TitleScene();
 		titleScene->Initialize();
@@ -62,6 +62,12 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	} else if (scene == Scene::kSelect) {
 		selectScene = new SelectScene();
 		selectScene->Initialize();
+	} else if (scene == Scene::kGameOver) {
+		gameOverScene = new GameOverScene();
+		gameOverScene->Initialize();
+	} else if (scene == Scene::kGameClear) {
+		gameClearScene = new GameClearScene();
+		gameClearScene->Initialize();
 	}
 
 	XINPUT_STATE state;
@@ -77,7 +83,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		imguiManager->Begin();
 #endif //  _DEBUG
 
-	
+		
 		ChangeScene();
 		UpdateScene();
 
@@ -157,11 +163,26 @@ void ChangeScene() {
 		break;
 	case Scene::kGameOver:
 		if (gameOverScene && gameOverScene->IsFinished()) {
-			scene = Scene::kTitle;
+			// decide where to go based on selection result
+			GameOverScene::Result r = gameOverScene->GetResult();
 			delete gameOverScene;
 			gameOverScene = nullptr;
-			titleScene = new TitleScene();
-			titleScene->Initialize();
+			if (r == GameOverScene::Result::kRetryGame) {
+				// restart game scene (default stage)
+				scene = Scene::kGame;
+				gameScene = new GameScene();
+				gameScene->Initialize();
+			} else if (r == GameOverScene::Result::kBackSelect) {
+				// go back to stage select
+				scene = Scene::kSelect;
+				selectScene = new SelectScene();
+				selectScene->Initialize();
+			} else {
+				// back to title by default
+				scene = Scene::kTitle;
+				titleScene = new TitleScene();
+				titleScene->Initialize();
+			}
 		}
 		break;
 	case Scene::kGameClear:
