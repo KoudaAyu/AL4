@@ -2,6 +2,7 @@
 #include "KamataEngine.h"
 
 #include"Fade.h"
+#include "DeathParticle.h"
 
 class TitleScene {
 
@@ -10,6 +11,7 @@ class TitleScene {
 		{
 			kFadeIn,
 			kMain,
+			kEffect,
 			kFadeOut,
 	    };
 
@@ -37,5 +39,17 @@ private:
 	KamataEngine::Model* model_ = nullptr;
 	KamataEngine::Camera camera_;
 	KamataEngine::WorldTransform worldTransform_;
+
+	// effect (演出) state - particle & rotation based
+	float effectTimer_ = 0.0f;
+	float effectDuration_ = 1.0f; // seconds for the effect animation
+	DeathParticle* particle_ = nullptr;
+	float rotationBoost_ = 6.0f; // additional rotation speed multiplier when boosted
+	float cameraStartZ_ = -50.0f;
+
+	// rotation speed control (radians per second)
+	float rotationSpeed_ = 0.5f; // current rotation speed (rad/s)
+	float targetRotationSpeed_ = 0.5f; // desired rotation speed
+	float rotationLerpSpeed_ = 8.0f; // how fast rotationSpeed_ approaches target (per second)
 
 };

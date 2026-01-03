@@ -47,7 +47,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 #endif //  _DEBUG
 #ifdef _DEBUG
 	// デバッグビルドではセレクトシーンから開始
-	scene = Scene::kSelect;
+	scene = Scene::kTitle;
 #else
 	scene = Scene::kTitle;
 #endif

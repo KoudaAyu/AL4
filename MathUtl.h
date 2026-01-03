@@ -1,5 +1,6 @@
 #pragma once
 #include "KamataEngine.h"
+#include <cmath>
 
 using namespace KamataEngine;
 
@@ -68,4 +69,16 @@ inline Vector3 Transform(const Vector3& v, const Matrix4x4& m) {
 	result.z = v.x * m.m[0][2] + v.y * m.m[1][2] + v.z * m.m[2][2] + m.m[3][2];
 
 	return result;
+}
+
+// vector length
+inline float Length(const Vector3& v) noexcept {
+	return std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+}
+
+// normalize
+inline Vector3 Normalize(const Vector3& v) noexcept {
+	float len = Length(v);
+	if (len <= 0.000001f) return Vector3{0.0f, 0.0f, 0.0f};
+	return v / len;
 }

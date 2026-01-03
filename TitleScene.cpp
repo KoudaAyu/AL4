@@ -3,6 +3,7 @@
 #include "KeyInput.h"
 #include <cassert>
 #include <numbers>
+#include <algorithm>
 
 using namespace KamataEngine;
 
@@ -11,6 +12,10 @@ TitleScene::~TitleScene() {
 	if (model_) {
 		delete model_;
 		model_ = nullptr;
+	}
+	if (particle_) {
+		delete particle_;
+		particle_ = nullptr;
 	}
 }
 
@@ -30,7 +35,7 @@ void TitleScene::Initialize() {
 	// Initialize camera for title scene
 	camera_.Initialize();
 	// Place camera so title model is visible: use default farther distance
-	camera_.translation_ = {0.0f, 0.0f, -50.0f};
+	camera_.translation_ = {0.0f, 0.0f, cameraStartZ_};
 	camera_.UpdateMatrix();
 	camera_.TransferMatrix();
 
@@ -42,9 +47,20 @@ void TitleScene::Initialize() {
 	// Increase scale so model is likely visible
 	worldTransform_.scale_ = {5.0f, 5.0f, 5.0f};
 
+	// initialize effect state
+	effectTimer_ = 0.0f;
+	particle_ = nullptr;
+
+	// rotation speed defaults
+	rotationSpeed_ = 0.5f;
+	targetRotationSpeed_ = 0.5f;
+	rotationLerpSpeed_ = 8.0f;
+
 }
 
 void TitleScene::Update() {
+
+	const float dt = 1.0f / 60.0f;
 
 	switch (phase_)
 	{
@@ -61,24 +77,61 @@ void TitleScene::Update() {
 		case Phase::kMain:
 		// accept space key or Xbox A button
 		if (Input::GetInstance()->PushKey(DIK_SPACE) || KeyInput::GetInstance()->TriggerPadButton(KeyInput::XINPUT_BUTTON_A)) {
-			phase_ = Phase::kFadeOut;
-			fade_->Start(Fade::Status::FadeOut, 3.0f);
+			// start the short effect animation before fading out: spawn particles and boost rotation
+			effectTimer_ = 0.0f;
+			if (!particle_) {
+				particle_ = new DeathParticle();
+				particle_->Initialize(model_, &camera_, worldTransform_.translation_);
+			}
+			// boost rotation speed target
+			targetRotationSpeed_ = 0.5f + rotationBoost_; // temporary high speed
+			phase_ = Phase::kEffect;
+		}
+
+		break;
+
+		case Phase::kEffect:
+		// play a short particle + rotation effect
+		effectTimer_ += dt;
+		if (particle_) particle_->Update();
+
+		{
+			float t = effectTimer_ / effectDuration_;
+			if (t > 1.0f) t = 1.0f;
+
+			// during effect we keep the boosted targetRotationSpeed_ (set on key press)
+			// when effect completes, restore the target to baseline
+			if (t >= 1.0f) {
+				// start fade out after effect completes
+				phase_ = Phase::kFadeOut;
+				fade_->Start(Fade::Status::FadeOut, 3.0f);
+				// restore rotation speed target back to baseline
+				targetRotationSpeed_ = 0.5f;
+			}
 		}
 
 		break;
 
 		case Phase::kFadeOut:
 			// advance fade once per frame so it can finish
+			// continue updating particle effect during fade out
+			if (particle_) particle_->Update();
 			fade_->Update();
 			if (fade_->IsFinished()) {
-			finished_ = true;
+				finished_ = true;
 		    }
 
 			break;
 	}
 
-	// rotate title slowly around Y
-	worldTransform_.rotation_.y += 0.5f * (1.0f / 60.0f);
+	// smoothly interpolate rotation speed toward target
+	{
+		float lerpT = std::clamp(rotationLerpSpeed_ * dt, 0.0f, 1.0f);
+		rotationSpeed_ += (targetRotationSpeed_ - rotationSpeed_) * lerpT;
+		// apply rotation using current rotationSpeed_
+		worldTransform_.rotation_.y += rotationSpeed_ * dt;
+	}
+
 	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
 	worldTransform_.TransferMatrix();
 
@@ -89,6 +142,10 @@ void TitleScene::Draw() {
 	Model::PreDraw();
 	if (model_) {
 		model_->Draw(worldTransform_, camera_);
+	}
+	// draw particles if spawned
+	if (particle_) {
+		particle_->Draw();
 	}
 	Model::PostDraw();
 

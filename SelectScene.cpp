@@ -183,18 +183,18 @@ void SelectScene::Update() {
         camera_.UpdateMatrix();
         camera_.TransferMatrix();
 
-        // update fade (in case it's running)
+        
         if (fade_) fade_->Update();
 
         if (transitionTimer_ <= 0.0f) {
-            // transition animation finished -> start fade if not started yet
+          
             if (fade_ && !fadeStarted_) {
                 fadeStarted_ = true;
-                // start fade out lasting e.g. 0.6s (half of transitionDuration_)
+                
                 fade_->Start(Fade::Status::FadeOut, transitionDuration_ * 0.5f);
             }
 
-            // if fade has been started, wait until it finishes to complete scene
+          
             if (!fade_ || (fadeStarted_ && fade_->IsFinished())) {
                 finished_ = true;
                 return;
@@ -247,16 +247,16 @@ void SelectScene::Update() {
 
     if (!transitioning_ && (padA || spaceTrig) && inputTimer_ <= 0.0f) {
         if (highlightedStage_ >= 0) {
-            // start transition instead of immediately finishing
+           
             chosenStage_ = highlightedStage_;
             transitioning_ = true;
             transitionTimer_ = transitionDuration_;
             transitionProgress_ = 0.0f;
             transitionCameraStart_ = camera_.translation_;
-            // move camera target to be centered on chosen stage and zoom in (closer z)
+           
             Vector3 s = stagePositions_[chosenStage_];
             transitionCameraTarget_ = {s.x, s.y, -18.0f};
-            // lock input briefly
+          
             inputTimer_ = inputCooldown_;
             return;
         } else {
@@ -294,11 +294,11 @@ void SelectScene::Draw() {
         WorldTransform* swt = stageWorldTransforms_[i];
         if (!swt) continue;
         if (transitioning_) {
-            // during transition, animate scales: chosen grows, others shrink
+          
             float t = transitionProgress_;
-            // chosen goes from highlighted scale (approx 1.6) to larger (3.0)
+          
             if (static_cast<int>(i) == chosenStage_) {
-                float s = LerpF(1.0f, 3.0f, t); // start from 1.0 to 3.0
+                float s = LerpF(1.0f, 3.0f, t);
                 swt->scale_ = {s, s, s};
             } else {
                 float s = LerpF(1.0f, 0.4f, t);
@@ -323,6 +323,6 @@ void SelectScene::Draw() {
 
     Model::PostDraw();
 
-    // draw fade overlay last
+    
     if (fade_) fade_->Draw();
 }
