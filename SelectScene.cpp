@@ -4,6 +4,7 @@
 
 #include "Player.h"
 #include "MapChipField.h"
+#include "CameraController.h"
 
 using namespace KamataEngine;
 
@@ -16,24 +17,64 @@ SelectScene::~SelectScene() {
         delete mapChipField_;
         mapChipField_ = nullptr;
     }
+    if (blockModel_) {
+        delete blockModel_;
+        blockModel_ = nullptr;
+    }
+
+    if (cameraController_) {
+        delete cameraController_;
+        cameraController_ = nullptr;
+    }
+
+    for (auto& row : worldTransformBlocks_) {
+        for (WorldTransform* wt : row) {
+            delete wt;
+        }
+    }
+    worldTransformBlocks_.clear();
 }
 
 void SelectScene::Initialize() {
-    // Initialize camera for a simple 2D-ish view
+  
     camera_.Initialize();
     camera_.translation_ = {0.0f, 0.0f, -50.0f};
     camera_.UpdateMatrix();
     camera_.TransferMatrix();
 
-    // Load a small map so player can stand and move
-    mapChipField_ = new MapChipField();
-    // Attempt to load a default map; fall back silently if missing
-    mapChipField_->LoadMapChipCsv("Resources/Debug/Map/Block.csv");
+ 
+    cameraController_ = new CameraController();
 
-    // Create player at a reasonable position
+   
+    mapChipField_ = new MapChipField();
+   
+    mapChipField_->LoadMapChipCsv("Resources/Map/SelectScene/SelectScene.csv");
+
+  
+    blockModel_ = Model::CreateFromOBJ("Block");
+
+  
+    if (mapChipField_) {
+        uint32_t vh = mapChipField_->GetNumBlockVertical();
+        uint32_t wh = mapChipField_->GetNumBlockHorizontal();
+        worldTransformBlocks_.assign(vh, std::vector<WorldTransform*>(wh, nullptr));
+        for (uint32_t y = 0; y < vh; ++y) {
+            for (uint32_t x = 0; x < wh; ++x) {
+                MapChipType t = mapChipField_->GetMapChipTypeByIndex(x, y);
+                if (t == MapChipType::kBlock || t == MapChipType::kIce) {
+                    WorldTransform* wt = new WorldTransform();
+                    wt->Initialize();
+                    wt->translation_ = mapChipField_->GetMapChipPositionByIndex(x, y);
+                    worldTransformBlocks_[y][x] = wt;
+                }
+            }
+        }
+    }
+
+ 
     player_ = new Player();
     Vector3 startPos = {4.0f, 4.0f, 0.0f};
-    // try to find spawn in the map if present
+  
     if (mapChipField_) {
         uint32_t vh = mapChipField_->GetNumBlockVertical();
         uint32_t wh = mapChipField_->GetNumBlockHorizontal();
@@ -51,10 +92,23 @@ void SelectScene::Initialize() {
 
     player_->Initialize(&camera_, startPos);
     player_->SetMapChipField(mapChipField_);
+
+   
+    if (cameraController_) {
+        if (mapChipField_) {
+            cameraController_->SetMovableArea(mapChipField_->GetMovableArea());
+        } else {
+            cameraController_->SetMovableArea({-50.0f, 50.0f, 50.0f, -50.0f});
+        }
+        cameraController_->Initialize(&camera_);
+        cameraController_->SetTarget(player_);
+        player_->SetCameraController(cameraController_);
+        cameraController_->Reset();
+    }
 }
 
 void SelectScene::Update() {
-    // Temporarily require Left Shift + Space to proceed so plain Space won't advance
+   
     bool spacePressed = Input::GetInstance()->PushKey(DIK_SPACE);
     bool shiftPressed = Input::GetInstance()->PushKey(DIK_LSHIFT) || Input::GetInstance()->PushKey(DIK_RSHIFT);
 
@@ -63,10 +117,14 @@ void SelectScene::Update() {
         return;
     }
 
-    // Update camera if you want (keep static for now)
-    camera_.UpdateMatrix();
+   
+    if (cameraController_) {
+        cameraController_->Update();
+    } else {
+        camera_.UpdateMatrix();
+    }
 
-    // Allow the player to receive input and update
+   
     if (player_) {
         player_->Update();
     }
@@ -74,6 +132,26 @@ void SelectScene::Update() {
 
 void SelectScene::Draw() {
     Model::PreDraw();
+
+   
+    if (!worldTransformBlocks_.empty()) {
+        uint32_t vh = static_cast<uint32_t>(worldTransformBlocks_.size());
+        uint32_t wh = static_cast<uint32_t>(worldTransformBlocks_[0].size());
+        for (uint32_t y = 0; y < vh; ++y) {
+            for (uint32_t x = 0; x < wh; ++x) {
+                WorldTransform* wt = worldTransformBlocks_[y][x];
+                if (!wt) continue;
+              
+                wt->matWorld_ = MakeAffineMatrix(wt->scale_, wt->rotation_, wt->translation_);
+                if (wt->parent_) wt->matWorld_ = Multiply(wt->parent_->matWorld_, wt->matWorld_);
+                wt->TransferMatrix();
+
+                if (blockModel_) {
+                    blockModel_->Draw(*wt, camera_);
+                }
+            }
+        }
+    }
 
     if (player_) player_->Draw();
 

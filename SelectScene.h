@@ -1,6 +1,9 @@
 #pragma once
 
 #include "KamataEngine.h"
+#include <vector>
+
+class CameraController; // forward
 
 class SelectScene {
 public:
@@ -24,4 +27,13 @@ private:
 
     // Map chip field so player can interact with tiles (optional)
     class MapChipField* mapChipField_ = nullptr;
+
+    // Models used to draw blocks
+    KamataEngine::Model* blockModel_ = nullptr;
+
+    // world transforms for blocks (rows x cols)
+    std::vector<std::vector<KamataEngine::WorldTransform*>> worldTransformBlocks_;
+
+    // Camera controller to follow the player similar to GameScene
+    CameraController* cameraController_ = nullptr;
 };
