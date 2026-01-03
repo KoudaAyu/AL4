@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <random>
+#include <cmath>
 
 using namespace KamataEngine;
 
@@ -23,11 +24,28 @@ void CameraController::Update() {
     
     camera_->translation_ = Lerp(camera_->translation_, targetPosition_, kInterpolationRate);
 
-    camera_->translation_.x = std::clamp(camera_->translation_.x, movableArea.left + Margin.left, movableArea.right - Margin.right);
-	camera_->translation_.y = std::clamp(camera_->translation_.y, movableArea.bottom + Margin.bottom, movableArea.top - Margin.top);
+    // Compute world-space half extents of the camera view at the object's plane (z ~= 0)
+    float camDistance = std::fabs(camera_->translation_.z); // distance from camera to world plane (z=0)
+    float halfHeight = std::tan(camera_->fovAngleY * 0.5f) * camDistance;
+    float halfWidth = halfHeight * camera_->aspectRatio;
 
-    camera_->translation_.x = std::clamp(camera_->translation_.x, movableArea.left, movableArea.right);
-	camera_->translation_.y = std::clamp(camera_->translation_.y, movableArea.bottom, movableArea.top);
+    // If the map is smaller than the viewport, center the camera on the map instead of clamping
+    float mapWidth = movableArea.right - movableArea.left;
+    float mapHeight = movableArea.top - movableArea.bottom;
+
+    if (mapWidth <= 2.0f * halfWidth) {
+        // center X
+        camera_->translation_.x = (movableArea.left + movableArea.right) * 0.5f;
+    } else {
+        camera_->translation_.x = std::clamp(camera_->translation_.x, movableArea.left + halfWidth, movableArea.right - halfWidth);
+    }
+
+    if (mapHeight <= 2.0f * halfHeight) {
+        // center Y
+        camera_->translation_.y = (movableArea.top + movableArea.bottom) * 0.5f;
+    } else {
+        camera_->translation_.y = std::clamp(camera_->translation_.y, movableArea.bottom + halfHeight, movableArea.top - halfHeight);
+    }
 
     // カメラシェイクの適用
     if (isShaking_ && shakeRemaining_ > 0.0f) {
@@ -68,6 +86,25 @@ void CameraController::Reset() {
 
     const WorldTransform& targetWorldTransform = target_->GetWorldTransform();
     camera_->translation_ = targetWorldTransform.translation_ + targetOffset_;
+
+    // ensure initial position respects movable area and viewport size
+    float camDistance = std::fabs(camera_->translation_.z);
+    float halfHeight = std::tan(camera_->fovAngleY * 0.5f) * camDistance;
+    float halfWidth = halfHeight * camera_->aspectRatio;
+
+    float mapWidth = movableArea.right - movableArea.left;
+    float mapHeight = movableArea.top - movableArea.bottom;
+
+    if (mapWidth <= 2.0f * halfWidth) {
+        camera_->translation_.x = (movableArea.left + movableArea.right) * 0.5f;
+    } else {
+        camera_->translation_.x = std::clamp(camera_->translation_.x, movableArea.left + halfWidth, movableArea.right - halfWidth);
+    }
+    if (mapHeight <= 2.0f * halfHeight) {
+        camera_->translation_.y = (movableArea.top + movableArea.bottom) * 0.5f;
+    } else {
+        camera_->translation_.y = std::clamp(camera_->translation_.y, movableArea.bottom + halfHeight, movableArea.top - halfHeight);
+    }
 }
 
 void CameraController::StartShake(float amplitude, float duration) {
