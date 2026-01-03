@@ -67,11 +67,11 @@ GameScene::~GameScene() {
 		countdownSprite_ = nullptr;
 	}
 
-	
-	for (KamataEngine::Sprite* s : heartSprites_) {
-		if (s) delete s;
+	// delete hearts_ sprites
+	for (auto& h : hearts_) {
+		if (h.sprite) delete h.sprite;
 	}
-	heartSprites_.clear();
+	hearts_.clear();
 
 	
 	if (pauseSprite_) {
@@ -153,7 +153,6 @@ void GameScene::Initialize() {
 
 	heartTextureHandle_ = TextureManager::Load("Sprite/PlayerHP.png");
 	if (heartTextureHandle_ != 0u && player_) {
-		
 		int hp = player_->GetHP();
 		const float heartSize = 32.0f;
 		const float heartMarginX = 20.0f;
@@ -163,8 +162,16 @@ void GameScene::Initialize() {
 			float y = static_cast<float>(kWindowHeight) - 20.0f;
 			KamataEngine::Sprite* s = KamataEngine::Sprite::Create(heartTextureHandle_, KamataEngine::Vector2{x, y}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
 			if (s) s->SetSize(KamataEngine::Vector2{heartSize, heartSize});
-			heartSprites_.push_back(s);
+
+			HeartUI h;
+			h.sprite = s;
+			h.baseSize = heartSize;
+			h.currentSize = heartSize;
+			h.animTimer = 0.0f;
+			h.removing = false;
+			hearts_.push_back(h);
 		}
+		lastPlayerHP_ = hp;
 	}
 
 	
@@ -566,30 +573,79 @@ void GameScene::Update() {
 			if (player_) {
 				int hp = player_->GetHP();
 				if (hp < 0) hp = 0;
-				// If number of heart sprites differs from current HP, rebuild
-				if (static_cast<int>(heartSprites_.size()) != hp) {
-					// destroy existing
-					for (KamataEngine::Sprite* s : heartSprites_) {
-						if (s) delete s;
+				// If HP increased, rebuild by adding new hearts
+				if (hp > lastPlayerHP_) {
+					int toAdd = hp - lastPlayerHP_;
+					const float heartSize = 32.0f;
+					const float heartMarginX = 20.0f;
+					const float heartSpacing = 8.0f;
+					for (int i = 0; i < toAdd; ++i) {
+						float x = heartMarginX + static_cast<int>(hearts_.size()) * (heartSize + heartSpacing);
+						float y = static_cast<float>(kWindowHeight) - 20.0f; // bottom-aligned
+						KamataEngine::Sprite* s = KamataEngine::Sprite::Create(heartTextureHandle_, KamataEngine::Vector2{x, y}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
+						if (s) s->SetSize(KamataEngine::Vector2{heartSize, heartSize});
+						HeartUI h; h.sprite = s; h.baseSize = heartSize; h.currentSize = heartSize; h.animTimer = 0.0f; h.removing = false; hearts_.push_back(h);
 					}
-					heartSprites_.clear();
+					lastPlayerHP_ = hp;
+				}
 
-					if (heartTextureHandle_ != 0u) {
-						const float heartSize = 32.0f;
+				// If HP decreased, mark the highest-index heart for removal (animate)
+				if (hp < lastPlayerHP_) {
+					int removeIndex = lastPlayerHP_ - 1; // remove last heart
+					if (removeIndex >= 0 && removeIndex < static_cast<int>(hearts_.size())) {
+						// record start position for the animation (current on-screen position)
 						const float heartMarginX = 20.0f;
 						const float heartSpacing = 8.0f;
-						for (int i = 0; i < hp; ++i) {
-							float x = heartMarginX + i * (heartSize + heartSpacing);
-							float y = static_cast<float>(kWindowHeight) - 20.0f; // bottom-aligned
-							KamataEngine::Sprite* s = KamataEngine::Sprite::Create(heartTextureHandle_, KamataEngine::Vector2{x, y}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
-							if (s) s->SetSize(KamataEngine::Vector2{heartSize, heartSize});
-							heartSprites_.push_back(s);
+						float sx = heartMarginX + static_cast<int>(removeIndex) * (hearts_[removeIndex].baseSize + heartSpacing);
+						float sy = static_cast<float>(kWindowHeight) - 20.0f;
+						hearts_[removeIndex].startPos = KamataEngine::Vector2{sx, sy};
+						hearts_[removeIndex].removing = true;
+						hearts_[removeIndex].animTimer = 0.0f;
+						// start heart shake
+						if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(1.0f, 0.15f);
+					}
+					lastPlayerHP_ = hp;
+				}
+
+				// Update animations for hearts
+				for (size_t i = 0; i < hearts_.size(); ++i) {
+					auto& h = hearts_[i];
+					if (!h.sprite) continue;
+					if (h.removing) {
+						// progress timer
+						h.animTimer += 1.0f / 60.0f;
+						float t = h.animTimer / heartRemoveDuration_;
+						if (t > 1.0f) t = 1.0f;
+						// scale down and fade out
+						h.currentSize = h.baseSize * (1.0f - t);
+						float alpha = 1.0f - t;
+						if (h.currentSize < 0.1f) h.currentSize = 0.0f;
+						h.sprite->SetSize(KamataEngine::Vector2{h.currentSize, h.currentSize});
+						h.sprite->SetColor(KamataEngine::Vector4{1.0f, 1.0f, 1.0f, alpha});
+						// keep the heart at its start position while shrinking/fading
+						h.sprite->SetPosition(h.startPos);
+						if (t >= 1.0f) {
+							// finished removal: delete sprite and erase element
+							if (h.sprite) { delete h.sprite; }
+							hearts_.erase(hearts_.begin() + static_cast<int>(i));
+							// adjust loop index
+							--i;
 						}
+					} else {
+						// ensure proper position/size for hearts that remain
+						const float heartMarginX = 20.0f;
+						const float heartSpacing = 8.0f;
+						float x = heartMarginX + static_cast<int>(i) * (h.baseSize + heartSpacing);
+						float y = static_cast<float>(kWindowHeight) - 20.0f;
+						h.sprite->SetPosition(KamataEngine::Vector2{x, y});
+						// ensure fully visible
+						h.sprite->SetColor(KamataEngine::Vector4{1,1,1,1});
+						h.sprite->SetSize(KamataEngine::Vector2{h.currentSize, h.currentSize});
 					}
 				}
 			}
 		}
-
+		
 		// フェーズ切り替えをチェック
 		ChangePhase();
 		break;
@@ -658,6 +714,51 @@ void GameScene::Update() {
 				if (wt->parent_) {
 					wt->matWorld_ = Multiply(wt->parent_->matWorld_, wt->matWorld_);
 				}
+				wt->TransferMatrix();
+			}
+		}
+
+		break;
+	case Phase::kVictory:
+		// During victory, keep camera following player and update a particle effect
+		#ifndef _DEBUG
+		cameraController_->Update();
+		camera_.UpdateMatrix();
+		#else
+		// Allow debug camera toggle but still update camera controller when not debug camera
+		if (Input::GetInstance()->TriggerKey(DIK_C)) {
+			isDebugCameraActive_ = !isDebugCameraActive_;
+		}
+		if (isDebugCameraActive_) {
+			debugCamera_->Update();
+			camera_.matView = debugCamera_->GetCamera().matView;
+			camera_.matProjection = debugCamera_->GetCamera().matProjection;
+			camera_.TransferMatrix();
+		} else {
+			cameraController_->Update();
+			camera_.UpdateMatrix();
+		}
+		#endif
+
+		skydome_->Update();
+
+		// Update victory particle if present
+		if (deathParticle_) {
+			deathParticle_->Update();
+		}
+
+		// simple timer to delay scene change
+		victoryTimer_ += 1.0f / 60.0f;
+		if (victoryTimer_ >= victoryDuration_) {
+			finished_ = true; // signal main to change to GameClear
+		}
+
+		// keep world transforms updated for visuals
+		for (auto& row : worldTransformBlocks_) {
+			for (WorldTransform* wt : row) {
+				if (!wt) continue;
+				wt->matWorld_ = MakeAffineMatrix(wt->scale_, wt->rotation_, wt->translation_);
+				if (wt->parent_) wt->matWorld_ = Multiply(wt->parent_->matWorld_, wt->matWorld_);
 				wt->TransferMatrix();
 			}
 		}
@@ -775,14 +876,14 @@ void GameScene::Draw() {
 	}
 
 	// Particle関係
-	if (phase_ == Phase::kDeath && deathParticle_) {
+	if ((phase_ == Phase::kDeath || phase_ == Phase::kVictory) && deathParticle_) {
 		deathParticle_->Draw();
 	}
 
 	Model::PostDraw();
 
 	
-	if (hudSprite_ || uiLeftSprite_ || uiMidSprite_ || uiRightSprite_ || countdownSprite_ || pauseSprite_ || !heartSprites_.empty()) {
+	if (hudSprite_ || uiLeftSprite_ || uiMidSprite_ || uiRightSprite_ || countdownSprite_ || pauseSprite_ || !hearts_.empty()) {
 		KamataEngine::DirectXCommon* dx = KamataEngine::DirectXCommon::GetInstance();
 		KamataEngine::Sprite::PreDraw(dx->GetCommandList());
 		if (hudSprite_) hudSprite_->Draw();
@@ -792,8 +893,8 @@ void GameScene::Draw() {
 		if (phase_ == Phase::kCountdown && countdownSprite_) countdownSprite_->Draw();
 		if (phase_ == Phase::kPause && pauseSprite_) pauseSprite_->Draw();
 		
-		for (KamataEngine::Sprite* s : heartSprites_) {
-			if (s) s->Draw();
+		for (auto& h : hearts_) {
+			if (h.sprite) h.sprite->Draw();
 		}
 		KamataEngine::Sprite::PostDraw();
 	}
@@ -899,8 +1000,18 @@ void GameScene::CheckAllCollisions() {
         if (IsCollisionAABBAABB(player_->GetAABB(), g->GetAABB())) {
             // require all keys to be collected before clearing
             if (keys_.empty()) {
-                finished_ = true; // trigger GameClear
-                return;
+                // Start a short victory sequence instead of immediately finishing
+		        if (phase_ != Phase::kVictory) {
+		            phase_ = Phase::kVictory;
+		            victoryTimer_ = 0.0f;
+		            // create a particle effect at player position to indicate victory
+		            const Vector3 victoryPos = player_->GetPosition();
+		            if (deathParticle_) { delete deathParticle_; deathParticle_ = nullptr; }
+		            deathParticle_ = new DeathParticle();
+		            deathParticle_->Initialize(model_, &camera_, victoryPos);
+		            if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(0.8f, 0.2f);
+		        }
+		        return;
             } else {
                 // Inform (debug) that keys remain; do not clear yet
                 DebugText::GetInstance()->ConsolePrintf("GameScene: goal reached but keys remain\n");
@@ -999,80 +1110,27 @@ void GameScene::Reset() {
 		player_->SetCameraController(cameraController_);
 	}
 
-	
-	for (Enemy* enemy : enemies_) {
-		delete enemy;
+	// clear existing heart UI
+	for (auto& h : hearts_) {
+		if (h.sprite) delete h.sprite;
 	}
-	enemies_.clear();
+	hearts_.clear();
+	lastPlayerHP_ = 0;
 
-	
-	for (Spike* s : spikes_) {
-		delete s;
-	}
-	spikes_.clear();
-	for (Goal* g : goals_) {
-		delete g;
-	}
-	goals_.clear();
-
-	for (Ladder* l : ladders_) {
-        delete l;
-    }
-    ladders_.clear();
-
-	if (mapChipField_) {
-		uint32_t vh = mapChipField_->GetNumBlockVertical();
-		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
-		bool goalSpawned = false;
-		for (uint32_t y = 0; y < vh; ++y) {
-			for (uint32_t x = 0; x < wh; ++x) {
-				MapChipType t = mapChipField_->GetMapChipTypeByIndex(x, y);
-				if (t == MapChipType::kEnemySpawn) {
-					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
-					Enemy* enemy = new Enemy();
-					enemy->Initialize(&camera_, enemyPosition);
-					enemies_.push_back(enemy);
-				} else if (t == MapChipType::kEnemySpawnShield) {
-					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
-					FrontShieldEnemy* fse = new FrontShieldEnemy();
-					fse->Initialize(&camera_, enemyPosition);
-					fse->SetFrontDotThreshold(0.6f);
-					enemies_.push_back(fse);
-				} else if (t == MapChipType::kSpike) {
-					Spike* s = new Spike();
-					Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
-					s->SetPosition(pos);
-					s->Initialize();
-					spikes_.push_back(s);
-				} else if (t == MapChipType::kGoal && !goalSpawned) {
-					Goal* g = new Goal();
-					Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
-					g->SetPosition(pos);
-					g->Initialize();
-					goals_.push_back(g);
-					goalSpawned = true;
-				} else if (t == MapChipType::kLadder) {
-					Ladder* l = new Ladder();
-					Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
-					l->SetPosition(pos);
-					l->Initialize();
-					ladders_.push_back(l);
-				}
-			}
+	// create hearts for new player
+	if (heartTextureHandle_ != 0u && player_) {
+		int hp = player_->GetHP();
+		const float heartSize = 32.0f;
+		const float heartMarginX = 20.0f;
+		const float heartSpacing = 8.0f;
+		for (int i = 0; i < hp; ++i) {
+			float x = heartMarginX + i * (heartSize + heartSpacing);
+			float y = static_cast<float>(kWindowHeight) - 20.0f;
+			KamataEngine::Sprite* s = KamataEngine::Sprite::Create(heartTextureHandle_, KamataEngine::Vector2{x, y}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
+			if (s) s->SetSize(KamataEngine::Vector2{heartSize, heartSize});
+			HeartUI h; h.sprite = s; h.baseSize = heartSize; h.currentSize = heartSize; h.animTimer = 0.0f; h.removing = false; hearts_.push_back(h);
 		}
-
-		// spawn keys
-		for (uint32_t y = 0; y < vh; ++y) {
-			for (uint32_t x = 0; x < wh; ++x) {
-				if (mapChipField_->GetMapChipTypeByIndex(x, y) == MapChipType::kKey) {
-					Key* k = new Key();
-					Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
-					k->SetPosition(pos);
-					k->Initialize();
-					keys_.push_back(k);
-				}
-			}
-		}
+		lastPlayerHP_ = player_->GetHP();
 	}
 
 

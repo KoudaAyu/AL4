@@ -23,6 +23,7 @@ public:
 		kPlay,
 		kDeath,
 		kPause, // 追加: 一時停止
+		kVictory, // 新規: クリア演出フェーズ（すぐにシーン遷移しない）
 	};
 
 public:
@@ -122,11 +123,25 @@ private:
 	uint32_t pauseTextureHandle_ = 0u;
 
 	// HP hearts UI
-	std::vector<KamataEngine::Sprite*> heartSprites_;
+	struct HeartUI {
+		KamataEngine::Sprite* sprite = nullptr;
+		float baseSize = 32.0f; // starting size when remove animation begins
+		float currentSize = 32.0f;
+		float animTimer = 0.0f;
+		bool removing = false;
+		KamataEngine::Vector2 startPos = {0.0f, 0.0f}; // initial on-screen position
+	};
+	std::vector<HeartUI> hearts_;
 	uint32_t heartTextureHandle_ = 0u;
+	// duration for heart removal animation in seconds
+	float heartRemoveDuration_ = 0.25f;
+	// keep last known player HP to detect changes
+	int lastPlayerHP_ = 0;
 
 	
 	float victoryTimer_ = 0.0f;
+	// duration for the victory sequence (seconds)
+	float victoryDuration_ = 2.0f;
 
 	
 	KamataEngine::Sprite* countdownSprite_ = nullptr;

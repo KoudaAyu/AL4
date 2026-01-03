@@ -46,7 +46,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	ImGuiManager* imguiManager = ImGuiManager::GetInstance();
 #endif //  _DEBUG
 #ifdef _DEBUG
-	scene = Scene::kGame;
+	// デバッグビルドではセレクトシーンから開始
+	scene = Scene::kSelect;
 #else
 	scene = Scene::kTitle;
 #endif
@@ -58,6 +59,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	} else if (scene == Scene::kGame) {
 		gameScene = new GameScene();
 		gameScene->Initialize();
+	} else if (scene == Scene::kSelect) {
+		selectScene = new SelectScene();
+		selectScene->Initialize();
 	}
 
 	XINPUT_STATE state;
