@@ -67,11 +67,17 @@ GameScene::~GameScene() {
 		countdownSprite_ = nullptr;
 	}
 
-	// destroy heart sprites
+	
 	for (KamataEngine::Sprite* s : heartSprites_) {
 		if (s) delete s;
 	}
 	heartSprites_.clear();
+
+	
+	if (pauseSprite_) {
+		delete pauseSprite_;
+		pauseSprite_ = nullptr;
+	}
 
 	for (Spike* s : spikes_) {
 		delete s;
@@ -351,6 +357,20 @@ void GameScene::Initialize() {
 	}
 
 
+
+	pauseTextureHandle_ = TextureManager::Load("Sprite/Pause/Pause.png");
+	if (pauseTextureHandle_ != 0u) {
+		pauseSprite_ = KamataEngine::Sprite::Create(
+			pauseTextureHandle_,
+			KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) / 2.0f},
+			KamataEngine::Vector4{1,1,1,1},
+			KamataEngine::Vector2{0.5f, 0.5f}
+		);
+		if (pauseSprite_) {
+			pauseSprite_->SetSize(KamataEngine::Vector2{600.0f, 400.0f});
+		}
+	}
+
 	phase_ = Phase::kCountdown;
 }
 
@@ -360,6 +380,15 @@ void GameScene::Update() {
 	if (Input::GetInstance()->TriggerKey(DIK_R) || KeyInput::GetInstance()->TriggerPadButton(XINPUT_GAMEPAD_B)) {
 		Reset();
 		return;
+	}
+
+	// Tabでポーズ切り替え（プレイ中⇔ポーズのみ）
+	if (Input::GetInstance()->TriggerKey(DIK_TAB)) {
+		if (phase_ == Phase::kPlay) {
+			phase_ = Phase::kPause;
+		} else if (phase_ == Phase::kPause) {
+			phase_ = Phase::kPlay;
+		}
 	}
 
 	switch (phase_) {
@@ -634,6 +663,54 @@ void GameScene::Update() {
 		}
 
 		break;
+	case Phase::kPause:
+#ifdef _DEBUG
+		// デバッグカメラのトグルは許可
+		if (Input::GetInstance()->TriggerKey(DIK_C)) {
+			isDebugCameraActive_ = !isDebugCameraActive_;
+		}
+		AxisIndicator::GetInstance()->SetVisible(true);
+		if (isDebugCameraActive_) {
+			AxisIndicator::GetInstance()->SetTargetCamera(&debugCamera_->GetCamera());
+			debugCamera_->Update();
+			camera_.matView = debugCamera_->GetCamera().matView;
+			camera_.matProjection = debugCamera_->GetCamera().matProjection;
+			camera_.TransferMatrix();
+		} else {
+			cameraController_->Update();
+			camera_.UpdateMatrix();
+		}
+#else
+		cameraController_->Update();
+		camera_.UpdateMatrix();
+#endif
+		// ワールド変換のみ反映（オブジェクトは更新しない）
+		for (auto& row : worldTransformBlocks_) {
+			for (WorldTransform* wt : row) {
+				if (!wt) continue;
+				wt->matWorld_ = MakeAffineMatrix(wt->scale_, wt->rotation_, wt->translation_);
+				if (wt->parent_) wt->matWorld_ = Multiply(wt->parent_->matWorld_, wt->matWorld_);
+				wt->TransferMatrix();
+			}
+		}
+		// UIの位置だけ維持
+		if (hudSprite_) {
+			const float hudMargin = 20.0f;
+			hudSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, hudMargin});
+		}
+		if (uiLeftSprite_) {
+			uiLeftSprite_->SetPosition(KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 50.0f});
+		}
+		if (uiMidSprite_) {
+			uiMidSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) - 50.0f});
+		}
+		if (uiRightSprite_) {
+			uiRightSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) - 50.0f, static_cast<float>(kWindowHeight) - 50.0f});
+		}
+		if (pauseSprite_) {
+			pauseSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) / 2.0f});
+		}
+		break;
 	}
 }
 
@@ -705,7 +782,7 @@ void GameScene::Draw() {
 	Model::PostDraw();
 
 	
-	if (hudSprite_ || uiLeftSprite_ || uiMidSprite_ || uiRightSprite_ || countdownSprite_ || !heartSprites_.empty()) {
+	if (hudSprite_ || uiLeftSprite_ || uiMidSprite_ || uiRightSprite_ || countdownSprite_ || pauseSprite_ || !heartSprites_.empty()) {
 		KamataEngine::DirectXCommon* dx = KamataEngine::DirectXCommon::GetInstance();
 		KamataEngine::Sprite::PreDraw(dx->GetCommandList());
 		if (hudSprite_) hudSprite_->Draw();
@@ -713,6 +790,7 @@ void GameScene::Draw() {
 		if (uiMidSprite_) uiMidSprite_->Draw();
 		if (uiRightSprite_) uiRightSprite_->Draw();
 		if (phase_ == Phase::kCountdown && countdownSprite_) countdownSprite_->Draw();
+		if (phase_ == Phase::kPause && pauseSprite_) pauseSprite_->Draw();
 		
 		for (KamataEngine::Sprite* s : heartSprites_) {
 			if (s) s->Draw();
@@ -1046,6 +1124,21 @@ void GameScene::Reset() {
 		
 		uiRightSprite_ = KamataEngine::Sprite::Create(uiRightTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) - 50.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{1.0f, 1.0f});
 		if (uiRightSprite_) uiRightSprite_->SetSize(KamataEngine::Vector2{330.0f, 30.0f});
+	}
+
+
+	if (pauseSprite_) {
+		delete pauseSprite_;
+		pauseSprite_ = nullptr;
+	}
+	if (pauseTextureHandle_ != 0u) {
+		pauseSprite_ = KamataEngine::Sprite::Create(
+			pauseTextureHandle_,
+			KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) / 2.0f},
+			KamataEngine::Vector4{1,1,1,1},
+			KamataEngine::Vector2{0.5f, 0.5f}
+		);
+		if (pauseSprite_) pauseSprite_->SetSize(KamataEngine::Vector2{300.0f, 100.0f});
 	}
 
 	GenerateBlocks();

@@ -22,6 +22,7 @@ public:
 		kCountdown,
 		kPlay,
 		kDeath,
+		kPause, // 追加: 一時停止
 	};
 
 public:
@@ -115,6 +116,10 @@ private:
 	uint32_t uiMidTextureHandle_ = 0u;
 	KamataEngine::Sprite* uiRightSprite_ = nullptr;
 	uint32_t uiRightTextureHandle_ = 0u;
+
+	// Pause UI
+	KamataEngine::Sprite* pauseSprite_ = nullptr;
+	uint32_t pauseTextureHandle_ = 0u;
 
 	// HP hearts UI
 	std::vector<KamataEngine::Sprite*> heartSprites_;
