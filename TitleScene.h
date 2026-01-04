@@ -54,4 +54,7 @@ private:
 	float targetRotationSpeed_ = 0.5f; // desired rotation speed
 	float rotationLerpSpeed_ = 8.0f; // how fast rotationSpeed_ approaches target (per second)
 
+	// Skydome for background
+	class Skydome* skydome_ = nullptr;
+
 };

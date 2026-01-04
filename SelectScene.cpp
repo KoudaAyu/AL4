@@ -255,7 +255,9 @@ void SelectScene::Update() {
             transitionCameraStart_ = camera_.translation_;
            
             Vector3 s = stagePositions_[chosenStage_];
-            transitionCameraTarget_ = {s.x, s.y, -18.0f};
+            // Prevent camera from moving to the stage position to avoid showing empty rows
+            // Keep the camera at its current translation for the duration of the transition
+            transitionCameraTarget_ = transitionCameraStart_;
           
             inputTimer_ = inputCooldown_;
             return;

@@ -4,6 +4,7 @@
 #include <cassert>
 #include <numbers>
 #include <algorithm>
+#include "Skydome.h"
 
 using namespace KamataEngine;
 
@@ -20,6 +21,10 @@ TitleScene::~TitleScene() {
     if (particleModel_) {
         delete particleModel_;
         particleModel_ = nullptr;
+    }
+    if (skydome_) {
+        delete skydome_;
+        skydome_ = nullptr;
     }
 }
 
@@ -44,6 +49,9 @@ void TitleScene::Initialize() {
 
     // Initialize camera for title scene
     camera_.Initialize();
+    // match GameScene farZ
+    camera_.farZ = 3000.0f;
+    camera_.UpdateProjectionMatrix();
     // Place camera so title model is visible: use default farther distance
     camera_.translation_ = {0.0f, 0.0f, cameraStartZ_};
     camera_.UpdateMatrix();
@@ -65,6 +73,11 @@ void TitleScene::Initialize() {
     rotationSpeed_ = 0.5f;
     targetRotationSpeed_ = 0.5f;
     rotationLerpSpeed_ = 8.0f;
+
+    // create and initialize skydome
+    skydome_ = new Skydome();
+    skydome_->Initialize();
+    skydome_->SetCamera(&camera_);
 
 }
 
@@ -146,11 +159,19 @@ void TitleScene::Update() {
     worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
     worldTransform_.TransferMatrix();
 
+    // update skydome so it follows camera if needed
+    if (skydome_) {
+        skydome_->Update();
+    }
+
 }
 
 void TitleScene::Draw() {
 
     Model::PreDraw();
+    // draw skydome first
+    if (skydome_) skydome_->Draw();
+
     if (model_) {
         model_->Draw(worldTransform_, camera_);
     }
