@@ -13,6 +13,8 @@
 #include <algorithm>
 #include "Enemy/ShooterEnemy.h"
 #include <cmath>
+#include <mmsystem.h>
+#pragma comment(lib, "winmm.lib")
 using namespace KamataEngine;
 
 GameScene::GameScene() : GameScene(0) {}
@@ -1398,6 +1400,9 @@ void GameScene::ChangePhase() {
 
 			deathParticle_ = new DeathParticle();
 			deathParticle_->Initialize(model_, &camera_, deathPos);
+
+			// play player death sound asynchronously
+			PlaySoundW(L"Resources/Audio/SE/Player_Death.wav", NULL, SND_FILENAME | SND_ASYNC | SND_NODEFAULT);
 			
 			readyForGameOver_ = false;
 		}

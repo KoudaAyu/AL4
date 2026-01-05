@@ -5,6 +5,8 @@
 #include "MapChipField.h"
 
 #include <Windows.h>
+#include <mmsystem.h>
+#pragma comment(lib, "winmm.lib")
 #include <Xinput.h>
 #pragma comment(lib, "xinput.lib")
 
@@ -191,6 +193,8 @@ void Player::HandleMovementInput() {
         isDodging_ = true;
         dodgeTimer_ = kDodgeDuration;
         dodgeCooldown_ = kDodgeCooldownTime;
+        // play sliding sound
+        PlaySoundW(L"Resources/Audio/SE/Sliding.wav", NULL, SND_FILENAME | SND_ASYNC | SND_NODEFAULT);
         // force crouch visually during roll
         if (!isCrouching_) {
             isCrouching_ = true;
@@ -491,6 +495,10 @@ void Player::HandleMovementInput() {
 		}
 		// 急速な二段ジャンプ入力で想定外に高くなるのを防ぐため、上向き速度を上限でクランプする
 		velocity_.y = std::min(velocity_.y, kJumpVelocityGround);
+
+		// play jump sound asynchronously
+		PlaySoundW(L"Resources/Audio/SE/Jump.wav", NULL, SND_FILENAME | SND_ASYNC | SND_NODEFAULT);
+
 		jumpCount_++;
 		onGround_ = false;
 
@@ -1259,6 +1267,8 @@ void Player::OnCollision(Enemy* enemy) {
 
 	DebugText::GetInstance()->ConsolePrintf("Player damaged. HP=%d\n", hp_);
 
+	// Play damage sound (async)
+	PlaySoundW(L"Resources/Audio/SE/Damage.wav", NULL, SND_FILENAME | SND_ASYNC | SND_NODEFAULT);
 
 	invincible_ = true;
 	invincibleTimer_ = kInvincibleDuration;
@@ -1312,6 +1322,9 @@ void Player::BehaviorAttackInitialize() {
 
 	// 攻撃開始時点のエフェクトの初期位置更新
 	UpdateAttackEffectTransform();
+
+	// play attack sound asynchronously
+	PlaySoundW(L"Resources/Audio/SE/Attack.wav", NULL, SND_FILENAME | SND_ASYNC | SND_NODEFAULT);
 }
 
 void Player::BehaviorRootUpdate() {}
