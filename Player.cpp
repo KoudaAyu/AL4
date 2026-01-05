@@ -277,6 +277,21 @@ void Player::HandleMovementInput() {
          else
              horizInput = stickX; // stickX は [-1,1] の範囲
 
+        // Update facing direction on ladder when player provides horizontal input
+        if (horizInput > 0.01f) {
+            if (lrDirection_ != LRDirection::kRight) {
+                lrDirection_ = LRDirection::kRight;
+                turnFirstRotationY_ = worldTransform_.rotation_.y;
+                turnTimer_ = kTimeTurn;
+            }
+        } else if (horizInput < -0.01f) {
+            if (lrDirection_ != LRDirection::kLeft) {
+                lrDirection_ = LRDirection::kLeft;
+                turnFirstRotationY_ = worldTransform_.rotation_.y;
+                turnTimer_ = kTimeTurn;
+            }
+        }
+
         // ハシゴ上での目標横速度
         float targetVx = std::clamp(horizInput, -1.0f, 1.0f) * kLadderHorizontalSpeed;
         // 目標へ滑らかに補間（係数が小さいほど穏やか）
