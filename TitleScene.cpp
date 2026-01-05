@@ -62,6 +62,8 @@ void TitleScene::Initialize() {
     worldTransform_.translation_ = {0.0f, 0.0f, 0.0f};
     // Rotate model so it faces the camera (fix model that is pointing upward)
     worldTransform_.rotation_.x = std::numbers::pi_v<float> / 2.0f; // flipped from -pi/2 to +pi/2 to correct upside-down text
+    // Rotate 180 degrees around Y to flip front/back so text faces the camera
+    worldTransform_.rotation_.y = std::numbers::pi_v<float>;
     // Increase scale so model is likely visible
     worldTransform_.scale_ = {5.0f, 5.0f, 5.0f};
 
