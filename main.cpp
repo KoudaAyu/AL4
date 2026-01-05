@@ -6,7 +6,6 @@
 #include "TitleScene.h"
 #include "SelectScene.h"
 #include "GameOverScene.h"
-#include "GameClearScene.h"
 
 using namespace KamataEngine;
 
@@ -14,7 +13,6 @@ TitleScene* titleScene = nullptr;
 SelectScene* selectScene = nullptr;
 GameScene* gameScene = nullptr;
 GameOverScene* gameOverScene = nullptr;
-GameClearScene* gameClearScene = nullptr;
 
 enum class Scene {
 
@@ -23,7 +21,6 @@ enum class Scene {
 	kSelect,
 	kGame,
 	kGameOver,
-	kGameClear,
 };
 
 Scene scene = Scene::kUnknown;
@@ -65,9 +62,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	} else if (scene == Scene::kGameOver) {
 		gameOverScene = new GameOverScene();
 		gameOverScene->Initialize();
-	} else if (scene == Scene::kGameClear) {
-		gameClearScene = new GameClearScene();
-		gameClearScene->Initialize();
 	}
 
 	XINPUT_STATE state;
@@ -108,7 +102,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	delete selectScene;
 	delete gameScene;
 	delete gameOverScene;
-	delete gameClearScene;
 
 	KamataEngine::Finalize();
 
@@ -163,13 +156,16 @@ void ChangeScene() {
 				return;
 			}
 
-			// クリア完了 -> ゲームクリアへ遷移
+			// クリア完了 -> ステージセレクトへ遷移
 			if (gameScene->IsFinished()) {
-				scene = Scene::kGameClear;
+				// go back to stage select instead of game clear scene
 				delete gameScene;
 				gameScene = nullptr;
-				gameClearScene = new GameClearScene();
-				gameClearScene->Initialize();
+				scene = Scene::kSelect;
+				selectScene = new SelectScene();
+				selectScene->Initialize();
+				// prevent leftover confirm input from affecting select scene
+				selectScene->SuppressPlayerNextJump();
 			}
 		}
 		break;
@@ -197,15 +193,6 @@ void ChangeScene() {
 			}
 		}
 		break;
-	case Scene::kGameClear:
-		if (gameClearScene && gameClearScene->IsFinished()) {
-			scene = Scene::kTitle;
-			delete gameClearScene;
-			gameClearScene = nullptr;
-			titleScene = new TitleScene();
-			titleScene->Initialize();
-		}
-		break;
 	}
 }
 
@@ -222,9 +209,6 @@ void UpdateScene() {
 		break;
 	case Scene::kGameOver:
 		if (gameOverScene) gameOverScene->Update();
-		break;
-	case Scene::kGameClear:
-		if (gameClearScene) gameClearScene->Update();
 		break;
 	}
 }
@@ -243,9 +227,6 @@ void DrawScene() {
 		break;
 	case Scene::kGameOver:
 		if (gameOverScene) gameOverScene->Draw();
-		break;
-	case Scene::kGameClear:
-		if (gameClearScene) gameClearScene->Draw();
 		break;
 	}
 }

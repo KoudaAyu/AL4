@@ -61,6 +61,24 @@ void GameOverScene::Update() {
     // Navigation: W/S or Up/Down to change selection
     bool up = Input::GetInstance()->TriggerKey(DIK_W) || Input::GetInstance()->TriggerKey(DIK_UP);
     bool down = Input::GetInstance()->TriggerKey(DIK_S) || Input::GetInstance()->TriggerKey(DIK_DOWN);
+
+    // Gamepad D-pad support
+    if (KeyInput::GetInstance()->TriggerPadButton(XINPUT_GAMEPAD_DPAD_UP)) up = true;
+    if (KeyInput::GetInstance()->TriggerPadButton(XINPUT_GAMEPAD_DPAD_DOWN)) down = true;
+
+    // Left stick rising-edge support (treat as discrete up/down)
+    {
+        static float prevStickY = 0.0f;
+        const float stickThreshold = 0.5f;
+        KamataEngine::Vector2 lstick = KeyInput::GetInstance()->GetLStick();
+        float stickY = lstick.y;
+        bool stickUpTriggered = (stickY > stickThreshold) && (prevStickY <= stickThreshold);
+        bool stickDownTriggered = (stickY < -stickThreshold) && (prevStickY >= -stickThreshold);
+        if (stickUpTriggered) up = true;
+        if (stickDownTriggered) down = true;
+        prevStickY = stickY;
+    }
+
     if (up) { selectedIndex_ = (selectedIndex_ + 2) % 3; } // wrap upward
     if (down) { selectedIndex_ = (selectedIndex_ + 1) % 3; } // wrap downward
 
@@ -93,15 +111,22 @@ void GameOverScene::Update() {
         if (fade_ && fade_->IsFinished()) { phase_ = Phase::kMain; }
         break;
     case Phase::kMain:
-        // Confirm with Space or Gamepad A
-        if (Input::GetInstance()->TriggerKey(DIK_SPACE) || KeyInput::GetInstance()->TriggerPadButton(KeyInput::XINPUT_BUTTON_A)) {
-            // Set result based on selected index
-            if (selectedIndex_ == 0) result_ = Result::kRetryGame;        // MorePlay
-            else if (selectedIndex_ == 1) result_ = Result::kBackSelect;  // BackSelect -> SelectScene
-            else result_ = Result::kBackTitle;                            // BackTitle
+        // Confirm with Space or Gamepad A (rising-edge)
+        {
+            static bool prevPadA = false;
+            bool padA = KeyInput::GetInstance()->PushPadButton(KeyInput::XINPUT_BUTTON_A);
+            bool padATriggered = padA && !prevPadA;
+            prevPadA = padA;
 
-            phase_ = Phase::kFadeOut;
-            if (fade_) fade_->Start(Fade::Status::FadeOut, 1.0f);
+            if (Input::GetInstance()->TriggerKey(DIK_SPACE) || padATriggered) {
+                // Set result based on selected index
+                if (selectedIndex_ == 0) result_ = Result::kRetryGame;        // MorePlay
+                else if (selectedIndex_ == 1) result_ = Result::kBackSelect;  // BackSelect -> SelectScene
+                else result_ = Result::kBackTitle;                            // BackTitle
+
+                phase_ = Phase::kFadeOut;
+                if (fade_) fade_->Start(Fade::Status::FadeOut, 1.0f);
+            }
         }
         break;
     case Phase::kFadeOut:
