@@ -18,6 +18,11 @@ ShooterEnemy::~ShooterEnemy() {
     }
     bullets_.clear();
 
+    if (ownsBulletModel_ && bulletModel_) {
+        delete bulletModel_;
+        bulletModel_ = nullptr;
+    }
+
     if (ownsModel_ && model_) {
         delete model_;
         model_ = nullptr;
@@ -64,16 +69,25 @@ void ShooterEnemy::Initialize(KamataEngine::Camera* camera, const KamataEngine::
 
     UpdateAABB();
 
+    // try to load a shared bullet model for shooter bullets
+    bulletModel_ = Model::CreateFromOBJ("EnemyBullet", true);
+    ownsBulletModel_ = (bulletModel_ != nullptr);
+
     // allocate bullet pool
     for (int i = 0; i < 8; ++i) {
         Bullet* b = new Bullet();
         b->alive = false;
-        // use shared model if possible
-        if (model_) {
+        // prefer shared bullet model if available
+        if (bulletModel_) {
+            b->model = bulletModel_;
+            b->ownsModel = false;
+        } else if (model_) {
+            // fallback to using owner model if available
             b->model = model_;
             b->ownsModel = false;
         } else {
-            b->model = KamataEngine::Model::CreateFromOBJ("Enemy", true);
+            // last resort: create per-bullet model
+            b->model = KamataEngine::Model::CreateFromOBJ("EnemyBullet", true);
             b->ownsModel = (b->model != nullptr);
         }
         bullets_.push_back(b);

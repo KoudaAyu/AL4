@@ -67,4 +67,8 @@ private:
     KamataEngine::Model* shooterModel_ = nullptr;
     bool ownsShooterModel_ = false;
     KamataEngine::WorldTransform shooterWorldTransform_;
+
+    // shared model for bullets (prefer using EnemyBullet for shooter bullets)
+    KamataEngine::Model* bulletModel_ = nullptr;
+    bool ownsBulletModel_ = false;
 };
