@@ -124,10 +124,19 @@ private:
 	
 	KamataEngine::Sprite* uiLeftSprite_ = nullptr;
 	uint32_t uiLeftTextureHandle_ = 0u;
+	// Added: separate texture handles for left UI (gamepad RT and keyboard E)
+	uint32_t uiLeftGamepadTextureHandle_ = 0u;
+	uint32_t uiLeftKeyboardTextureHandle_ = 0u;
 	KamataEngine::Sprite* uiMidSprite_ = nullptr;
 	uint32_t uiMidTextureHandle_ = 0u;
 	KamataEngine::Sprite* uiRightSprite_ = nullptr;
-	uint32_t uiRightTextureHandle_ = 0u;
+	// Removed duplicate uiRightTextureHandle_. Use separate handles below.
+	// Added: separate texture handles for gamepad and keyboard variants of right UI
+	uint32_t uiRightGamepadTextureHandle_ = 0u;
+	uint32_t uiRightKeyboardTextureHandle_ = 0u;
+	// Added: separate texture handles for gamepad/keyboard variants of mid UI
+	uint32_t uiMidGamepadTextureHandle_ = 0u;
+	uint32_t uiMidKeyboardTextureHandle_ = 0u;
 
 	// Pause UI
 	KamataEngine::Sprite* pauseSprite_ = nullptr;
@@ -143,6 +152,9 @@ private:
 
 	// Request to resume next frame (prevents immediate input passing to player)
 	bool resumeRequested_ = false;
+
+	// Remember last input device: true if last input was gamepad, false for keyboard
+	bool lastInputWasPad_ = false;
 
 	// HP hearts UI
 	struct HeartUI {
