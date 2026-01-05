@@ -66,6 +66,9 @@ public:
 	void SuppressPlayerNextJump();
 
 private:
+	// Performs the actual immediate reset (called after fade-out completes)
+	void PerformResetNow();
+
 	bool finished_ = false;
 	int startingStage_ = 0; // index of stage to load (set by SelectScene)
 
@@ -171,4 +174,9 @@ private:
 	
 	class Fade* fade_ = nullptr;
 	float introFadeDuration_ = 1.0f; 
+
+	// Deferred reset state: when true a fade-out is in progress and the actual reset will be
+	// performed once the fade finishes.
+	bool resetPending_ = false;
+	float resetFadeDuration_ = 0.6f; // seconds
 };

@@ -234,10 +234,10 @@ void GameScene::Initialize() {
 					goalSpawned = true;
 				} else if (t == MapChipType::kLadder) {
 					Ladder* l = new Ladder();
-				 Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
-					l->SetPosition(pos);
-					l->Initialize();
-					ladders_.push_back(l);
+				 	Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
+				 	l->SetPosition(pos);
+				 	l->Initialize();
+				 	ladders_.push_back(l);
 				}
 			}
 			// Do not break here; continue scanning to spawn all spikes and enemies
@@ -318,9 +318,7 @@ void GameScene::Initialize() {
 	if (uiLeftTextureHandle_ != 0u) {
 		
 		uiLeftSprite_ = KamataEngine::Sprite::Create(uiLeftTextureHandle_, KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
-		if (uiLeftSprite_) {
-		 uiLeftSprite_->SetSize(KamataEngine::Vector2{150.0f, 30.0f});
-		}
+		if (uiLeftSprite_) uiLeftSprite_->SetSize(KamataEngine::Vector2{150.0f, 30.0f});
 	}
 	
 	uiMidTextureHandle_ = TextureManager::Load("Debug/Reset.png");
@@ -407,6 +405,16 @@ void GameScene::Initialize() {
 }
 
 void GameScene::Update() {
+
+	// If a reset is already pending, ignore additional reset requests
+	if (resetPending_) {
+		if (fade_) fade_->Update();
+		if (fade_ && fade_->IsFinished()) {
+			// Proceed with the reset
+			PerformResetNow();
+		}
+		return;
+	}
 
 	// リセットキーでシーンをリセット
 	if (Input::GetInstance()->TriggerKey(DIK_R) || KeyInput::GetInstance()->TriggerPadButton(XINPUT_GAMEPAD_B)) {
@@ -733,7 +741,7 @@ void GameScene::Update() {
 
 		// トグル
 		if (Input::GetInstance()->TriggerKey(DIK_C)) {
-		 isDebugCameraActive_ = !isDebugCameraActive_;
+	 	isDebugCameraActive_ = !isDebugCameraActive_;
 		}
 		AxisIndicator::GetInstance()->SetVisible(true);
 		if (isDebugCameraActive_) {
@@ -840,7 +848,7 @@ void GameScene::Update() {
 #ifdef _DEBUG
 		// デバッグカメラのトグルは許可
 		if (Input::GetInstance()->TriggerKey(DIK_C)) {
-		 isDebugCameraActive_ = !isDebugCameraActive_;
+	 	isDebugCameraActive_ = !isDebugCameraActive_;
 		}
 		AxisIndicator::GetInstance()->SetVisible(true);
 		if (isDebugCameraActive_) {
@@ -898,6 +906,19 @@ void GameScene::Update() {
 		if (KeyInput::GetInstance()->TriggerPadButton(XINPUT_GAMEPAD_DPAD_UP)) moveUp = true;
 		if (KeyInput::GetInstance()->TriggerPadButton(XINPUT_GAMEPAD_DPAD_DOWN)) moveDown = true;
 
+		// left stick: detect rising edge beyond threshold to act as trigger
+		{
+			static float prevStickY = 0.0f;
+			const float stickThreshold = 0.5f;
+			KamataEngine::Vector2 lstick = KeyInput::GetInstance()->GetLStick();
+			float stickY = lstick.y;
+			bool stickUpTriggered = (stickY > stickThreshold) && (prevStickY <= stickThreshold);
+			bool stickDownTriggered = (stickY < -stickThreshold) && (prevStickY >= -stickThreshold);
+			if (stickUpTriggered) moveUp = true;
+			if (stickDownTriggered) moveDown = true;
+			prevStickY = stickY;
+		}
+
 		if (moveUp) {
 			pauseMenuSelectedIndex_ = (pauseMenuSelectedIndex_ - 1 + 3) % 3;
 		}
@@ -916,21 +937,27 @@ void GameScene::Update() {
 		}
 
 		// accept: Space or gamepad A
-		bool accept = Input::GetInstance()->TriggerKey(DIK_SPACE) || KeyInput::GetInstance()->TriggerPadButton(KeyInput::XINPUT_BUTTON_A);
-		if (accept) {
-			switch (pauseMenuSelectedIndex_) {
-			case 0: // Back to game (resume)
-				phase_ = Phase::kPlay;
-				// prevent the immediate next frame from treating SPACE/A as jump
-				if (player_) player_->SuppressNextJump();
-				break;
-			case 1: // Reset
-				Reset();
-				break;
-			case 2: // Back to select scene
-				// request main to switch back to select
-				backToSelectRequested_ = true;
-				break;
+		{
+			static bool prevPadA = false;
+			bool padA = KeyInput::GetInstance()->PushPadButton(KeyInput::XINPUT_BUTTON_A);
+			bool padATriggered = padA && !prevPadA; // rising edge
+			prevPadA = padA;
+			bool accept = Input::GetInstance()->TriggerKey(DIK_SPACE) || padATriggered;
+			if (accept) {
+				switch (pauseMenuSelectedIndex_) {
+				case 0: // Back to game (resume)
+					phase_ = Phase::kPlay;
+					// prevent the immediate next frame from treating SPACE/A as jump
+					if (player_) player_->SuppressNextJump();
+					break;
+				case 1: // Reset
+					Reset();
+					break;
+				case 2: // Back to select scene
+					// request main to switch back to select
+					backToSelectRequested_ = true;
+					break;
+				}
 			}
 		}
 
@@ -1256,6 +1283,20 @@ void GameScene::ChangePhase() {
 // リセット処理
 void GameScene::Reset() {
 	
+	// If a reset is already pending, ignore additional reset requests
+	if (resetPending_) return;
+
+	// Start a fade-out, defer the actual reset until fade finished
+	if (!fade_) {
+		fade_ = new Fade();
+		fade_->Initialize();
+	}
+	fade_->Start(Fade::Status::FadeOut, resetFadeDuration_);
+	resetPending_ = true;
+}
+
+void GameScene::PerformResetNow() {
+	// fully clean and re-create player and UI etc. - reuse much of Initialize's reset logic but avoid full re-init of entire scene
 	if (player_) {
 		delete player_;
 		player_ = nullptr;
@@ -1313,7 +1354,7 @@ void GameScene::Reset() {
 		deathParticle_ = nullptr;
 	}
 
-	
+
 	if (hudSprite_) {
 		delete hudSprite_;
 		hudSprite_ = nullptr;
@@ -1329,7 +1370,7 @@ void GameScene::Reset() {
 		}
 	}
 
-	
+
 	if (uiLeftSprite_) {
 		delete uiLeftSprite_;
 		uiLeftSprite_ = nullptr;
@@ -1413,8 +1454,14 @@ void GameScene::Reset() {
 	countdownTime_ = countdownStart_;
 
 	victoryTimer_ = 0.0f;
+
+	// reset pending flag finished, start fade-in to return visually
+	resetPending_ = false;
+	if (fade_) {
+		fade_->Start(Fade::Status::FadeIn, introFadeDuration_);
+	}
 }
 
 void GameScene::SuppressPlayerNextJump() {
-	if (player_) player_->SuppressNextJump();
+    if (player_) player_->SuppressNextJump();
 }
