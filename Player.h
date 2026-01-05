@@ -371,7 +371,7 @@ private:
 	static inline const float kInvincibleDuration = 1.0f;
 
 	// 攻撃エフェクトの拡大率
-	static inline const float kAttackEffectScale = 6.0f;
+	static inline const float kAttackEffectScale = 3.0f;
 	// 攻撃エフェクトのZバイアス（カメラに少し近づけて奥の敵と重なった時の非表示を回避）
 	static inline const float kAttackEffectZBias = -0.15f;
 

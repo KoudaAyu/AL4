@@ -12,9 +12,11 @@ FrontShieldEnemy::~FrontShieldEnemy() {
 }
 
 void FrontShieldEnemy::Initialize(KamataEngine::Camera* camera, const KamataEngine::Vector3& pos) {
-    // Create OBJ model similarly to Player
-   
-  
+    // default: maintain previous behavior (left-facing)
+    Initialize(camera, pos, true);
+}
+
+void FrontShieldEnemy::Initialize(KamataEngine::Camera* camera, const KamataEngine::Vector3& pos, bool faceLeft) {
     // Create body OBJ model similarly to Player/Enemy
     model_ = Model::CreateFromOBJ("FrontShieldEnemy", true);
     ownsModel_ = true;
@@ -36,10 +38,14 @@ void FrontShieldEnemy::Initialize(KamataEngine::Camera* camera, const KamataEngi
     // ワールド変換の初期化
     worldTransform_.Initialize();
     worldTransform_.translation_ = pos;
-    // 左向きにする
-    worldTransform_.rotation_.y = std::numbers::pi_v<float> / 2.0f;
-    // Use same facing convention as other enemies: right -> pi/2, left -> 3*pi/2
-    worldTransform_.rotation_.y = static_cast<float>(std::numbers::pi / 2.0);
+
+    // decide rotation based on facing: project uses -pi/2 for right-facing baseline
+    if (faceLeft) {
+        // left-facing: add pi to flip
+        worldTransform_.rotation_.y = -std::numbers::pi_v<float> / 2.0f + std::numbers::pi_v<float>;
+    } else {
+        worldTransform_.rotation_.y = -std::numbers::pi_v<float> / 2.0f;
+    }
 
     // set logical facing to match visual rotation
     lrDirection_ = (std::sin(worldTransform_.rotation_.y) > 0.0f) ? LRDirection::kRight : LRDirection::kLeft;

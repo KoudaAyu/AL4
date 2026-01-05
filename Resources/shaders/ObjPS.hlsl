@@ -10,6 +10,11 @@ float4 main(VSOutput input) : SV_TARGET {
 	// テクスチャマッピング
 	float4 texcolor = tex.Sample(smp, uv);
 
+	// Alpha cutout: discard pixels with very low alpha to avoid semi-transparent fringe artifacts
+	// Adjust threshold if needed (0.0 - 1.0)
+	static const float kAlphaCutThreshold = 0.1f;
+	clip(texcolor.a - kAlphaCutThreshold);
+
 	// 光沢度
 	const float shininess = 4.0f;
 	// 頂点から視点への方向ベクトル

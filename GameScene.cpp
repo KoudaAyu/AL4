@@ -110,7 +110,7 @@ GameScene::~GameScene() {
 	keys_.clear();
 
 	// delete ladders
-	for (Ladder* l : ladders_) {
+for (Ladder* l : ladders_) {
 		delete l;
 	}
 	ladders_.clear();
@@ -208,12 +208,23 @@ void GameScene::Initialize() {
 					Enemy* enemy = new Enemy();
 					
 					enemy->Initialize(&camera_, enemyPosition);
+					// provide map reference for patrol behavior
+					enemy->SetMapChipField(mapChipField_);
 					enemies_.push_back(enemy);
 				} else if (t == MapChipType::kEnemySpawnShield) {
 					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
 					FrontShieldEnemy* fse = new FrontShieldEnemy();
 					fse->Initialize(&camera_, enemyPosition);
 					fse->SetFrontDotThreshold(0.6f);
+					// enable patrol map awareness
+					fse->SetMapChipField(mapChipField_);
+					enemies_.push_back(fse);
+				} else if (t == MapChipType::kEnemySpawnShieldRight) {
+					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					FrontShieldEnemy* fse = new FrontShieldEnemy();
+					fse->Initialize(&camera_, enemyPosition, false); // face right
+					fse->SetFrontDotThreshold(0.6f);
+					fse->SetMapChipField(mapChipField_);
 					enemies_.push_back(fse);
 				} else if (t == MapChipType::kShooter) {
 					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
@@ -221,6 +232,16 @@ void GameScene::Initialize() {
 					se->Initialize(&camera_, enemyPosition);
 					se->SetBulletSpeed(0.2f);
 					se->SetFireInterval(2.0f);
+					se->SetMapChipField(mapChipField_);
+					enemies_.push_back(se);
+				} else if (t == MapChipType::kShooterRight) {
+					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					ShooterEnemy* se = new ShooterEnemy();
+					se->Initialize(&camera_, enemyPosition);
+					se->SetFacingRight(true); // face right
+					se->SetBulletSpeed(0.2f);
+					se->SetFireInterval(2.0f);
+					se->SetMapChipField(mapChipField_);
 					enemies_.push_back(se);
 				} else if (t == MapChipType::kSpike) {
 					Spike* s = new Spike();
@@ -241,6 +262,11 @@ void GameScene::Initialize() {
 				 	l->SetPosition(pos);
 				 	l->Initialize();
 				 	ladders_.push_back(l);
+				} else if (t == MapChipType::kEnemySpawnLeft) {
+					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					Enemy* enemy = new Enemy();
+					enemy->Initialize(&camera_, enemyPosition, true); // face left
+					enemies_.push_back(enemy);
 				}
 			}
 			// Do not break here; continue scanning to spawn all spikes and enemies
@@ -477,7 +503,7 @@ void GameScene::Update() {
                 // initialize pause menu selection when entering pause
                 pauseMenuSelectedIndex_ = 0;
                 // ensure menu tint updated immediately
-                for (int i = 0; i < 3; ++i) {
+                for (int i = 0; i < 3; i++) {
                     if (pauseMenuSprites_[i]) {
                         if (i == pauseMenuSelectedIndex_)
                             pauseMenuSprites_[i]->SetColor(KamataEngine::Vector4{1,0,0,1});
@@ -1672,17 +1698,34 @@ void GameScene::PerformResetNow() {
 				if (t == MapChipType::kEnemySpawn) {
 					Enemy* enemy = new Enemy();
 					enemy->Initialize(&camera_, pos);
+					enemy->SetMapChipField(mapChipField_);
 					enemies_.push_back(enemy);
 				} else if (t == MapChipType::kEnemySpawnShield) {
 					FrontShieldEnemy* fse = new FrontShieldEnemy();
 					fse->Initialize(&camera_, pos);
 					fse->SetFrontDotThreshold(0.6f);
+					fse->SetMapChipField(mapChipField_);
+					enemies_.push_back(fse);
+				} else if (t == MapChipType::kEnemySpawnShieldRight) {
+					FrontShieldEnemy* fse = new FrontShieldEnemy();
+					fse->Initialize(&camera_, pos, false); // face right
+					fse->SetFrontDotThreshold(0.6f);
+					fse->SetMapChipField(mapChipField_);
 					enemies_.push_back(fse);
 				} else if (t == MapChipType::kShooter) {
 					ShooterEnemy* se = new ShooterEnemy();
 					se->Initialize(&camera_, pos);
 					se->SetBulletSpeed(0.2f);
 					se->SetFireInterval(2.0f);
+					se->SetMapChipField(mapChipField_);
+					enemies_.push_back(se);
+				} else if (t == MapChipType::kShooterRight) {
+					ShooterEnemy* se = new ShooterEnemy();
+					se->Initialize(&camera_, pos);
+					se->SetFacingRight(true); // face right
+					se->SetBulletSpeed(0.2f);
+					se->SetFireInterval(2.0f);
+					se->SetMapChipField(mapChipField_);
 					enemies_.push_back(se);
 				} else if (t == MapChipType::kSpike) {
 					Spike* s = new Spike();
@@ -1705,6 +1748,10 @@ void GameScene::PerformResetNow() {
 					k->SetPosition(pos);
 					k->Initialize();
 					keys_.push_back(k);
+				} else if (t == MapChipType::kEnemySpawnLeft) {
+					Enemy* enemy = new Enemy();
+					enemy->Initialize(&camera_, pos, true); // face left
+					enemies_.push_back(enemy);
 				}
 			}
 		}

@@ -7,7 +7,7 @@ enum class MapChipType {
 	kBlank = 0, // 0
 	kBlock = 1, // 1
 	kReserved2 = 2, // 2: reserved / kept open
-	kEnemySpawn = 3,       // 3: 敵 スポーン場所
+	kEnemySpawn = 3,       // 3: 敵 スポーン場所 (右向き)
 	kEnemySpawnShield = 4, // 4: シールド持ち敵 スポーン場所
 	kSpike = 5, //5: 棘
 	kGoal = 6,  //6: ゴール
@@ -16,6 +16,9 @@ enum class MapChipType {
 	kLadder = 9, //9: はしご（追加）
 	kStage = 10, //10: ステージノード（SelectScene でステージ選択用）
 	kShooter = 11, //11: 弾を発射する敵（Spikeのようにマップに置く）
+	kEnemySpawnLeft = 12, //12: 敵 スポーン場所 (左向き)
+	kEnemySpawnShieldRight = 13, //13: シールド持ち敵 スポーン場所 (右向き)
+	kShooterRight = 14, //14: 右向きの Shooter 敵 スポーン場所
 };
 
 struct MapChipData {

@@ -26,7 +26,9 @@ public:
 	
 	void SetFrontDotThreshold(float t) { frontDotThreshold_ = t; }
 
+	// preserve existing Initialize (left-facing) and add overload to specify facing
 	void Initialize(KamataEngine::Camera* camera, const KamataEngine::Vector3& pos);
+	void Initialize(KamataEngine::Camera* camera, const KamataEngine::Vector3& pos, bool faceLeft);
 
 private:
 
