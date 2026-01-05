@@ -226,6 +226,10 @@ void SelectScene::Update() {
 
     
     if (player_ && !transitioning_) {
+        // If the confirm input was pressed this frame (space or gamepad A), suppress the player's next jump
+        if (padA || spaceTrig) {
+            player_->SuppressNextJump();
+        }
         player_->Update();
     }
 
@@ -339,4 +343,8 @@ void SelectScene::Draw() {
 
     
     if (fade_) fade_->Draw();
+}
+
+void SelectScene::SuppressPlayerNextJump() {
+    if (player_) player_->SuppressNextJump();
 }

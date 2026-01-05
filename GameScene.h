@@ -50,6 +50,9 @@ public:
 	// リセット
 	void Reset();
 
+	// Request flag accessor for returning to SelectScene from pause menu
+	bool IsBackToSelectRequested() const { return backToSelectRequested_; }
+
 public:
 	int32_t GetWindowWidth() const { return kWindowWidth; }
 	int32_t GetWindowHeight() const { return kWindowHeight; }
@@ -58,6 +61,9 @@ public:
 
 	// Returns true when the player has entered the death sequence and the death animation finished
 	bool IsPlayerDead() const { return readyForGameOver_; }
+
+	// Request the player to ignore jump input on the next update (prevents carry-over jump after scene changes)
+	void SuppressPlayerNextJump();
 
 private:
 	bool finished_ = false;
@@ -123,6 +129,17 @@ private:
 	// Pause UI
 	KamataEngine::Sprite* pauseSprite_ = nullptr;
 	uint32_t pauseTextureHandle_ = 0u;
+
+	// New: pause menu sprites (three items shown top-down)
+	KamataEngine::Sprite* pauseMenuSprites_[3] = { nullptr, nullptr, nullptr };
+	uint32_t pauseMenuTextureHandles_[3] = { 0u, 0u, 0u };
+	int pauseMenuSelectedIndex_ = 0;
+
+	// Request to go back to SelectScene
+	bool backToSelectRequested_ = false;
+
+	// Request to resume next frame (prevents immediate input passing to player)
+	bool resumeRequested_ = false;
 
 	// HP hearts UI
 	struct HeartUI {

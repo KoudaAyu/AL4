@@ -83,6 +83,14 @@ GameScene::~GameScene() {
 		pauseSprite_ = nullptr;
 	}
 
+	// delete pause menu sprites
+	for (int i = 0; i < 3; ++i) {
+		if (pauseMenuSprites_[i]) {
+			delete pauseMenuSprites_[i];
+			pauseMenuSprites_[i] = nullptr;
+		}
+	}
+
 	for (Spike* s : spikes_) {
 		delete s;
 	}
@@ -356,7 +364,7 @@ void GameScene::Initialize() {
 
 
 
-	pauseTextureHandle_ = TextureManager::Load("Sprite/Pause/Pause.png");
+	// pauseTextureHandle_ = TextureManager::Load("Sprite/Pause/Pause.png");
 	if (pauseTextureHandle_ != 0u) {
 		pauseSprite_ = KamataEngine::Sprite::Create(
 			pauseTextureHandle_,
@@ -366,6 +374,27 @@ void GameScene::Initialize() {
 		);
 		if (pauseSprite_) {
 			pauseSprite_->SetSize(KamataEngine::Vector2{600.0f, 400.0f});
+		}
+	}
+
+	// Load pause menu item textures and create sprites (stacked top-down)
+	pauseMenuTextureHandles_[0] = TextureManager::Load("Sprite/Pause/BackGame.png");
+	pauseMenuTextureHandles_[1] = TextureManager::Load("Sprite/Pause/Reset.png");
+	pauseMenuTextureHandles_[2] = TextureManager::Load("Sprite/Pause/BackSelect.png");
+
+	const float menuWidth = 400.0f;
+	const float menuHeight = 80.0f;
+	const float topStart = 100.0f; // distance from top of window
+	const float spacing = 20.0f;
+	for (int i = 0; i < 3; ++i) {
+		if (pauseMenuTextureHandles_[i] != 0u) {
+			pauseMenuSprites_[i] = KamataEngine::Sprite::Create(
+				pauseMenuTextureHandles_[i],
+				KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, topStart + i * (menuHeight + spacing)},
+				KamataEngine::Vector4{1,1,1,1},
+				KamataEngine::Vector2{0.5f, 0.0f} // top-centered pivot
+			);
+			if (pauseMenuSprites_[i]) pauseMenuSprites_[i]->SetSize(KamataEngine::Vector2{menuWidth, menuHeight});
 		}
 	}
 
@@ -396,6 +425,17 @@ void GameScene::Update() {
 		if (Input::GetInstance()->TriggerKey(DIK_TAB) || padPauseTriggered) {
 			if (phase_ == Phase::kPlay) {
 				phase_ = Phase::kPause;
+				// initialize pause menu selection when entering pause
+				pauseMenuSelectedIndex_ = 0;
+				// ensure menu tint updated immediately
+				for (int i = 0; i < 3; ++i) {
+					if (pauseMenuSprites_[i]) {
+						if (i == pauseMenuSelectedIndex_)
+							pauseMenuSprites_[i]->SetColor(KamataEngine::Vector4{1.0f, 0.4f, 0.4f, 1.0f});
+						else
+							pauseMenuSprites_[i]->SetColor(KamataEngine::Vector4{1,1,1,1});
+					}
+				}
 			} else if (phase_ == Phase::kPause) {
 				phase_ = Phase::kPlay;
 			}
@@ -843,6 +883,57 @@ void GameScene::Update() {
 		if (pauseSprite_) {
 			pauseSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) / 2.0f});
 		}
+		// keep pause menu item positions in case window size changes
+		for (int i = 0; i < 3; ++i) {
+			if (pauseMenuSprites_[i]) {
+				float y = 100.0f + i * (80.0f + 20.0f);
+				pauseMenuSprites_[i]->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, y});
+			}
+		}
+
+		// navigation: W/S or Up/Down or gamepad D-pad up/down
+		bool moveUp = Input::GetInstance()->TriggerKey(DIK_W) || Input::GetInstance()->TriggerKey(DIK_UP);
+		bool moveDown = Input::GetInstance()->TriggerKey(DIK_S) || Input::GetInstance()->TriggerKey(DIK_DOWN);
+		// gamepad dpad handled via KeyInput
+		if (KeyInput::GetInstance()->TriggerPadButton(XINPUT_GAMEPAD_DPAD_UP)) moveUp = true;
+		if (KeyInput::GetInstance()->TriggerPadButton(XINPUT_GAMEPAD_DPAD_DOWN)) moveDown = true;
+
+		if (moveUp) {
+			pauseMenuSelectedIndex_ = (pauseMenuSelectedIndex_ - 1 + 3) % 3;
+		}
+		if (moveDown) {
+			pauseMenuSelectedIndex_ = (pauseMenuSelectedIndex_ + 1) % 3;
+		}
+
+		// update tinting: selected red, others white
+		for (int i = 0; i < 3; ++i) {
+			if (pauseMenuSprites_[i]) {
+				if (i == pauseMenuSelectedIndex_)
+					pauseMenuSprites_[i]->SetColor(KamataEngine::Vector4{1.0f, 0.4f, 0.4f, 1.0f});
+				else
+					pauseMenuSprites_[i]->SetColor(KamataEngine::Vector4{1,1,1,1});
+			}
+		}
+
+		// accept: Space or gamepad A
+		bool accept = Input::GetInstance()->TriggerKey(DIK_SPACE) || KeyInput::GetInstance()->TriggerPadButton(KeyInput::XINPUT_BUTTON_A);
+		if (accept) {
+			switch (pauseMenuSelectedIndex_) {
+			case 0: // Back to game (resume)
+				phase_ = Phase::kPlay;
+				// prevent the immediate next frame from treating SPACE/A as jump
+				if (player_) player_->SuppressNextJump();
+				break;
+			case 1: // Reset
+				Reset();
+				break;
+			case 2: // Back to select scene
+				// request main to switch back to select
+				backToSelectRequested_ = true;
+				break;
+			}
+		}
+
 		break;
 	}
 }
@@ -910,7 +1001,7 @@ void GameScene::Draw() {
 
     Model::PostDraw();
 
-    if (hudSprite_ || uiLeftSprite_ || uiMidSprite_ || uiRightSprite_ || countdownSprite_ || pauseSprite_ || !hearts_.empty()) {
+    if (hudSprite_ || uiLeftSprite_ || uiMidSprite_ || uiRightSprite_ || countdownSprite_ || pauseSprite_ || pauseMenuSprites_[0] || pauseMenuSprites_[1] || pauseMenuSprites_[2] || !hearts_.empty()) {
         KamataEngine::DirectXCommon* dx = KamataEngine::DirectXCommon::GetInstance();
         KamataEngine::Sprite::PreDraw(dx->GetCommandList());
         if (hudSprite_) hudSprite_->Draw();
@@ -919,6 +1010,14 @@ void GameScene::Draw() {
         if (uiRightSprite_) uiRightSprite_->Draw();
         if (phase_ == Phase::kCountdown && countdownSprite_) countdownSprite_->Draw();
         if (phase_ == Phase::kPause && pauseSprite_) pauseSprite_->Draw();
+
+        // draw pause menu items when paused (stacked top-down)
+        if (phase_ == Phase::kPause) {
+            for (int i = 0; i < 3; ++i) {
+                if (pauseMenuSprites_[i]) pauseMenuSprites_[i]->Draw();
+            }
+        }
+
         for (auto& h : hearts_) {
             if (h.sprite) h.sprite->Draw();
         }
@@ -1264,6 +1363,7 @@ void GameScene::Reset() {
 		delete pauseSprite_;
 		pauseSprite_ = nullptr;
 	}
+	// pauseTextureHandle_ = TextureManager::Load("Sprite/Pause/Pause.png");
 	if (pauseTextureHandle_ != 0u) {
 		pauseSprite_ = KamataEngine::Sprite::Create(
 			pauseTextureHandle_,
@@ -1272,6 +1372,27 @@ void GameScene::Reset() {
 			KamataEngine::Vector2{0.5f, 0.5f}
 		);
 		if (pauseSprite_) pauseSprite_->SetSize(KamataEngine::Vector2{300.0f, 100.0f});
+	}
+
+	// Load pause menu item textures and create sprites (stacked top-down)
+	pauseMenuTextureHandles_[0] = TextureManager::Load("Sprite/Pause/BackGame.png");
+	pauseMenuTextureHandles_[1] = TextureManager::Load("Sprite/Pause/Reset.png");
+	pauseMenuTextureHandles_[2] = TextureManager::Load("Sprite/Pause/BackSelect.png");
+
+	const float menuWidth = 400.0f;
+	const float menuHeight = 80.0f;
+	const float topStart = 100.0f; // distance from top of window
+	const float spacing = 20.0f;
+	for (int i = 0; i < 3; ++i) {
+		if (pauseMenuTextureHandles_[i] != 0u) {
+			pauseMenuSprites_[i] = KamataEngine::Sprite::Create(
+				pauseMenuTextureHandles_[i],
+				KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, topStart + i * (menuHeight + spacing)},
+				KamataEngine::Vector4{1,1,1,1},
+				KamataEngine::Vector2{0.5f, 0.0f} // top-centered pivot
+			);
+			if (pauseMenuSprites_[i]) pauseMenuSprites_[i]->SetSize(KamataEngine::Vector2{menuWidth, menuHeight});
+		}
 	}
 
 	GenerateBlocks();
@@ -1292,4 +1413,8 @@ void GameScene::Reset() {
 	countdownTime_ = countdownStart_;
 
 	victoryTimer_ = 0.0f;
+}
+
+void GameScene::SuppressPlayerNextJump() {
+	if (player_) player_->SuppressNextJump();
 }

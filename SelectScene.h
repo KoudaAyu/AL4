@@ -19,6 +19,9 @@ public:
     // IsFinished() が true の後に選択されたステージインデックスを返す（未選択時は -1）
     int GetChosenStageIndex() const { return chosenStage_; }
 
+    // Prevent the internal player from recognizing a jump on the next update (used after scene switches)
+    void SuppressPlayerNextJump();
+
 private:
     bool finished_ = false;
 

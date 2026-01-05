@@ -179,6 +179,9 @@ public:
 	// Query invincibility state
 	bool IsInvincible() const { return invincible_; }
 
+	// Prevent jump input being recognized on the next update (useful when resuming from pause)
+	void SuppressNextJump();
+
 private:
 	// ワールド変換データ
 	WorldTransform worldTransform_;

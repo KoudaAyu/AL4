@@ -141,6 +141,18 @@ void ChangeScene() {
 		break;
 	case Scene::kGame:
 		if (gameScene) {
+			// check request to go back to select from pause menu
+			if (gameScene->IsBackToSelectRequested()) {
+				// switch to select scene
+				delete gameScene;
+				gameScene = nullptr;
+				scene = Scene::kSelect;
+				selectScene = new SelectScene();
+				selectScene->Initialize();
+				// prevent leftover confirm input (space/A) from making the select-scene player jump
+				selectScene->SuppressPlayerNextJump();
+				return;
+			}
 			// プレイヤーが死亡したらゲームオーバーへ遷移
 			if (gameScene->IsPlayerDead()) {
 				scene = Scene::kGameOver;

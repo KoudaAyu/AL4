@@ -1374,3 +1374,9 @@ void Player::ApplyInvincibility(float duration) {
     invincible_ = true;
     invincibleTimer_ = duration;
 }
+
+void Player::SuppressNextJump() {
+	// mark previous jump keys/buttons as pressed so next frame rising edge isn't detected
+	prevJumpKeyPressed_ = true;
+	prevAButtonPressed_ = true;
+}
