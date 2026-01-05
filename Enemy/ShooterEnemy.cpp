@@ -3,6 +3,7 @@
 #include "../MathUtl.h"
 #include "../MapChipField.h"
 #include <cmath>
+#include <numbers>
 
 using namespace KamataEngine;
 
@@ -33,15 +34,34 @@ void ShooterEnemy::Initialize(KamataEngine::Camera* camera, const KamataEngine::
     worldTransform_.rotation_ = {0, 0, 0};
     worldTransform_.scale_ = {0.9f, 0.9f, 0.9f};
 
+    // ensure model faces according to current facing flag
+    SetFacingRight(faceRight_);
+
     UpdateAABB();
 
     // allocate bullet pool
     for (int i = 0; i < 8; ++i) {
         Bullet* b = new Bullet();
         b->alive = false;
-        b->model = KamataEngine::Model::CreateFromOBJ("Enemy", true);
-        b->ownsModel = (b->model != nullptr);
+        // use shared model if possible
+        if (model_) {
+            b->model = model_;
+            b->ownsModel = false;
+        } else {
+            b->model = KamataEngine::Model::CreateFromOBJ("Enemy", true);
+            b->ownsModel = (b->model != nullptr);
+        }
         bullets_.push_back(b);
+    }
+}
+
+void ShooterEnemy::SetFacingRight(bool right) {
+    faceRight_ = right;
+    // Use same convention as Player: right = pi/2, left = 3*pi/2
+    if (faceRight_) {
+        worldTransform_.rotation_.y = static_cast<float>(std::numbers::pi / 2.0);
+    } else {
+        worldTransform_.rotation_.y = static_cast<float>(std::numbers::pi * 3.0 / 2.0);
     }
 }
 
@@ -60,7 +80,9 @@ void ShooterEnemy::Update() {
         // Only spawn bullets when allowed
         if (allowShooting_) {
             timer_ = 0.0f;
-            Vector3 dir = {1.0f, 0.0f, 0.0f};
+            // derive facing from actual model rotation to ensure visual and behavior match
+            bool facingRight = (std::sin(worldTransform_.rotation_.y) > 0.0f);
+            Vector3 dir = facingRight ? Vector3{1.0f, 0.0f, 0.0f} : Vector3{-1.0f, 0.0f, 0.0f};
             for (auto b : bullets_) {
                 if (!b->alive) {
                     b->alive = true;
@@ -69,7 +91,8 @@ void ShooterEnemy::Update() {
                     b->vel = {dir.x * bulletSpeed_, dir.y * bulletSpeed_, 0.0f};
                     b->wt.translation_ = b->pos;
                     b->wt.scale_ = {0.3f, 0.3f, 0.3f};
-                    b->wt.rotation_ = {0,0,0};
+                    // align bullet model rotation with shooter so it visually faces same direction
+                    b->wt.rotation_ = worldTransform_.rotation_;
                     b->wt.matWorld_ = MakeAffineMatrix(b->wt.scale_, b->wt.rotation_, b->wt.translation_);
                     b->wt.TransferMatrix();
                     static constexpr float bw = 0.2f;

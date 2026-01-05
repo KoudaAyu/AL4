@@ -154,6 +154,8 @@ void SelectScene::Initialize() {
     // fade controller
     fade_ = new Fade();
     fade_->Initialize();
+    // start fade-in so scene appears by gradually becoming visible
+    fade_->Start(Fade::Status::FadeIn, 0.6f);
 }
 
 static float LerpF(float a, float b, float t) { return a + (b - a) * t; }
@@ -170,6 +172,13 @@ void SelectScene::Update() {
     bool padA = KeyInput::GetInstance()->TriggerPadButton(KeyInput::XINPUT_BUTTON_A);
     bool spaceTrig = Input::GetInstance()->TriggerKey(DIK_SPACE);
 
+    // Update fade once at frame start if still fading in (do not block camera/player updates)
+    bool fadeUpdatedThisFrame = false;
+    if (fade_ && !transitioning_ && !fade_->IsFinished()) {
+        fade_->Update();
+        fadeUpdatedThisFrame = true;
+    }
+
     // camera update
     if (transitioning_) {
         // drive camera along transition
@@ -184,7 +193,7 @@ void SelectScene::Update() {
         camera_.TransferMatrix();
 
         
-        if (fade_) fade_->Update();
+        if (fade_ && !fadeUpdatedThisFrame) fade_->Update();
 
         if (transitionTimer_ <= 0.0f) {
           
@@ -203,10 +212,13 @@ void SelectScene::Update() {
     } else {
         if (cameraController_) {
             cameraController_->Update();
+            // ensure camera matrices are transferred after controller updates
+            camera_.TransferMatrix();
         } else {
             camera_.UpdateMatrix();
+            camera_.TransferMatrix();
         }
-        if (fade_) {
+        if (fade_ && !fadeUpdatedThisFrame) {
             // keep fade idle (no status) updated to be safe
             fade_->Update();
         }
@@ -239,13 +251,13 @@ void SelectScene::Update() {
     }
 
    
-    if (debugSkip) {
+    if (debugSkip && (fade_ == nullptr || fade_->IsFinished())) {
      
         finished_ = true;
         return;
     }
 
-    if (!transitioning_ && (padA || spaceTrig) && inputTimer_ <= 0.0f) {
+    if (!transitioning_ && (fade_ == nullptr || fade_->IsFinished()) && (padA || spaceTrig) && inputTimer_ <= 0.0f) {
         if (highlightedStage_ >= 0) {
            
             chosenStage_ = highlightedStage_;

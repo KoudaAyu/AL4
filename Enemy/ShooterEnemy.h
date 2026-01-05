@@ -24,6 +24,10 @@ public:
     // control whether this shooter instance is allowed to fire (used to disable shooting during countdown)
     void SetAllowShooting(bool allow) { allowShooting_ = allow; }
 
+    // control facing direction: if true bullets go to the right, otherwise to the left
+    void SetFacingRight(bool right);
+    bool IsFacingRight() const { return faceRight_; }
+
     // Remove the first bullet found colliding with the given AABB. Returns true if a bullet was consumed.
     bool ConsumeBulletCollidingWithAABB(const AABB& aabb);
 
@@ -55,4 +59,7 @@ private:
 
     // whether this shooter instance is allowed to spawn bullets
     bool allowShooting_ = false;
+
+    // whether shooter faces right (true) or left (false). Controls bullet direction.
+    bool faceRight_ = true;
 };
