@@ -226,7 +226,7 @@ void GameScene::Initialize() {
 					goalSpawned = true;
 				} else if (t == MapChipType::kLadder) {
 					Ladder* l = new Ladder();
-					Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
+				 Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
 					l->SetPosition(pos);
 					l->Initialize();
 					ladders_.push_back(l);
@@ -385,12 +385,20 @@ void GameScene::Update() {
 		return;
 	}
 
-	// Tabでポーズ切り替え（プレイ中⇔ポーズのみ）　
-	if (Input::GetInstance()->TriggerKey(DIK_TAB)) {
-		if (phase_ == Phase::kPlay) {
-			phase_ = Phase::kPause;
-		} else if (phase_ == Phase::kPause) {
-			phase_ = Phase::kPlay;
+	// Tab と XBOX Start/Back でポーズ切替（Start/Back は押下の立ち上がりのみで1回だけ反応）
+	{
+		static bool prevPadPausePressed = false; // フレーム間の押下状態
+		bool padPausePressed = KeyInput::GetInstance()->PushPadButton(XINPUT_GAMEPAD_START) ||
+			KeyInput::GetInstance()->PushPadButton(XINPUT_GAMEPAD_BACK);
+		bool padPauseTriggered = padPausePressed && !prevPadPausePressed; // 立ち上がり検出
+		prevPadPausePressed = padPausePressed;
+
+		if (Input::GetInstance()->TriggerKey(DIK_TAB) || padPauseTriggered) {
+			if (phase_ == Phase::kPlay) {
+				phase_ = Phase::kPause;
+			} else if (phase_ == Phase::kPause) {
+				phase_ = Phase::kPlay;
+			}
 		}
 	}
 

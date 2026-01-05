@@ -65,6 +65,23 @@ static float NormalizeLeftStickX(SHORT rawValue) {
 	return v;
 }
 
+static float NormalizeLeftStickY(SHORT rawValue) {
+
+	const float denom = 32767.0f;
+	float v = 0.0f;
+	if (rawValue == -32768) {
+		v = -1.0f;
+	} else {
+		v = static_cast<float>(rawValue) / denom;
+	}
+	v = std::clamp(v, -1.0f, 1.0f);
+	const float deadzone = static_cast<float>(XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE) / denom;
+	if (std::fabs(v) < deadzone) {
+		return 0.0f;
+	}
+	return v;
+}
+
 static float GetHorizontalInputIntensity(float stickX, bool keyRight, bool keyLeft) {
 
 	if (keyRight)
@@ -122,11 +139,14 @@ void Player::Initialize(Camera* camera, const Vector3& position) {
 	worldTransform_.rotation_.y = std::numbers::pi_v<float> / 2.0f;
 	worldTransform_.scale_ = {0.3f, 0.3f, 0.3f};
 
+	// store base Y scale for crouch restore
+	baseScaleY_ = worldTransform_.scale_.y;
+
 	// 攻撃エフェクトの初期化（プレイヤーと同じ回転・位置、スケールは拡大）
 	attackWorldTransform_.Initialize();
 	attackWorldTransform_.scale_ = {worldTransform_.scale_.x * kAttackEffectScale,
-									 worldTransform_.scale_.y * kAttackEffectScale,
-									 worldTransform_.scale_.z * kAttackEffectScale};
+							 worldTransform_.scale_.y * kAttackEffectScale,
+							 worldTransform_.scale_.z * kAttackEffectScale};
 	attackWorldTransform_.rotation_ = worldTransform_.rotation_;
 	attackWorldTransform_.translation_ = worldTransform_.translation_;
 
@@ -150,6 +170,42 @@ void Player::HandleMovementInput() {
             velocity_.y = std::max(velocity_.y, -kLimitFallSpeed);
         }
         return;
+    }
+
+    // Q handling: tap = roll (trigger)
+    bool qTriggered = Input::GetInstance()->TriggerKey(DIK_Q);
+    
+    // Also allow Xbox left trigger (LT) rising to trigger dodge
+    static bool prevLeftTriggerPressed = false;
+    bool leftTriggerPressed = (state.Gamepad.bLeftTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
+    bool leftTriggerRising = leftTriggerPressed && !prevLeftTriggerPressed;
+    prevLeftTriggerPressed = leftTriggerPressed;
+    
+    // combine keyboard Q and gamepad LT rising
+    bool dodgeTriggered = qTriggered || leftTriggerRising;
+
+    // If Q was tapped, initiate roll/dodge
+    if (dodgeTriggered && !isDodging_ && dodgeCooldown_ <= 0.0f && behavior_ != Behavior::kAttack && !isDying_) {
+        float dir = (lrDirection_ == LRDirection::kRight) ? 1.0f : -1.0f;
+        velocity_.x = dir * kDodgeSpeed;
+        isDodging_ = true;
+        dodgeTimer_ = kDodgeDuration;
+        dodgeCooldown_ = kDodgeCooldownTime;
+        // force crouch visually during roll
+        if (!isCrouching_) {
+            isCrouching_ = true;
+            crouchForcedByDodge_ = true;
+            // compute half-heights in world units (use absolute scales) so scaling pivots at the bottom
+            float oldHalfHeight = kHeight * 0.5f * worldTransform_.scale_.y;
+            float newScaleY = baseScaleY_ * kCrouchVisualScale;
+            float newHalfHeight = kHeight * 0.5f * newScaleY;
+            // set new scale and move translation so feet (bottom) remain at same world Y
+            worldTransform_.scale_.y = newScaleY;
+            worldTransform_.translation_.y += (newHalfHeight - oldHalfHeight);
+            UpdateAABB();
+        }
+        if (cameraController_)
+            cameraController_->StartShake(0.5f, 0.12f);
     }
 
     float stickX = NormalizeLeftStickX(state.Gamepad.sThumbLX);
@@ -182,8 +238,10 @@ void Player::HandleMovementInput() {
     }
 
     // ハシゴ昇降入力
-    bool climbUp = Input::GetInstance()->PushKey(DIK_W);
-    bool climbDown = Input::GetInstance()->PushKey(DIK_S);
+    // include gamepad left stick vertical for climbing
+    float stickY_for_climb = NormalizeLeftStickY(state.Gamepad.sThumbLY);
+    bool climbUp = Input::GetInstance()->PushKey(DIK_W) || (stickY_for_climb > 0.2f);
+    bool climbDown = Input::GetInstance()->PushKey(DIK_S) || (stickY_for_climb < -0.2f);
 
     if (ladderHere && (climbUp || climbDown)) {
         // ハシゴ状態へ移行
@@ -194,7 +252,12 @@ void Player::HandleMovementInput() {
     if (onLadder_) {
         // 既存の縦方向速度をキャンセルし、昇降を適用
         velocity_.y = 0.0f;
-        if (climbUp) {
+        // allow analog stick control for smooth climbing
+        float stickY = NormalizeLeftStickY(state.Gamepad.sThumbLY);
+        if (std::fabs(stickY) > 0.01f) {
+            // stickY is [-1,1], positive means up
+            velocity_.y = stickY * kClimbSpeed;
+        } else if (climbUp) {
             velocity_.y = kClimbSpeed;
         } else if (climbDown) {
             velocity_.y = -kClimbSpeed;
@@ -347,7 +410,7 @@ void Player::HandleMovementInput() {
 
 #ifdef _DEBUG
 			DebugText::GetInstance()->ConsolePrintf("AirInput onGround=%s inputR=%.3f inputL=%.3f accelX=%.3f velBefore=%.3f\n",
-					onGround_ ? "true" : "false", inputIntensityRight, inputIntensityLeft, accelX, velocity_.x);
+				onGround_ ? "true" : "false", inputIntensityRight, inputIntensityLeft, accelX, velocity_.x);
 #endif
 
 			velocity_.x += accelX;
@@ -428,7 +491,10 @@ void Player::Update() {
 		return;
 	}
 
+	// Update rumble state so vibration stops after its duration
+	UpdateRumble();
 
+	
 	if (isDying_) {
 		
 		velocity_ = {0.0f, 0.0f, 0.0f};
@@ -516,17 +582,44 @@ void Player::Update() {
 	// 現在のRT状態を保存（次フレームとの比較用）
 	prevRightTriggerPressed_ = rtPressed;
 
-	// 攻撃が要求されているフレームは回避を抑制（入力競合対策）
-	if (behaviorRequest_ != Behavior::kAttack) {
-		EmergencyAvoidance();
+	// 攻撃が要求されているフレームは回避入力処理を抑制（入力競合対策）
+	// NOTE: Q-trigger dodge is handled in HandleMovementInput(). Here we update dodge timers.
+
+	// decrease dodge timer if currently dodging; end dodge when timer elapses
+	if (isDodging_) {
+		dodgeTimer_ -= 1.0f / 60.0f;
+		if (dodgeTimer_ <= 0.0f) {
+			isDodging_ = false;
+			// reduce horizontal speed when dodge ends
+			velocity_.x *= 0.5f;
+			velocity_.x = std::clamp(velocity_.x, -kLimitRunSpeed, kLimitRunSpeed);
+			// restore visual crouch if it was forced by dodge
+			if (crouchForcedByDodge_) {
+				float oldHalfHeight = kHeight * 0.5f * worldTransform_.scale_.y;
+				worldTransform_.scale_.y = baseScaleY_;
+				float newHalfHeight = kHeight * 0.5f * worldTransform_.scale_.y;
+				worldTransform_.translation_.y += (newHalfHeight - oldHalfHeight);
+				isCrouching_ = false;
+				crouchForcedByDodge_ = false;
+				UpdateAABB();
+			}
+		}
 	}
+
+	// dodge cooldown decrement
+	if (dodgeCooldown_ > 0.0f) {
+		dodgeCooldown_ -= 1.0f / 60.0f;
+		if (dodgeCooldown_ < 0.0f)
+			dodgeCooldown_ = 0.0f;
+	}
+
 
 	// 衝突情報を初期化
 	CollisionMapInfo collisionInfo;
 	// 移動量を加味して現在地を算定するために、現在の速度をcollisionInfoにセット
 	collisionInfo.movement_ = velocity_;
 
-	// 2. 移動量を加味して衝突判定する（軸ごとに解決してガタつきを抑制）
+	// 2. 移動量を加味して衝突判定する（軸ごとに解決してガタつきを抑制）"
 	mapChipCollisionCheck(collisionInfo);
 
 	// 3. 判定結果を反映して移動させる
@@ -563,6 +656,7 @@ void Player::Update() {
 		worldTransform_.rotation_.y = destinationRotationYTable[static_cast<uint32_t>(lrDirection_)];
 	}
 
+	// Update AABB: adjust height when crouching
 	UpdateAABB();
 
 	// 8. 行列計算
@@ -676,7 +770,7 @@ void Player::JudgmentResult(const CollisionMapInfo& info) {
 	DebugText::GetInstance()->ConsolePrintf("JudgmentResult: afterPos=(%.3f,%.3f)\n", worldTransform_.translation_.x, worldTransform_.translation_.y);
 #endif
 
-	// マップの移動可能領域に基づいて X をクランプする（左端より外に行けないようにする）
+	// マップの移動可能領域に基づいて X をクランプする（左端より外に行けないようにする）　
 	if (mapChipField_) {
 		Rect area = mapChipField_->GetMovableArea();
 		float halfWidth = kWidth * 0.5f;
@@ -749,7 +843,7 @@ void Player::SwitchingTheGrounding(CollisionMapInfo& info) {
 #endif
 			if (centerType == MapChipType::kBlock || centerType == MapChipType::kIce) {
 				hit = true; // 中心に足場があれば地面あり
-				// 追加で左右を確認して安定化（あればより確実）
+				// 追加で左右を確認して安定化（あればより確実）"
 				for (int i = 0; i < kSampleCount; ++i) {
 					if (i == 1) continue; // centerは既に見た
 					Vector3 samplePos = worldTransform_.translation_ + Vector3{ sampleXOffsets[i], - (kHeight * 0.5f) - kGroundCheckExtra, 0.0f };
@@ -758,7 +852,6 @@ void Player::SwitchingTheGrounding(CollisionMapInfo& info) {
 #ifdef _DEBUG
 					DebugText::GetInstance()->ConsolePrintf("GroundSample i=%d pos=(%.3f,%.3f) idx=(%d,%d) type=%d\n", i, samplePos.x, samplePos.y, idx.xIndex, idx.yIndex, static_cast<int>(type));
 #endif
-					// 無くても問題なし（中心があれば十分）
 				}
 			} else {
 				// 中心に地面がないなら周辺もチェックして、2点以上当たっていれば地面ありとみなす
@@ -1156,7 +1249,10 @@ void Player::OnCollision(Enemy* enemy) {
 	invincibleTimer_ = kInvincibleDuration;
 
 	
-	StartRumble(0.8f, 0.8f, 150);
+	// Start a milder, shorter rumble on damage (intensity 0.4, duration 500 ms)
+	// change duration to 1000 ms (1 second)
+	// milder and shorter rumble: intensity 0.25, duration 250 ms
+	StartRumble(0.25f, 0.25f, 250);
 	if (cameraController_)
 		cameraController_->StartShake(0.8f, 0.12f);
 
@@ -1171,12 +1267,15 @@ void Player::OnCollision(Enemy* enemy) {
 }
 
 void Player::UpdateAABB() {
-	// プレイヤーと同等サイズの簡易AABB（必要なら調整）
+	// プレイヤーと同等サイズの簡易AABB（必要なら調整）"
 
 	static constexpr float kDepth = 0.8f * 2.0f;
 
 	Vector3 center = worldTransform_.translation_;
-	Vector3 half = {kWidth * 0.5f, kHeight * 0.5f, kDepth * 0.5f};
+	// adjust height based on crouch: use multiplier
+	float heightMultiplier = isCrouching_ ? kCrouchHeightMultiplier : 1.0f;
+	float effectiveHeight = kHeight * heightMultiplier;
+	Vector3 half = {kWidth * 0.5f, effectiveHeight * 0.5f, kDepth * 0.5f};
 
 	// 回転は無視して軸整列AABBを更新（必要ならメッシュ頂点から算出実装へ拡張）
 	aabb_.min = {center.x - half.x, center.y - half.y, center.z - half.z};
@@ -1184,34 +1283,8 @@ void Player::UpdateAABB() {
 }
 
 void Player::EmergencyAvoidance() {
-	bool dodgePressed = Input::GetInstance()->TriggerKey(DIK_Q);
-	if (dodgePressed && !isDodging_ && dodgeCooldown_ <= 0.0f && behavior_ != Behavior::kAttack) {
-
-		float dir = (lrDirection_ == LRDirection::kRight) ? 1.0f : -1.0f;
-		velocity_.x = dir * kDodgeSpeed;
-		isDodging_ = true;
-		dodgeTimer_ = kDodgeDuration;
-		dodgeCooldown_ = kDodgeCooldownTime;
-		if (cameraController_)
-			cameraController_->StartShake(0.5f, 0.12f);
-	}
-
-	if (isDodging_) {
-		dodgeTimer_ -= 1.0f / 60.0f;
-		// 回避の継続時間
-		if (dodgeTimer_ <= 0.0f) {
-			isDodging_ = false;
-
-			velocity_.x *= 0.5f;
-
-			velocity_.x = std::clamp(velocity_.x, -kLimitRunSpeed, kLimitRunSpeed);
-		}
-	}
-	if (dodgeCooldown_ > 0.0f) {
-		dodgeCooldown_ -= 1.0f / 60.0f;
-		if (dodgeCooldown_ < 0.0f)
-			dodgeCooldown_ = 0.0f;
-	}
+	// Dodge via Q is handled once in HandleMovementInput using TriggerKey(DIK_Q).
+	// Keep this function empty to avoid duplicate or continuous triggers.
 }
 
 void Player::BehaviorRootInitialize() {}
@@ -1260,12 +1333,12 @@ void Player::UpdateAttackEffectTransform() {
 	// プレイヤーの進行方向前にエフェクトを配置
 	float dirSign = (lrDirection_ == LRDirection::kRight) ? 1.0f : -1.0f;
 
-	// 前方オフセット（プレイヤー幅の半分 + 攻撃幅の半分より少し前に）
+	// 前方オフセット（プレイヤー幅の半分 + 攻撃幅の半分より少し前に）	
 	const float forwardOffset = (kWidth * 0.5f) + (kAttackWidth * 0.5f) * 0.8f;
 
 	attackWorldTransform_.scale_ = {worldTransform_.scale_.x * kAttackEffectScale,
-									 worldTransform_.scale_.y * kAttackEffectScale,
-									 worldTransform_.scale_.z * kAttackEffectScale};
+						 worldTransform_.scale_.y * kAttackEffectScale,
+						 worldTransform_.scale_.z * kAttackEffectScale};
 	attackWorldTransform_.rotation_ = worldTransform_.rotation_;
 	attackWorldTransform_.translation_ = worldTransform_.translation_;
 	attackWorldTransform_.translation_.x += dirSign * forwardOffset;

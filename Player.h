@@ -310,7 +310,7 @@ private:
 	static inline const float kWallContactGraceTime = 0.1f; 
 	float wallContactGraceTimer_ = 0.0f;
 
-	bool isAlive_ = true; 	
+	bool isAlive_ = true;	
 
 	//攻撃ギミックの経過時間
 	uint32_t attackParameter_ = 0;
@@ -380,4 +380,15 @@ private:
 	int keyCount_ = 0;
 
 	bool onIce_ = false; // 現在接地しているタイルがIceかどうか
+
+	// --- Crouch (Qキー) ---
+	bool isCrouching_ = false;
+	// If crouch was started by a dodge/roll (temporary), remember to restore when dodge ends
+	bool crouchForcedByDodge_ = false;
+	// 視覚的にモデルを縮めるスケール倍率（Y方向）
+	static inline const float kCrouchVisualScale = 0.6f;
+	// 当たり判定で使う高さ倍率
+	static inline const float kCrouchHeightMultiplier = 0.5f;
+	// 元のYスケールを保持して復元する
+	float baseScaleY_ = 1.0f;
 };

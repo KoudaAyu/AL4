@@ -42,3 +42,11 @@ bool KeyInput::TriggerPadButton(int button) const {
 	}
 	return false;
 }
+
+bool KeyInput::PushPadButton(int button) const {
+	XINPUT_STATE state{};
+	if (XInputGetState(0, &state) == ERROR_SUCCESS) {
+		return (state.Gamepad.wButtons & button) != 0;
+	}
+	return false;
+}
