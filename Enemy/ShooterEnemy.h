@@ -61,5 +61,10 @@ private:
     bool allowShooting_ = false;
 
     // whether shooter faces right (true) or left (false). Controls bullet direction.
-    bool faceRight_ = true;
+    bool faceRight_ = false;
+
+    // optional secondary model for the shooter's equipment (like shield/gun)
+    KamataEngine::Model* shooterModel_ = nullptr;
+    bool ownsShooterModel_ = false;
+    KamataEngine::WorldTransform shooterWorldTransform_;
 };

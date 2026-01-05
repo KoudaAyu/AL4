@@ -35,6 +35,10 @@ private:
     const int32_t kWindowWidth = 1280;
     const int32_t kWindowHeight = 720;
 
+    // Full-screen background for game over
+    uint32_t backgroundTextureHandle_ = 0u;
+    KamataEngine::Sprite* backgroundSprite_ = nullptr;
+
     // Stacked menu sprites (top/mid/bottom)
     uint32_t gameOverTextureHandle_ = 0u; // middle
     KamataEngine::Sprite* gameOverSprite_ = nullptr;

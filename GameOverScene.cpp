@@ -8,6 +8,7 @@ GameOverScene::~GameOverScene() {
     if (gameOverSprite_) { delete gameOverSprite_; gameOverSprite_ = nullptr; }
     if (optionLeftSprite_) { delete optionLeftSprite_; optionLeftSprite_ = nullptr; }
     if (optionRightSprite_) { delete optionRightSprite_; optionRightSprite_ = nullptr; }
+    if (backgroundSprite_) { delete backgroundSprite_; backgroundSprite_ = nullptr; }
     delete fade_;
     fade_ = nullptr;
 }
@@ -25,12 +26,23 @@ void GameOverScene::Initialize() {
     uint32_t texMid = TextureManager::Load("Sprite/GameOver/BackSelect.png");
     uint32_t texBot = TextureManager::Load("Sprite/GameOver/BackTitle.png");
 
+    // load background texture (full screen)
+    uint32_t texBg = TextureManager::Load("Sprite/GameOver/BackScreen.png");
+
     // Create centered stacked sprites
     const float centerX = static_cast<float>(kWindowWidth) * 0.5f;
+    const float centerY = static_cast<float>(kWindowHeight) * 0.5f;
     const float itemW = 400.0f;
     const float itemH = 80.0f;
     const float spacing = 25.0f;
-    const float startY = static_cast<float>(kWindowHeight) * 0.5f - (itemH * 1.5f + spacing);
+    const float startY = centerY - (itemH + spacing); // top item y so that middle is centered
+
+    if (texBg != 0u) {
+        backgroundTextureHandle_ = texBg;
+        // full screen sprite centered
+        backgroundSprite_ = KamataEngine::Sprite::Create(texBg, KamataEngine::Vector2{centerX, centerY}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 0.5f});
+        if (backgroundSprite_) backgroundSprite_->SetSize(KamataEngine::Vector2{static_cast<float>(kWindowWidth), static_cast<float>(kWindowHeight)});
+    }
 
     if (texTop != 0u) {
         optionLeftTextureHandle_ = texTop;
@@ -39,12 +51,12 @@ void GameOverScene::Initialize() {
     }
     if (texMid != 0u) {
         gameOverTextureHandle_ = texMid;
-        gameOverSprite_ = KamataEngine::Sprite::Create(texMid, KamataEngine::Vector2{centerX, startY + itemH + spacing}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 0.5f});
+        gameOverSprite_ = KamataEngine::Sprite::Create(texMid, KamataEngine::Vector2{centerX, centerY}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 0.5f});
         if (gameOverSprite_) gameOverSprite_->SetSize(KamataEngine::Vector2{itemW, itemH});
     }
     if (texBot != 0u) {
         optionRightTextureHandle_ = texBot;
-        optionRightSprite_ = KamataEngine::Sprite::Create(texBot, KamataEngine::Vector2{centerX, startY + (itemH + spacing) * 2.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 0.5f});
+        optionRightSprite_ = KamataEngine::Sprite::Create(texBot, KamataEngine::Vector2{centerX, centerY + (itemH + spacing)}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 0.5f});
         if (optionRightSprite_) optionRightSprite_->SetSize(KamataEngine::Vector2{itemW, itemH});
     }
 
@@ -54,9 +66,10 @@ void GameOverScene::Initialize() {
 void GameOverScene::Update() {
     // Layout constants
     const float centerX = static_cast<float>(kWindowWidth) * 0.5f;
+    const float centerY = static_cast<float>(kWindowHeight) * 0.5f;
     const float itemH = 80.0f;
     const float spacing = 25.0f;
-    const float startY = static_cast<float>(kWindowHeight) * 0.5f - (itemH * 1.5f + spacing);
+    const float startY = centerY - (itemH + spacing);
 
     // Navigation: W/S or Up/Down to change selection
     bool up = Input::GetInstance()->TriggerKey(DIK_W) || Input::GetInstance()->TriggerKey(DIK_UP);
@@ -97,11 +110,11 @@ void GameOverScene::Update() {
         setColor(optionLeftSprite_, 0);
     }
     if (gameOverSprite_) {
-        gameOverSprite_->SetPosition(KamataEngine::Vector2{centerX, startY + itemH + spacing});
+        gameOverSprite_->SetPosition(KamataEngine::Vector2{centerX, centerY});
         setColor(gameOverSprite_, 1);
     }
     if (optionRightSprite_) {
-        optionRightSprite_->SetPosition(KamataEngine::Vector2{centerX, startY + (itemH + spacing) * 2.0f});
+        optionRightSprite_->SetPosition(KamataEngine::Vector2{centerX, centerY + (itemH + spacing)});
         setColor(optionRightSprite_, 2);
     }
 
@@ -139,6 +152,9 @@ void GameOverScene::Update() {
 void GameOverScene::Draw() {
     KamataEngine::DirectXCommon* dx = KamataEngine::DirectXCommon::GetInstance();
     KamataEngine::Sprite::PreDraw(dx->GetCommandList());
+
+    // Draw background first so it's behind menu
+    if (backgroundSprite_) backgroundSprite_->Draw();
 
     if (optionLeftSprite_) optionLeftSprite_->Draw();
     if (gameOverSprite_) gameOverSprite_->Draw();

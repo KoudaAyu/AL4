@@ -22,6 +22,11 @@ ShooterEnemy::~ShooterEnemy() {
         delete model_;
         model_ = nullptr;
     }
+
+    if (ownsShooterModel_ && shooterModel_) {
+        delete shooterModel_;
+        shooterModel_ = nullptr;
+    }
 }
 
 void ShooterEnemy::Initialize(KamataEngine::Camera* camera, const KamataEngine::Vector3& pos) {
@@ -36,6 +41,26 @@ void ShooterEnemy::Initialize(KamataEngine::Camera* camera, const KamataEngine::
 
     // ensure model faces according to current facing flag
     SetFacingRight(faceRight_);
+
+    // create optional shooter model (e.g. "Shooter" or "Shooter.obj")
+    shooterWorldTransform_.Initialize();
+    shooterWorldTransform_.translation_ = pos;
+    shooterWorldTransform_.rotation_ = worldTransform_.rotation_;
+    shooterWorldTransform_.scale_ = {0.9f, 0.9f, 0.9f};
+
+    shooterModel_ = Model::CreateFromOBJ("Shooter", true);
+    if (shooterModel_) {
+        ownsShooterModel_ = true;
+    } else {
+        // try fallback to "ShooterEnemy" or reuse body model
+        shooterModel_ = Model::CreateFromOBJ("ShooterEnemy", true);
+        if (shooterModel_) {
+            ownsShooterModel_ = true;
+        } else if (model_) {
+            shooterModel_ = model_;
+            ownsShooterModel_ = false;
+        }
+    }
 
     UpdateAABB();
 
@@ -58,11 +83,14 @@ void ShooterEnemy::Initialize(KamataEngine::Camera* camera, const KamataEngine::
 void ShooterEnemy::SetFacingRight(bool right) {
     faceRight_ = right;
     // Use same convention as Player: right = pi/2, left = 3*pi/2
+    // NOTE: the model's forward axis is inverted in this project, so swap the angles
     if (faceRight_) {
-        worldTransform_.rotation_.y = static_cast<float>(std::numbers::pi / 2.0);
-    } else {
         worldTransform_.rotation_.y = static_cast<float>(std::numbers::pi * 3.0 / 2.0);
+    } else {
+        worldTransform_.rotation_.y = static_cast<float>(std::numbers::pi / 2.0);
     }
+    // keep shooter world rotation in sync
+    shooterWorldTransform_.rotation_ = worldTransform_.rotation_;
 }
 
 void ShooterEnemy::Update() {
@@ -70,6 +98,12 @@ void ShooterEnemy::Update() {
 
     worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
     worldTransform_.TransferMatrix();
+
+    // update shooter visual transform to match body
+    shooterWorldTransform_.translation_ = worldTransform_.translation_;
+    shooterWorldTransform_.rotation_ = worldTransform_.rotation_;
+    shooterWorldTransform_.matWorld_ = MakeAffineMatrix(shooterWorldTransform_.scale_, shooterWorldTransform_.rotation_, shooterWorldTransform_.translation_);
+    shooterWorldTransform_.TransferMatrix();
 
     // Only advance firing timer when shooting is allowed
     if (allowShooting_) {
@@ -80,8 +114,8 @@ void ShooterEnemy::Update() {
         // Only spawn bullets when allowed
         if (allowShooting_) {
             timer_ = 0.0f;
-            // derive facing from actual model rotation to ensure visual and behavior match
-            bool facingRight = (std::sin(worldTransform_.rotation_.y) > 0.0f);
+            // determine facing from stored flag to ensure bullets follow configured facing
+            bool facingRight = faceRight_;
             Vector3 dir = facingRight ? Vector3{1.0f, 0.0f, 0.0f} : Vector3{-1.0f, 0.0f, 0.0f};
             for (auto b : bullets_) {
                 if (!b->alive) {
@@ -129,6 +163,9 @@ void ShooterEnemy::Update() {
 void ShooterEnemy::Draw() {
     if (!isAlive_) return;
     if (model_ && camera_) model_->Draw(worldTransform_, *camera_);
+
+    // draw optional shooter model (e.g. gun) in front of body
+    if (shooterModel_ && camera_) shooterModel_->Draw(shooterWorldTransform_, *camera_);
 
     for (auto b : bullets_) {
         if (!b->alive) continue;

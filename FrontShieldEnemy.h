@@ -14,12 +14,14 @@ public:
 
 public:
 	FrontShieldEnemy() = default;
-	~FrontShieldEnemy() override = default;
+	~FrontShieldEnemy() override;
 
 	using Enemy::Initialize;
 
 
 	void OnCollision(Player* player) override;
+	void Update() override;
+	void Draw() override;
 
 	
 	void SetFrontDotThreshold(float t) { frontDotThreshold_ = t; }
@@ -33,4 +35,9 @@ private:
 	float frontDotThreshold_ = 0.5f;
 
 	uint32_t soundDataHandle = KamataEngine::Audio::GetInstance()->LoadWave("Audio/SE/FrontShieldEnemy_Alive.wav");
+
+	// Separate shield model so shield and body can be transformed independently
+	KamataEngine::Model* shieldModel_ = nullptr;
+	bool ownsShieldModel_ = false;
+	KamataEngine::WorldTransform shieldWorldTransform_;
 };

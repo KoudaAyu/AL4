@@ -419,15 +419,17 @@ void GameScene::Initialize() {
 
 	const float menuWidth = 400.0f;
 	const float menuHeight = 80.0f;
-	const float topStart = 100.0f; // distance from top of window
 	const float spacing = 20.0f;
+	const float centerY = static_cast<float>(kWindowHeight) * 0.5f;
 	for (int i = 0; i < 3; ++i) {
 		if (pauseMenuTextureHandles_[i] != 0u) {
+			// position so that the middle item (i==1) is centered vertically
+			float y = centerY + (i - 1) * (menuHeight + spacing);
 			pauseMenuSprites_[i] = KamataEngine::Sprite::Create(
 				pauseMenuTextureHandles_[i],
-				KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, topStart + i * (menuHeight + spacing)},
+				KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, y},
 				KamataEngine::Vector4{1,1,1,1},
-				KamataEngine::Vector2{0.5f, 0.0f} // top-centered pivot
+				KamataEngine::Vector2{0.5f, 0.5f} // center pivot
 			);
 			if (pauseMenuSprites_[i]) pauseMenuSprites_[i]->SetSize(KamataEngine::Vector2{menuWidth, menuHeight});
 		}
@@ -476,7 +478,7 @@ void GameScene::Update() {
                 for (int i = 0; i < 3; ++i) {
                     if (pauseMenuSprites_[i]) {
                         if (i == pauseMenuSelectedIndex_)
-                            pauseMenuSprites_[i]->SetColor(KamataEngine::Vector4{1.0f, 0.4f, 0.4f, 1.0f});
+                            pauseMenuSprites_[i]->SetColor(KamataEngine::Vector4{1,0,0,1});
                         else
                             pauseMenuSprites_[i]->SetColor(KamataEngine::Vector4{1,1,1,1});
                     }
@@ -1021,7 +1023,10 @@ void GameScene::Update() {
 		// keep pause menu item positions in case window size changes
 		for (int i = 0; i < 3; ++i) {
 			if (pauseMenuSprites_[i]) {
-				float y = 100.0f + i * (80.0f + 20.0f);
+				const float menuHeightLocal = 80.0f;
+				const float spacingLocal = 20.0f;
+				const float centerYLocal = static_cast<float>(kWindowHeight) * 0.5f;
+				float y = centerYLocal + (i - 1) * (menuHeightLocal + spacingLocal);
 				pauseMenuSprites_[i]->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, y});
 			}
 		}
@@ -1057,7 +1062,7 @@ void GameScene::Update() {
 		for (int i = 0; i < 3; ++i) {
 			if (pauseMenuSprites_[i]) {
 				if (i == pauseMenuSelectedIndex_)
-					pauseMenuSprites_[i]->SetColor(KamataEngine::Vector4{1.0f, 0.4f, 0.4f, 1.0f});
+					pauseMenuSprites_[i]->SetColor(KamataEngine::Vector4{1,0,0,1});
 				else
 					pauseMenuSprites_[i]->SetColor(KamataEngine::Vector4{1,1,1,1});
 			}
@@ -1599,19 +1604,20 @@ void GameScene::PerformResetNow() {
 	pauseMenuTextureHandles_[1] = TextureManager::Load("Sprite/Pause/Reset.png");
 	pauseMenuTextureHandles_[2] = TextureManager::Load("Sprite/Pause/BackSelect.png");
 
-	const float menuWidth = 400.0f;
-	const float menuHeight = 80.0f;
-	const float topStart = 100.0f; // distance from top of window
-	const float spacing = 20.0f;
+	const float menuWidth2 = 400.0f;
+	const float menuHeight2 = 80.0f;
+	const float spacing2 = 20.0f;
+	const float centerY2 = static_cast<float>(kWindowHeight) * 0.5f;
 	for (int i = 0; i < 3; ++i) {
 		if (pauseMenuTextureHandles_[i] != 0u) {
+			float y = centerY2 + (i - 1) * (menuHeight2 + spacing2);
 			pauseMenuSprites_[i] = KamataEngine::Sprite::Create(
 				pauseMenuTextureHandles_[i],
-				KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, topStart + i * (menuHeight + spacing)},
+				KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, y},
 				KamataEngine::Vector4{1,1,1,1},
-				KamataEngine::Vector2{0.5f, 0.0f} // top-centered pivot
+				KamataEngine::Vector2{0.5f, 0.5f} // center pivot
 			);
-			if (pauseMenuSprites_[i]) pauseMenuSprites_[i]->SetSize(KamataEngine::Vector2{menuWidth, menuHeight});
+			if (pauseMenuSprites_[i]) pauseMenuSprites_[i]->SetSize(KamataEngine::Vector2{menuWidth2, menuHeight2});
 		}
 	}
 
@@ -1620,6 +1626,83 @@ void GameScene::PerformResetNow() {
 	if (cameraController_) {
 		cameraController_->SetTarget(player_);
 		cameraController_->Reset();
+	}
+
+	// Ensure existing dynamic objects are cleared and respawned so reset creates fresh enemies, spikes, goals, keys, ladders
+	// Delete old enemies
+	for (Enemy* e : enemies_) {
+		if (e) delete e;
+	}
+	enemies_.clear();
+	// Delete spikes
+	for (Spike* s : spikes_) {
+		if (s) delete s;
+	}
+	spikes_.clear();
+	// Delete goals
+	for (Goal* g : goals_) {
+		if (g) delete g;
+	}
+	goals_.clear();
+	// Delete keys
+	for (Key* k : keys_) {
+		if (k) delete k;
+	}
+	keys_.clear();
+	// Delete ladders
+	for (Ladder* l : ladders_) {
+		if (l) delete l;
+	}
+	ladders_.clear();
+
+	// Respawn entities from the map
+	if (mapChipField_) {
+		uint32_t vh = mapChipField_->GetNumBlockVertical();
+		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
+		bool goalSpawned = false;
+		for (uint32_t y = 0; y < vh; ++y) {
+			for (uint32_t x = 0; x < wh; ++x) {
+				MapChipType t = mapChipField_->GetMapChipTypeByIndex(x, y);
+				Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
+				if (t == MapChipType::kEnemySpawn) {
+					Enemy* enemy = new Enemy();
+					enemy->Initialize(&camera_, pos);
+					enemies_.push_back(enemy);
+				} else if (t == MapChipType::kEnemySpawnShield) {
+					FrontShieldEnemy* fse = new FrontShieldEnemy();
+					fse->Initialize(&camera_, pos);
+					fse->SetFrontDotThreshold(0.6f);
+					enemies_.push_back(fse);
+				} else if (t == MapChipType::kShooter) {
+					ShooterEnemy* se = new ShooterEnemy();
+					se->Initialize(&camera_, pos);
+					se->SetBulletSpeed(0.2f);
+					se->SetFireInterval(2.0f);
+					enemies_.push_back(se);
+				} else if (t == MapChipType::kSpike) {
+					Spike* s = new Spike();
+					s->SetPosition(pos);
+					s->Initialize();
+					spikes_.push_back(s);
+				} else if (t == MapChipType::kGoal && !goalSpawned) {
+					Goal* g = new Goal();
+					g->SetPosition(pos);
+					g->Initialize();
+					goals_.push_back(g);
+					goalSpawned = true;
+				} else if (t == MapChipType::kLadder) {
+					Ladder* l = new Ladder();
+					l->SetPosition(pos);
+					l->Initialize();
+					ladders_.push_back(l);
+				} else if (t == MapChipType::kKey) {
+					Key* k = new Key();
+					k->SetPosition(pos);
+					k->Initialize();
+					keys_.push_back(k);
+				}
+			}
+		}
 	}
 
 	// ensure shooters are disabled during countdown on reset
@@ -1639,8 +1722,4 @@ void GameScene::PerformResetNow() {
 	if (fade_) {
 		fade_->Start(Fade::Status::FadeIn, introFadeDuration_);
 	}
-}
-
-void GameScene::SuppressPlayerNextJump() {
-    if (player_) player_->SuppressNextJump();
 }
