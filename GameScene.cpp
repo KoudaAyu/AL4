@@ -17,6 +17,15 @@
 #pragma comment(lib, "winmm.lib")
 using namespace KamataEngine;
 
+// margin from right edge for top-right UI elements (increase to move UI left)
+static constexpr float kUIRightMargin = 230.0f;
+// additional left offset for the small top-right left-variant (uiBottomRightSprite_)
+static constexpr float kUIBottomRightOffset = 40.0f;
+// margin from right edge for the mid UI (Menu / TAB). Increase to move mid UI left.
+static constexpr float kUIMidRightMargin = 300.0f;
+// add dedicated offset for Phase sprite positioning to the right of mid UI
+static constexpr float kUIPhaseRightOffset = 150.0f;
+
 GameScene::GameScene() : GameScene(0) {}
 
 GameScene::GameScene(int startingStage) : readyForGameOver_(false), startingStage_(startingStage) {}
@@ -26,9 +35,16 @@ GameScene::~GameScene() {
 	delete debugCamera_;
 #endif 
 
+	  if (bgmStarted_) {
+		Audio::GetInstance()->StopWave(bgmVoiceHandle_);
+		bgmVoiceHandle_ = 0u;
+		bgmStarted_ = false;
+	}
+
 	delete blockModel_;
 	delete cameraController_;
 	delete mapChipField_;
+	delete nikukyuModel_;
 	delete model_;
 
 	for (Enemy* enemy : enemies_) {
@@ -66,6 +82,11 @@ GameScene::~GameScene() {
 	if (uiRightSprite_) {
 		delete uiRightSprite_;
 		uiRightSprite_ = nullptr;
+	}
+	// delete top-right left-variant sprite if present
+	if (uiBottomRightSprite_) {
+		delete uiBottomRightSprite_;
+		uiBottomRightSprite_ = nullptr;
 	}
 
 	
@@ -135,6 +156,8 @@ void GameScene::Initialize() {
 	blockModel_ = Model::CreateFromOBJ("Block");
 	// Load Ice.obj for map chip type 8
 	iceModel_ = Model::CreateFromOBJ("Ice");
+
+	nikukyuModel_ = Model::CreateFromOBJ("Nikukyuu");
 #ifdef _DEBUG
 	assert(textureHandle_);
 #endif
@@ -145,7 +168,7 @@ void GameScene::Initialize() {
 
 	mapChipField_ = new MapChipField();
 	
-	const char* mapFiles[] = {"Resources/Debug/Map/Block.csv", "Resources/Debug/Map/Block1.csv"};
+	const char* mapFiles[] = {"Resources/Debug/Map/Block.csv", "Resources/Debug/Map/Block1.csv", "Resources/Debug/Map/Block2.csv"};
 	const int numMapFiles = static_cast<int>(std::size(mapFiles));
 	int idx = startingStage_;
 	if (idx < 0) idx = 0;
@@ -171,7 +194,6 @@ void GameScene::Initialize() {
 	player_->Initialize(&camera_, playerPosition);
 	player_->SetMapChipField(mapChipField_);
 
-
 	heartTextureHandle_ = TextureManager::Load("Sprite/PlayerHP.png");
 	if (heartTextureHandle_ != 0u && player_) {
 		int hp = player_->GetHP();
@@ -180,8 +202,8 @@ void GameScene::Initialize() {
 		const float heartSpacing = 8.0f;
 		for (int i = 0; i < hp; ++i) {
 			float x = heartMarginX + i * (heartSize + heartSpacing);
-			float y = static_cast<float>(kWindowHeight) - 20.0f;
-			KamataEngine::Sprite* s = KamataEngine::Sprite::Create(heartTextureHandle_, KamataEngine::Vector2{x, y}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
+			float y = 20.0f; // moved to top margin
+			KamataEngine::Sprite* s = KamataEngine::Sprite::Create(heartTextureHandle_, KamataEngine::Vector2{x, y}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 0.0f});
 			if (s) s->SetSize(KamataEngine::Vector2{heartSize, heartSize});
 
 			HeartUI h;
@@ -343,41 +365,79 @@ void GameScene::Initialize() {
 	}
 
 	
-	uiLeftTextureHandle_ = TextureManager::Load("Debug/Attack.png");
-	if (uiLeftTextureHandle_ != 0u) {
-		uiLeftSprite_ = KamataEngine::Sprite::Create(uiLeftTextureHandle_, KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
-		if (uiLeftSprite_) uiLeftSprite_->SetSize(KamataEngine::Vector2{150.0f, 30.0f});
-	}
+	// Do not load main left Attack UI — keep it hidden by default
+	uiLeftTextureHandle_ = 0u;
 	// Load left UI variants: RT for gamepad, E for keyboard
 	uiLeftGamepadTextureHandle_ = TextureManager::Load("Sprite/GameScene/RT.png");
 	uiLeftKeyboardTextureHandle_ = TextureManager::Load("Sprite/GameScene/E.png");
+	uiAttackTextureHandle_ = TextureManager::Load("Sprite/GameScene/Attack.png");
+
 	// If preferred variants exist, prefer keyboard E initially
 	uint32_t defaultLeftHandle = uiLeftKeyboardTextureHandle_ != 0u ? uiLeftKeyboardTextureHandle_ : uiLeftGamepadTextureHandle_;
 	if (defaultLeftHandle != 0u && !uiLeftSprite_) {
-		uiLeftSprite_ = KamataEngine::Sprite::Create(defaultLeftHandle, KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
-		if (uiLeftSprite_) {
-			uiLeftSprite_->SetSize(KamataEngine::Vector2{70.0f, 40.0f});
+		// Instead of placing the small variant at bottom-left, place it at top-right under the mid/right icons
+		const float topMargin = 20.0f;
+		const float midHeight = 40.0f;
+		const float spacingBelowMid = 8.0f;
+		const float spacingBelowRight = 8.0f;
+		float rightX = static_cast<float>(kWindowWidth) - kUIRightMargin;
+		float rightY = topMargin + midHeight + spacingBelowMid;
+		float bottomY = rightY + midHeight + spacingBelowRight;
+		float bottomRightX = rightX - kUIBottomRightOffset; // shift small icon further left
+		uiBottomRightSprite_ = KamataEngine::Sprite::Create(defaultLeftHandle, KamataEngine::Vector2{bottomRightX, bottomY}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{1.0f, 0.0f});
+		if (uiBottomRightSprite_) {
+			uiBottomRightSprite_->SetSize(KamataEngine::Vector2{70.0f, 40.0f});
 			auto desc = TextureManager::GetInstance()->GetResoureDesc(defaultLeftHandle);
-			uiLeftSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
+			uiBottomRightSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
+		}
+	}
+
+	// --- Phase.png の生成と配置 ---
+	if (uiAttackTextureHandle_ != 0u && !uiJumpSprite_) {
+		// uiMidSprite_ の位置を基準にする
+		// uiMidSprite_ はアンカー {1.0f, 0.0f} なので、その座標 (x) は TAB画像の右端。
+		// そこに少しの余白 (10pxなど) を足して配置する。
+		float phasePadding = 10.0f;
+		Vector2 midPos = uiBottomRightSprite_->GetPosition();
+		Vector2 phasePos = {midPos.x + phasePadding + kUIPhaseRightOffset, midPos.y}; // move Phase further right via offset
+
+		// アンカーポイントを {0.0f, 0.0f} (左上) にすると、TABの右隣に並べやすくなります
+		uiJumpSprite_ = KamataEngine::Sprite::Create(uiAttackTextureHandle_, phasePos, {1, 1, 1, 1}, {0.0f, 0.0f});
+
+		if (uiJumpSprite_) {
+			// 画像のサイズを設定 (例: 80x40)
+			uiJumpSprite_->SetSize(Vector2{150.0f, 40.0f});
+
+			// 全領域を使用するように設定
+			auto desc = TextureManager::GetInstance()->GetResoureDesc(uiAttackTextureHandle_);
+			uiJumpSprite_->SetTextureRect({0.0f, 0.0f}, {static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
 		}
 	}
 	
 	uiMidTextureHandle_ = TextureManager::Load("Debug/Reset.png");
 	if (uiMidTextureHandle_ != 0u) {
-		uiMidSprite_ = KamataEngine::Sprite::Create(uiMidTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 1.0f});
+		// place mid UI at top-right
+		uiMidSprite_ = KamataEngine::Sprite::Create(uiMidTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) - kUIMidRightMargin, 20.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 0.0f});
 		if (uiMidSprite_) {
 			 uiMidSprite_->SetSize(KamataEngine::Vector2{280.0f, 40.0f});
 			 auto desc = TextureManager::GetInstance()->GetResoureDesc(uiMidTextureHandle_);
 			 uiMidSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
 		}
 	}
+
+
+
+
 	// Load separate textures for mid UI (keyboard TAB vs gamepad Menu button)
 	uiMidGamepadTextureHandle_ = TextureManager::Load("Sprite/GameScene/MenuButton.png");
 	uiMidKeyboardTextureHandle_ = TextureManager::Load("Sprite/GameScene/TAB.png");
+	uiPhaseTextureHandle_ = TextureManager::Load("Sprite/GameScene/Pause.png");
+
 	// set initial mid sprite according to available resources (prefer keyboard TAB)
 	uint32_t defaultMidHandle = uiMidKeyboardTextureHandle_ != 0u ? uiMidKeyboardTextureHandle_ : uiMidGamepadTextureHandle_;
 	if (defaultMidHandle != 0u && !uiMidSprite_) {
-		uiMidSprite_ = KamataEngine::Sprite::Create(defaultMidHandle, KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 1.0f});
+		// place the mid UI at top-right
+		uiMidSprite_ = KamataEngine::Sprite::Create(defaultMidHandle, KamataEngine::Vector2{static_cast<float>(kWindowWidth) - kUIMidRightMargin, 20.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{1.0f, 0.0f});
 		if (uiMidSprite_) {
 			uiMidSprite_->SetSize(KamataEngine::Vector2{280.0f, 40.0f});
 			// ensure sprite uses full texture region
@@ -387,13 +447,45 @@ void GameScene::Initialize() {
 			}
 		}
 	}
+
+	// --- Phase.png の生成と配置 ---
+	if (uiPhaseTextureHandle_ != 0u && !uiPhaseSprite_) {
+		// uiMidSprite_ の位置を基準にする
+		// uiMidSprite_ はアンカー {1.0f, 0.0f} なので、その座標 (x) は TAB画像の右端。
+		// そこに少しの余白 (10pxなど) を足して配置する。
+		float phasePadding = 10.0f;
+		Vector2 midPos = uiMidSprite_->GetPosition();
+		Vector2 phasePos = {midPos.x + phasePadding + kUIPhaseRightOffset, midPos.y}; // move Phase further right via offset
+
+		// アンカーポイントを {0.0f, 0.0f} (左上) にすると、TABの右隣に並べやすくなります
+		uiPhaseSprite_ = KamataEngine::Sprite::Create(uiPhaseTextureHandle_, phasePos, {1, 1, 1, 1}, {0.0f, 0.0f});
+
+		if (uiPhaseSprite_) {
+			// 画像のサイズを設定 (例: 80x40)
+			uiPhaseSprite_->SetSize(Vector2{200.0f, 40.0f});
+
+			// 全領域を使用するように設定
+			auto desc = TextureManager::GetInstance()->GetResoureDesc(uiPhaseTextureHandle_);
+			uiPhaseSprite_->SetTextureRect({0.0f, 0.0f}, {static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
+		}
+	}
 	// Load separate keyboard/gamepad textures for right UI
 	uiRightGamepadTextureHandle_ = TextureManager::Load("Sprite/GameScene/AButton.png");
 	uiRightKeyboardTextureHandle_ = TextureManager::Load("Sprite/GameScene/SPACE.png");
+	uiJumpTextureHandle_ = TextureManager::Load("Sprite/GameScene/Jump.png");
+
+	
+
 	// Default choice: keyboard image if present, otherwise gamepad
 	uint32_t defaultRightHandle = uiRightKeyboardTextureHandle_ != 0u ? uiRightKeyboardTextureHandle_ : uiRightGamepadTextureHandle_;
 	if (defaultRightHandle != 0u) {
-		uiRightSprite_ = KamataEngine::Sprite::Create(defaultRightHandle, KamataEngine::Vector2{static_cast<float>(kWindowWidth) - 50.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{1.0f, 1.0f});
+		// place right UI at the top-right below the mid UI (align right)
+		const float topMargin = 20.0f;
+		const float midHeight = 40.0f;
+		const float spacingBelowMid = 8.0f;
+		float rightX = static_cast<float>(kWindowWidth) - kUIRightMargin; // 20px -> margin constant
+		float rightY = topMargin + midHeight + spacingBelowMid; // below mid UI
+		uiRightSprite_ = KamataEngine::Sprite::Create(defaultRightHandle, KamataEngine::Vector2{rightX, rightY}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{1.0f, 0.0f});
 		if (uiRightSprite_) {
 			uiRightSprite_->SetSize(KamataEngine::Vector2{156.0f, 40.0f});
 			// ensure sprite uses full texture region
@@ -401,6 +493,27 @@ void GameScene::Initialize() {
 				auto desc = TextureManager::GetInstance()->GetResoureDesc(defaultRightHandle);
 				uiRightSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
 			}
+		}
+	}
+
+	if (uiJumpTextureHandle_ != 0u && !uiAttackSprite_) {
+		// uiMidSprite_ の位置を基準にする
+		// uiMidSprite_ はアンカー {1.0f, 0.0f} なので、その座標 (x) は TAB画像の右端。
+		// そこに少しの余白 (10pxなど) を足して配置する。
+		float phasePadding = 10.0f;
+		Vector2 midPos = uiRightSprite_->GetPosition();
+		Vector2 phasePos = {midPos.x + phasePadding + kUIPhaseRightOffset - 120, midPos.y}; // move Phase further right via offset
+
+		// アンカーポイントを {0.0f, 0.0f} (左上) にすると、TABの右隣に並べやすくなります
+		uiAttackSprite_ = KamataEngine::Sprite::Create(uiJumpTextureHandle_, phasePos, {1, 1, 1, 1}, {0.0f, 0.0f});
+
+		if (uiAttackSprite_) {
+			// 画像のサイズを設定 (例: 80x40)
+			uiAttackSprite_->SetSize(Vector2{200.0f, 40.0f});
+
+			// 全領域を使用するように設定
+			auto desc = TextureManager::GetInstance()->GetResoureDesc(uiJumpTextureHandle_);
+			uiAttackSprite_->SetTextureRect({0.0f, 0.0f}, {static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
 		}
 	}
 
@@ -471,9 +584,15 @@ void GameScene::Initialize() {
 	fade_->Start(Fade::Status::FadeIn, introFadeDuration_);
 
 	seDecisionDataHandle_ = Audio::GetInstance()->LoadWave("Audio/SE/Player_Death.wav");
+	bgmDataHandle_ = Audio::GetInstance()->LoadWave("Audio/BGM/GameScene.wav");
 }
 
 void GameScene::Update() {
+
+	  if (!bgmStarted_) {
+		bgmVoiceHandle_ = Audio::GetInstance()->PlayWave(bgmDataHandle_, true, 0.8f);
+		bgmStarted_ = true;
+	}
 
 	// If a reset is already pending, ignore additional reset requests
 	if (resetPending_) {
@@ -532,10 +651,10 @@ void GameScene::Update() {
         for (int b : padButtons) {
             if (ki->PushPadButton(b)) { padInputThisFrame = true; break; }
         }
-        // Also consider trigger/edge events as pad input to be more responsive
-        for (int b : padButtons) {
-            if (ki->TriggerPadButton(b)) { padInputThisFrame = true; break; }
-        }
+		// Also consider trigger/edge events as pad input to be more responsive
+		for (int b : padButtons) {
+			if (ki->TriggerPadButton(b)) { padInputThisFrame = true; break; }
+		}
 
         // If any pad input observed at any time, remember pad as last input
         if (padInputThisFrame) lastInputWasPad_ = true;
@@ -555,24 +674,50 @@ void GameScene::Update() {
     }
 
     // Update left UI variant based on last input
-    {
-        uint32_t leftHandle = lastInputWasPad_ ? uiLeftGamepadTextureHandle_ : uiLeftKeyboardTextureHandle_;
-        if (leftHandle == 0u) leftHandle = lastInputWasPad_ ? uiLeftKeyboardTextureHandle_ : uiLeftGamepadTextureHandle_;
-        if (leftHandle != 0u) {
-            if (!uiLeftSprite_) {
-                uiLeftSprite_ = KamataEngine::Sprite::Create(leftHandle, KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
-                if (uiLeftSprite_) uiLeftSprite_->SetSize(KamataEngine::Vector2{70.0f, 40.0f});
-            } else {
-                // Update left sprite texture/size/rect only
-                uiLeftSprite_->SetTextureHandle(leftHandle);
-                uiLeftSprite_->SetSize(KamataEngine::Vector2{70.0f, 40.0f});
-                auto desc = TextureManager::GetInstance()->GetResoureDesc(leftHandle);
-                uiLeftSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
-            }
-        }
-    }
+	{
+		uint32_t leftHandle = lastInputWasPad_ ? uiLeftGamepadTextureHandle_ : uiLeftKeyboardTextureHandle_;
+		if (leftHandle == 0u) leftHandle = lastInputWasPad_ ? uiLeftKeyboardTextureHandle_ : uiLeftGamepadTextureHandle_;
+		// Do not create or replace the bottom-left main left UI if the Attack texture is not loaded
+		if (uiLeftTextureHandle_ != 0u) {
+			// main left UI exists: ensure it's present or updated
+			if (!uiLeftSprite_) {
+				uiLeftSprite_ = KamataEngine::Sprite::Create(uiLeftTextureHandle_, KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
+				if (uiLeftSprite_) uiLeftSprite_->SetSize(KamataEngine::Vector2{70.0f, 40.0f});
+			}
+		} // else: don't create main left UI at all
 
-	// Dynamic mid UI: show MenuButton when pad last used, TAB image when keyboard TAB pressed
+		// Always manage the small top-right left-variant (uiBottomRightSprite_)
+		if (leftHandle != 0u) {
+			uint32_t brHandle = leftHandle; // use same leftHandle (E or RT)
+			const float topMargin = 20.0f;
+			const float midHeight = 40.0f;
+			const float spacingBelowMid = 8.0f;
+			const float spacingBelowRight = 8.0f;
+			float rightX = static_cast<float>(kWindowWidth) - kUIRightMargin;
+			float rightY = topMargin + midHeight + spacingBelowMid; // position of uiRightSprite_
+			float bottomY = rightY + midHeight + spacingBelowRight; // below uiRightSprite_
+			if (brHandle != 0) {
+				if (!uiBottomRightSprite_) {
+					float bottomRightX = rightX - kUIBottomRightOffset;
+					uiBottomRightSprite_ = KamataEngine::Sprite::Create(brHandle, KamataEngine::Vector2{bottomRightX, bottomY}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{1.0f, 0.0f});
+					if (uiBottomRightSprite_) {
+						uiBottomRightSprite_->SetSize(KamataEngine::Vector2{70.0f, 40.0f});
+						auto desc2 = TextureManager::GetInstance()->GetResoureDesc(brHandle);
+						uiBottomRightSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc2.Width), static_cast<float>(desc2.Height)});
+					}
+				} else {
+					uiBottomRightSprite_->SetTextureHandle(brHandle);
+					uiBottomRightSprite_->SetSize(KamataEngine::Vector2{70.0f, 40.0f});
+					auto desc2 = TextureManager::GetInstance()->GetResoureDesc(brHandle);
+					uiBottomRightSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc2.Width), static_cast<float>(desc2.Height)});
+					float bottomRightX = rightX - kUIBottomRightOffset;
+					uiBottomRightSprite_->SetPosition(KamataEngine::Vector2{bottomRightX, bottomY});
+				}
+			}
+		}
+	}
+
+    // Dynamic mid UI: show MenuButton when pad last used, TAB image when keyboard TAB pressed
     {
         KeyInput* ki = KeyInput::GetInstance();
         // detect any pad input this frame
@@ -594,13 +739,12 @@ void GameScene::Update() {
         if (midHandle == 0u) midHandle = lastInputWasPad_ ? uiMidKeyboardTextureHandle_ : uiMidGamepadTextureHandle_;
         if (midHandle != 0u) {
             if (!uiMidSprite_) {
-                uiMidSprite_ = KamataEngine::Sprite::Create(midHandle, KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 1.0f});
+                // create at top-right when dynamically created
+				uiMidSprite_ = KamataEngine::Sprite::Create(midHandle, KamataEngine::Vector2{static_cast<float>(kWindowWidth) - kUIMidRightMargin, 20.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{1.0f, 0.0f});
                 if (uiMidSprite_) uiMidSprite_->SetSize(KamataEngine::Vector2{280.0f, 40.0f});
             } else {
                 uiMidSprite_->SetTextureHandle(midHandle);
-                // Ensure sprite uses full intended size after texture change
                 uiMidSprite_->SetSize(KamataEngine::Vector2{280.0f, 40.0f});
-                // Update texture rect to full texture so it doesn't get clipped
                 {
                     auto desc = TextureManager::GetInstance()->GetResoureDesc(midHandle);
                     uiMidSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
@@ -800,13 +944,20 @@ void GameScene::Update() {
 		}
 	
 		if (uiLeftSprite_) {
-			uiLeftSprite_->SetPosition(KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 50.0f});
+			uiLeftSprite_->SetPosition(KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 20.0f});
 		}
 		if (uiMidSprite_) {
-			uiMidSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) - 50.0f});
+			// Update mid UI position to top-right (keep margin)
+			uiMidSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) - kUIMidRightMargin, 20.0f});
 		}
 		if (uiRightSprite_) {
-			uiRightSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) - 50.0f, static_cast<float>(kWindowHeight) - 50.0f});
+			// place right UI at the top-right below the mid UI (align right)
+			const float topMargin = 20.0f;
+			const float midHeight = 40.0f;
+			const float spacingBelowMid = 8.0f;
+			float rightX = static_cast<float>(kWindowWidth) - kUIRightMargin; // moved left using constant
+			float rightY = topMargin + midHeight + spacingBelowMid; // below mid UI
+			uiRightSprite_->SetPosition(KamataEngine::Vector2{rightX, rightY});
 		}
 
 		// Update heart sprites to match player's current HP
@@ -817,13 +968,13 @@ void GameScene::Update() {
 				// If HP increased, rebuild by adding new hearts
 				if (hp > lastPlayerHP_) {
 					int toAdd = hp - lastPlayerHP_;
-					const float heartSize = 32.0f;
+					const float heartSize = 64.0f;
 					const float heartMarginX = 20.0f;
 					const float heartSpacing = 8.0f;
 					for (int i = 0; i < toAdd; ++i) {
 						float x = heartMarginX + static_cast<int>(hearts_.size()) * (heartSize + heartSpacing);
-						float y = static_cast<float>(kWindowHeight) - 20.0f; // bottom-aligned
-						KamataEngine::Sprite* s = KamataEngine::Sprite::Create(heartTextureHandle_, KamataEngine::Vector2{x, y}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
+						float y = 20.0f; // top-aligned
+						KamataEngine::Sprite* s = KamataEngine::Sprite::Create(heartTextureHandle_, KamataEngine::Vector2{x, y}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 0.0f});
 						if (s) s->SetSize(KamataEngine::Vector2{heartSize, heartSize});
 						HeartUI h; h.sprite = s; h.baseSize = heartSize; h.currentSize = heartSize; h.animTimer = 0.0f; h.removing = false; hearts_.push_back(h);
 					}
@@ -838,7 +989,7 @@ void GameScene::Update() {
 						const float heartMarginX = 20.0f;
 						const float heartSpacing = 8.0f;
 						float sx = heartMarginX + static_cast<int>(removeIndex) * (hearts_[removeIndex].baseSize + heartSpacing);
-						float sy = static_cast<float>(kWindowHeight) - 20.0f;
+						float sy = 20.0f; // top-aligned start position
 						hearts_[removeIndex].startPos = KamataEngine::Vector2{sx, sy};
 						hearts_[removeIndex].removing = true;
 						hearts_[removeIndex].animTimer = 0.0f;
@@ -877,7 +1028,7 @@ void GameScene::Update() {
 						const float heartMarginX = 20.0f;
 						const float heartSpacing = 8.0f;
 						float x = heartMarginX + static_cast<int>(i) * (h.baseSize + heartSpacing);
-						float y = static_cast<float>(kWindowHeight) - 20.0f;
+						float y = 20.0f; // top-aligned
 						h.sprite->SetPosition(KamataEngine::Vector2{x, y});
 						// ensure fully visible
 						h.sprite->SetColor(KamataEngine::Vector4{1,1,1,1});
@@ -1039,13 +1190,13 @@ void GameScene::Update() {
 			hudSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, hudMargin});
 		}
 		if (uiLeftSprite_) {
-			uiLeftSprite_->SetPosition(KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 50.0f});
+			uiLeftSprite_->SetPosition(KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 20.0f});
 		}
 		if (uiMidSprite_) {
-			uiMidSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) - 50.0f});
+			uiMidSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) - kUIMidRightMargin, 20.0f});
 		}
 		if (uiRightSprite_) {
-			uiRightSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) - 50.0f, static_cast<float>(kWindowHeight) - 50.0f});
+			uiRightSprite_->SetPosition(KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 80.0f});
 		}
 		if (pauseSprite_) {
 			pauseSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) / 2.0f});
@@ -1190,14 +1341,27 @@ void GameScene::Draw() {
 
     Model::PostDraw();
 
-    if (hudSprite_ || uiLeftSprite_ || uiMidSprite_ || uiRightSprite_ || countdownSprite_ || pauseSprite_ || pauseMenuSprites_[0] || pauseMenuSprites_[1] || pauseMenuSprites_[2] || !hearts_.empty()) {
+    if (hudSprite_ || uiLeftSprite_ || uiMidSprite_ || uiRightSprite_ || uiBottomRightSprite_ || countdownSprite_ || pauseSprite_ || pauseMenuSprites_[0] || pauseMenuSprites_[1] || pauseMenuSprites_[2] || !hearts_.empty()) {
         KamataEngine::DirectXCommon* dx = KamataEngine::DirectXCommon::GetInstance();
         KamataEngine::Sprite::PreDraw(dx->GetCommandList());
         if (hudSprite_) hudSprite_->Draw();
         if (uiLeftSprite_) uiLeftSprite_->Draw();
-        if (uiMidSprite_) uiMidSprite_->Draw();
+        // draw right first so mid is rendered on top
         if (uiRightSprite_) uiRightSprite_->Draw();
-        if (phase_ == Phase::kCountdown && countdownSprite_) countdownSprite_->Draw();
+        // draw the small left-variant placed at top-right (e.g. RT / E)
+        if (uiBottomRightSprite_) uiBottomRightSprite_->Draw();
+        if (uiMidSprite_) uiMidSprite_->Draw();
+		if (uiPhaseSprite_) {
+			uiPhaseSprite_->Draw();
+		}
+		if (uiAttackSprite_) {
+			uiAttackSprite_->Draw();
+		}
+		if (uiJumpSprite_)
+		{
+			uiJumpSprite_->Draw();
+		}
+		if (phase_ == Phase::kCountdown && countdownSprite_) countdownSprite_->Draw();
         if (phase_ == Phase::kPause && pauseSprite_) pauseSprite_->Draw();
 
         // draw pause menu items when paused (stacked top-down)
@@ -1371,7 +1535,7 @@ void GameScene::CheckAllCollisions() {
 		            const Vector3 victoryPos = player_->GetPosition();
 		            if (deathParticle_) { delete deathParticle_; deathParticle_ = nullptr; }
 		            deathParticle_ = new DeathParticle();
-		            deathParticle_->Initialize(model_, &camera_, victoryPos);
+					deathParticle_->Initialize(nikukyuModel_, &camera_, victoryPos);
 		             if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(0.8f, 0.2f);
 		        }
 		        return;
@@ -1427,7 +1591,7 @@ void GameScene::ChangePhase() {
 			}
 
 			deathParticle_ = new DeathParticle();
-			deathParticle_->Initialize(model_, &camera_, deathPos);
+			deathParticle_->Initialize(nikukyuModel_, &camera_, deathPos);
 
 			// play player death sound asynchronously
 			if (seDecisionDataHandle_ != 0u) {
@@ -1482,7 +1646,7 @@ void GameScene::PerformResetNow() {
 					break;
 				}
 			}
-		}
+			}
 	}
 	player_ = new Player();
 	player_->Initialize(&camera_, playerPosition);
@@ -1506,9 +1670,9 @@ void GameScene::PerformResetNow() {
 		const float heartMarginX = 20.0f;
 		const float heartSpacing = 8.0f;
 		for (int i = 0; i < hp; ++i) {
-			float x = heartMarginX + i * (heartSize + heartSpacing);
-			float y = static_cast<float>(kWindowHeight) - 20.0f;
-			KamataEngine::Sprite* s = KamataEngine::Sprite::Create(heartTextureHandle_, KamataEngine::Vector2{x, y}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
+					float x = heartMarginX + i * (heartSize + heartSpacing);
+			float y = 20.0f; // top-aligned
+			KamataEngine::Sprite* s = KamataEngine::Sprite::Create(heartTextureHandle_, KamataEngine::Vector2{x, y}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 0.0f});
 			if (s) s->SetSize(KamataEngine::Vector2{heartSize, heartSize});
 			HeartUI h; h.sprite = s; h.baseSize = heartSize; h.currentSize = heartSize; h.animTimer = 0.0f; h.removing = false; hearts_.push_back(h);
 		}
@@ -1546,19 +1710,31 @@ void GameScene::PerformResetNow() {
 		delete uiMidSprite_;
 		uiMidSprite_ = nullptr;
 	}
+	if (uiRightSprite_) {
+		delete uiRightSprite_;
+		uiRightSprite_ = nullptr;
+	}
+	// delete top-right left-variant sprite if present
+	if (uiBottomRightSprite_) {
+		delete uiBottomRightSprite_;
+		uiBottomRightSprite_ = nullptr;
+	}
+
 	if (uiLeftTextureHandle_ != 0u) {
-		uiLeftSprite_ = KamataEngine::Sprite::Create(uiLeftTextureHandle_, KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
+		uiLeftSprite_ = KamataEngine::Sprite::Create(uiLeftTextureHandle_, KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 20.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
 		if (uiLeftSprite_) uiLeftSprite_->SetSize(KamataEngine::Vector2{150.0f, 30.0f});
 	}
 	// During reset recreate preferred left UI
 	uint32_t leftHandleAfterReset = lastInputWasPad_ ? uiLeftGamepadTextureHandle_ : uiLeftKeyboardTextureHandle_;
 	if (leftHandleAfterReset == 0u) leftHandleAfterReset = lastInputWasPad_ ? uiLeftKeyboardTextureHandle_ : uiLeftGamepadTextureHandle_;
 	if (leftHandleAfterReset != 0u && !uiLeftSprite_) {
-		uiLeftSprite_ = KamataEngine::Sprite::Create(leftHandleAfterReset, KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
+		// place the small left variant slightly lower so it appears closer to the bottom edge
+		uiLeftSprite_ = KamataEngine::Sprite::Create(leftHandleAfterReset, KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 20.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
 		if (uiLeftSprite_) uiLeftSprite_->SetSize(KamataEngine::Vector2{70.0f, 40.0f});
 	}
 	if (uiMidTextureHandle_ != 0u) {
-		uiMidSprite_ = KamataEngine::Sprite::Create(uiMidTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 1.0f});
+		// place mid UI at top-right
+		uiMidSprite_ = KamataEngine::Sprite::Create(uiMidTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) - kUIMidRightMargin, 20.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 0.0f});
 		if (uiMidSprite_) {
 			 uiMidSprite_->SetSize(KamataEngine::Vector2{280.0f, 40.0f});
 			 auto desc = TextureManager::GetInstance()->GetResoureDesc(uiMidTextureHandle_);
@@ -1571,7 +1747,8 @@ void GameScene::PerformResetNow() {
 	// set initial mid sprite according to available resources (prefer keyboard TAB)
 	uint32_t defaultMidHandle = uiMidKeyboardTextureHandle_ != 0u ? uiMidKeyboardTextureHandle_ : uiMidGamepadTextureHandle_;
 	if (defaultMidHandle != 0u && !uiMidSprite_) {
-		uiMidSprite_ = KamataEngine::Sprite::Create(defaultMidHandle, KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 1.0f});
+		// place the mid UI at top-right
+		uiMidSprite_ = KamataEngine::Sprite::Create(defaultMidHandle, KamataEngine::Vector2{static_cast<float>(kWindowWidth) - kUIMidRightMargin, 20.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{1.0f, 0.0f});
 		if (uiMidSprite_) {
 			uiMidSprite_->SetSize(KamataEngine::Vector2{280.0f, 40.0f});
 			// ensure sprite uses full texture region
@@ -1581,13 +1758,41 @@ void GameScene::PerformResetNow() {
 			}
 		}
 	}
+	// --- Phase.png の生成と配置 ---
+	if (uiPhaseTextureHandle_ != 0u && !uiPhaseSprite_) {
+		// uiMidSprite_ の位置を基準にする
+		// uiMidSprite_ はアンカー {1.0f, 0.0f} なので、その座標 (x) は TAB画像の右端。
+		// そこに少しの余白 (10pxなど) を足して配置する。
+		float phasePadding = 10.0f;
+		Vector2 midPos = uiMidSprite_->GetPosition();
+		Vector2 phasePos = {midPos.x + phasePadding + kUIPhaseRightOffset, midPos.y}; // move Phase further right via offset
+
+		// アンカーポイントを {0.0f, 0.0f} (左上) にすると、TABの右隣に並べやすくなります
+		uiPhaseSprite_ = KamataEngine::Sprite::Create(uiPhaseTextureHandle_, phasePos, {1, 1, 1, 1}, {0.0f, 0.0f});
+
+		if (uiPhaseSprite_) {
+			// 画像のサイズを設定 (例: 80x40)
+			uiPhaseSprite_->SetSize(Vector2{200.0f, 40.0f});
+
+			// 全領域を使用するように設定
+			auto desc = TextureManager::GetInstance()->GetResoureDesc(uiPhaseTextureHandle_);
+			uiPhaseSprite_->SetTextureRect({0.0f, 0.0f}, {static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
+		}
+	}
 	// Load separate keyboard/gamepad textures for right UI
 	uiRightGamepadTextureHandle_ = TextureManager::Load("Sprite/GameScene/AButton.png");
 	uiRightKeyboardTextureHandle_ = TextureManager::Load("Sprite/GameScene/SPACE.png");
+
 	// Default choice: keyboard image if present, otherwise gamepad
 	uint32_t defaultRightHandle = uiRightKeyboardTextureHandle_ != 0u ? uiRightKeyboardTextureHandle_ : uiRightGamepadTextureHandle_;
 	if (defaultRightHandle != 0u) {
-		uiRightSprite_ = KamataEngine::Sprite::Create(defaultRightHandle, KamataEngine::Vector2{static_cast<float>(kWindowWidth) - 50.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{1.0f, 1.0f});
+		// place right UI at the top-right below the mid UI (align right)
+		const float topMargin = 20.0f;
+		const float midHeight = 40.0f;
+		const float spacingBelowMid = 8.0f;
+		float rightX = static_cast<float>(kWindowWidth) - kUIRightMargin; // 20px -> margin constant
+		float rightY = topMargin + midHeight + spacingBelowMid; // below mid UI
+		uiRightSprite_ = KamataEngine::Sprite::Create(defaultRightHandle, KamataEngine::Vector2{rightX, rightY}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{1.0f, 0.0f});
 		if (uiRightSprite_) {
 			uiRightSprite_->SetSize(KamataEngine::Vector2{156.0f, 40.0f});
 			// ensure sprite uses full texture region
@@ -1685,7 +1890,7 @@ void GameScene::PerformResetNow() {
 	}
 	keys_.clear();
 	// Delete ladders
-	for (Ladder* l : ladders_) {
+for (Ladder* l : ladders_) {
 		if (l) delete l;
 	}
 	ladders_.clear();
