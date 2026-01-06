@@ -469,6 +469,8 @@ void GameScene::Initialize() {
 	fade_->Initialize();
 	
 	fade_->Start(Fade::Status::FadeIn, introFadeDuration_);
+
+	seDecisionDataHandle_ = Audio::GetInstance()->LoadWave("Audio/SE/Player_Death.wav");
 }
 
 void GameScene::Update() {
@@ -1428,8 +1430,10 @@ void GameScene::ChangePhase() {
 			deathParticle_->Initialize(model_, &camera_, deathPos);
 
 			// play player death sound asynchronously
-			PlaySoundW(L"Resources/Audio/SE/Player_Death.wav", NULL, SND_FILENAME | SND_ASYNC | SND_NODEFAULT);
-			
+			if (seDecisionDataHandle_ != 0u) {
+				Audio::GetInstance()->PlayWave(seDecisionDataHandle_, false, 1.0f);
+			}
+			//seDecisionDataHandle_
 			readyForGameOver_ = false;
 		}
 

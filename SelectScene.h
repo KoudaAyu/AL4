@@ -67,4 +67,9 @@ private:
     // フェードコントローラ
     class Fade* fade_ = nullptr;
     bool fadeStarted_ = false; // start fade only after transition animation ends
+
+    // Audio handles for Select scene BGM
+    uint32_t bgmDataHandle_ = 0u;
+    uint32_t bgmVoiceHandle_ = 0u;
+    bool bgmStarted_ = false;
 };

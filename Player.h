@@ -394,4 +394,10 @@ private:
 	static inline const float kCrouchHeightMultiplier = 0.5f;
 	// 元のYスケールを保持して復元する
 	float baseScaleY_ = 1.0f;
+
+	//SE
+	uint32_t seSlidingDecisionDataHandle_ = 0u;
+	uint32_t seJumpDecisionDataHandle_ = 0u;
+	uint32_t seDamageSoundHandle_ = 0u;
+	uint32_t seAttackSoundHandle_ = 0u;
 };

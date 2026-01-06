@@ -158,6 +158,11 @@ void Player::Initialize(Camera* camera, const Vector3& position) {
 	hp_ = kMaxHP;
 	isAlive_ = true;
 	isDying_ = false;
+
+	seSlidingDecisionDataHandle_ = Audio::GetInstance()->LoadWave("Audio/SE/Sliding.wav");
+	seJumpDecisionDataHandle_ = Audio::GetInstance()->LoadWave("Audio/SE/Jump.wav");
+	seDamageSoundHandle_ = Audio::GetInstance()->LoadWave("Audio/SE/Damage.wav");
+	seAttackSoundHandle_ = Audio::GetInstance()->LoadWave("Audio/SE/Attack.wav");
 }
 
 // 移動処理
@@ -194,8 +199,10 @@ void Player::HandleMovementInput() {
         dodgeTimer_ = kDodgeDuration;
         dodgeCooldown_ = kDodgeCooldownTime;
         // play sliding sound
-        PlaySoundW(L"Resources/Audio/SE/Sliding.wav", NULL, SND_FILENAME | SND_ASYNC | SND_NODEFAULT);
-        // force crouch visually during roll
+		if (seSlidingDecisionDataHandle_ != 0u) {
+			Audio::GetInstance()->PlayWave(seSlidingDecisionDataHandle_, false, 1.0f);
+		}
+		// force crouch visually during roll
         if (!isCrouching_) {
             isCrouching_ = true;
             crouchForcedByDodge_ = true;
@@ -497,8 +504,9 @@ void Player::HandleMovementInput() {
 		velocity_.y = std::min(velocity_.y, kJumpVelocityGround);
 
 		// play jump sound asynchronously
-		PlaySoundW(L"Resources/Audio/SE/Jump.wav", NULL, SND_FILENAME | SND_ASYNC | SND_NODEFAULT);
-
+		if (seJumpDecisionDataHandle_ != 0u) {
+			Audio::GetInstance()->PlayWave(seJumpDecisionDataHandle_, false, 1.0f);
+		}
 		jumpCount_++;
 		onGround_ = false;
 
@@ -1268,8 +1276,9 @@ void Player::OnCollision(Enemy* enemy) {
 	DebugText::GetInstance()->ConsolePrintf("Player damaged. HP=%d\n", hp_);
 
 	// Play damage sound (async)
-	PlaySoundW(L"Resources/Audio/SE/Damage.wav", NULL, SND_FILENAME | SND_ASYNC | SND_NODEFAULT);
-
+	if (seDamageSoundHandle_ != 0u) {
+		Audio::GetInstance()->PlayWave(seDamageSoundHandle_, false, 1.0f);
+	}
 	invincible_ = true;
 	invincibleTimer_ = kInvincibleDuration;
 
@@ -1324,7 +1333,9 @@ void Player::BehaviorAttackInitialize() {
 	UpdateAttackEffectTransform();
 
 	// play attack sound asynchronously
-	PlaySoundW(L"Resources/Audio/SE/Attack.wav", NULL, SND_FILENAME | SND_ASYNC | SND_NODEFAULT);
+	if (seAttackSoundHandle_ != 0u) {
+		Audio::GetInstance()->PlayWave(seAttackSoundHandle_, false, 1.0f);
+	}
 }
 
 void Player::BehaviorRootUpdate() {}

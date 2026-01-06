@@ -57,4 +57,10 @@ private:
 	// Skydome for background
 	class Skydome* skydome_ = nullptr;
 
+	// Audio handles
+	uint32_t bgmDataHandle_ = 0u;
+	uint32_t bgmVoiceHandle_ = 0u;
+	uint32_t seDecisionDataHandle_ = 0u;
+	bool bgmStarted_ = false;
+
 };

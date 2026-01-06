@@ -9,10 +9,19 @@
 
 #include <algorithm>
 #include <cmath>
+#include <mmsystem.h>
+#pragma comment(lib, "winmm.lib")
 
 using namespace KamataEngine;
 
 SelectScene::~SelectScene() {
+    // stop BGM via Audio
+    if (bgmStarted_) {
+        Audio::GetInstance()->StopWave(bgmVoiceHandle_);
+        bgmVoiceHandle_ = 0u;
+        bgmStarted_ = false;
+    }
+
     if (player_) {
         delete player_;
         player_ = nullptr;
@@ -156,6 +165,9 @@ void SelectScene::Initialize() {
     fade_->Initialize();
     // start fade-in so scene appears by gradually becoming visible
     fade_->Start(Fade::Status::FadeIn, 0.6f);
+
+    // Load select scene BGM (relative to Resources/)
+    bgmDataHandle_ = Audio::GetInstance()->LoadWave("Audio/BGM/SelectScene.wav");
 }
 
 static float LerpF(float a, float b, float t) { return a + (b - a) * t; }
@@ -167,6 +179,12 @@ void SelectScene::Update() {
    
   
     if (inputTimer_ > 0.0f) inputTimer_ -= 1.0f / 60.0f;
+
+    // Ensure BGM has started once
+    if (!bgmStarted_) {
+        bgmVoiceHandle_ = Audio::GetInstance()->PlayWave(bgmDataHandle_, true, 0.8f);
+        bgmStarted_ = true;
+    }
 
     bool debugSkip = Input::GetInstance()->PushKey(DIK_SPACE) && (Input::GetInstance()->PushKey(DIK_LSHIFT) || Input::GetInstance()->PushKey(DIK_RSHIFT));
     bool padA = KeyInput::GetInstance()->TriggerPadButton(KeyInput::XINPUT_BUTTON_A);

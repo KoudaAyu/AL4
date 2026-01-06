@@ -5,10 +5,19 @@
 #include <numbers>
 #include <algorithm>
 #include "Skydome.h"
+#include <mmsystem.h>
+#pragma comment(lib, "winmm.lib")
 
 using namespace KamataEngine;
 
 TitleScene::~TitleScene() {
+    // stop BGM via Audio
+    if (bgmStarted_) {
+        Audio::GetInstance()->StopWave(bgmVoiceHandle_);
+        bgmVoiceHandle_ = 0u;
+        bgmStarted_ = false;
+    }
+
     delete fade_;
     if (model_) {
         delete model_;
@@ -81,11 +90,20 @@ void TitleScene::Initialize() {
     skydome_->Initialize();
     skydome_->SetCamera(&camera_);
 
+    // Load BGM and SE (paths are relative to Resources/)
+    bgmDataHandle_ = Audio::GetInstance()->LoadWave("Audio/BGM/Title.wav");
+    seDecisionDataHandle_ = Audio::GetInstance()->LoadWave("Audio/SE/Decision.wav");
 }
 
 void TitleScene::Update() {
 
     const float dt = 1.0f / 60.0f;
+
+    // Ensure BGM has started once
+    if (!bgmStarted_) {
+        bgmVoiceHandle_ = Audio::GetInstance()->PlayWave(bgmDataHandle_, true, 0.8f);
+        bgmStarted_ = true;
+    }
 
     switch (phase_)
     {
@@ -99,9 +117,14 @@ void TitleScene::Update() {
 
         break;
 
-        case Phase::kMain:
+    case Phase::kMain:
         // accept space key or Xbox A button
         if (Input::GetInstance()->PushKey(DIK_SPACE) || KeyInput::GetInstance()->TriggerPadButton(KeyInput::XINPUT_BUTTON_A)) {
+            // play decision sound without stopping BGM
+            if (seDecisionDataHandle_ != 0u) {
+                Audio::GetInstance()->PlayWave(seDecisionDataHandle_, false, 1.0f);
+            }
+
             // start the short effect animation before fading out: spawn particles and boost rotation
             effectTimer_ = 0.0f;
             if (!particle_) {
@@ -116,7 +139,7 @@ void TitleScene::Update() {
 
         break;
 
-        case Phase::kEffect:
+    case Phase::kEffect:
         // play a short particle + rotation effect
         effectTimer_ += dt;
         if (particle_) particle_->Update();
@@ -138,16 +161,16 @@ void TitleScene::Update() {
 
         break;
 
-        case Phase::kFadeOut:
-            // advance fade once per frame so it can finish
-            // continue updating particle effect during fade out
-            if (particle_) particle_->Update();
-            fade_->Update();
-            if (fade_->IsFinished()) {
-                finished_ = true;
-            }
+    case Phase::kFadeOut:
+        // advance fade once per frame so it can finish
+        // continue updating particle effect during fade out
+        if (particle_) particle_->Update();
+        fade_->Update();
+        if (fade_->IsFinished()) {
+            finished_ = true;
+        }
 
-            break;
+        break;
     }
 
     // smoothly interpolate rotation speed toward target

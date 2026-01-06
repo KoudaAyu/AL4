@@ -191,4 +191,6 @@ private:
 	// performed once the fade finishes.
 	bool resetPending_ = false;
 	float resetFadeDuration_ = 0.6f; // seconds
+
+	uint32_t seDecisionDataHandle_ = 0u;
 };
