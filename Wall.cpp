@@ -1,13 +1,13 @@
-#include "BloodVessels.h"
+#include "Wall.h"
 
 
 using namespace KamataEngine;
 
-BloodVessels::BloodVessels() {}
+Wall::Wall() {}
 
-BloodVessels::~BloodVessels() {}
+Wall::~Wall() {}
 
-void BloodVessels::Initialize(KamataEngine::Camera* camera, const Vector3& pos) {
+void Wall::Initialize(KamataEngine::Camera* camera, const Vector3& pos) {
 	
 	camera_ = camera;
 
@@ -16,7 +16,7 @@ void BloodVessels::Initialize(KamataEngine::Camera* camera, const Vector3& pos) 
 	worldTransform_.translation_ = pos;
 }
 
-void BloodVessels::Update() {
+void Wall::Update() {
 	UpdateAABB();
 
 	worldTransform_.matWorld_ = 
@@ -24,9 +24,9 @@ void BloodVessels::Update() {
 	worldTransform_.TransferMatrix();
 }
 
-void BloodVessels::Draw() { model_->Draw(worldTransform_, *camera_); }
+void Wall::Draw() { model_->Draw(worldTransform_, *camera_); }
 
-void BloodVessels::UpdateAABB() {
+void Wall::UpdateAABB() {
 	aabb_.min.x = worldTransform_.translation_.x - worldTransform_.scale_.x;
 	aabb_.min.y = worldTransform_.translation_.y - worldTransform_.scale_.y;
 	aabb_.min.z = worldTransform_.translation_.z - worldTransform_.scale_.z;
@@ -36,6 +36,8 @@ void BloodVessels::UpdateAABB() {
 	aabb_.max.z = worldTransform_.translation_.z + worldTransform_.scale_.z;
 }
 
-const AABB& BloodVessels::GetAABB() const {
+const AABB& Wall::GetAABB() const {
 	return aabb_;
 }
+
+const KamataEngine::Vector3& Wall::GetPosition() const { return worldTransform_.translation_; }

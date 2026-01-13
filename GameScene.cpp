@@ -5,12 +5,16 @@ using namespace KamataEngine;
 
 GameScene::GameScene() {}
 
-GameScene::~GameScene() { 
+GameScene::~GameScene() {
 	for (int32_t i = 0; i < kMaxEnemy_; ++i) {
 		delete enemies_.front();
 		enemies_.pop_front();
 	}
-	delete bloodVessels_;
+	for (int32_t i = 0; i < kMaxWall_; ++i) {
+		delete walls_.front();
+		walls_.pop_front();
+	}
+
 	delete player_;
 	delete model_;
 }
@@ -22,18 +26,22 @@ void GameScene::Initialize() {
 
 #pragma region Player初期化
 	player_ = new Player();
-	player_->Initialize(&camera_, Vector3{0.0f, 0.0f, 0.0f});
+	player_->Initialize(&camera_, Vector3{-5.0f, 0.0f, 0.0f});
 #pragma endregion Player初期化
 
-#pragma region BloodVessels初期化
-	bloodVessels_ = new BloodVessels();
-	bloodVessels_->Initialize(&camera_, Vector3{0.0f, 10.0f, 0.0f});
-#pragma endregion BloodVessels初期化
+#pragma region Wall初期化
+
+	for (int32_t i = 0; i < kMaxWall_; ++i) {
+		Wall* wall = new Wall();
+		wall->Initialize(&camera_, Vector3{static_cast<float>(i * 5 ), static_cast<float>(i * 8), 0.0f});
+		walls_.push_back(wall);
+	}
+#pragma endregion Wall初期化
 
 #pragma region Enemy初期化
 	for (int32_t i = 0; i < kMaxEnemy_; ++i) {
 		Enemy* enemy = new Enemy();
-		enemy->Initialize(&camera_, Vector3{static_cast<float>(i * 5 - 10), -10.0f, 0.0f});
+		enemy->Initialize(&camera_, Vector3{static_cast<float>(i * 5 - 10), static_cast<float>(i * 10), 0.0f});
 		enemies_.push_back(enemy);
 	}
 #pragma endregion Enemy初期化
@@ -43,9 +51,15 @@ void GameScene::Initialize() {
 }
 
 void GameScene::Update() {
-	bloodVessels_->Update();
+
+	for (int32_t i = 0; i < kMaxWall_; ++i) {
+		walls_.front()->Update();
+		walls_.push_back(walls_.front());
+		walls_.pop_front();
+	}
+
 	for (int32_t i = 0; i < kMaxEnemy_; ++i) {
-		enemies_.front()->Update();
+		enemies_.front()->Update(walls_);
 		enemies_.push_back(enemies_.front());
 		enemies_.pop_front();
 	}
@@ -61,7 +75,12 @@ void GameScene::Draw() {
 
 	/*model_->Draw(worldTransform_, camera_);*/
 
-	bloodVessels_->Draw();
+	for (int32_t i = 0; i < kMaxWall_; ++i) {
+		walls_.front()->Draw();
+		walls_.push_back(walls_.front());
+		walls_.pop_front();
+	}
+
 	for (int32_t i = 0; i < kMaxEnemy_; ++i) {
 		enemies_.front()->Draw();
 		enemies_.push_back(enemies_.front());
@@ -75,27 +94,31 @@ void GameScene::Draw() {
 
 void GameScene::CollisionCheck() {
 #pragma region AABB更新
-	if (!player_ || !bloodVessels_) return;
+	if (!player_)
+		return;
 
 	// プレイヤーと血管の AABB を更新
 	player_->UpdateAABB();
-	bloodVessels_->UpdateAABB();
-
 	const AABB& aabbPlayer = player_->GetAABB();
-	const AABB& aabbBlood = bloodVessels_->GetAABB();
 #pragma endregion AABB更新
 
-#pragma region PlayerとBloodVesselsの衝突判定
+#pragma region PlayerとWallの衝突判定
+	for (Wall* wall : walls_) {
+		if (!wall)
+			continue;
+		wall->UpdateAABB();
+		const AABB& aabbWall = wall->GetAABB();
 
-	if (IsCollisionAABBAABB(aabbPlayer, aabbBlood)) {
-		player_->HandleCollision();
+		if (IsCollisionAABBAABB(aabbPlayer, aabbWall)) {
+			player_->HandleCollision();
+		}
 	}
-
-#pragma endregion PlayerとBloodVesselsの衝突判定
+#pragma endregion PlayerとWallの衝突判定
 
 #pragma region PlayerとEnemyの衝突判定
 	for (Enemy* enemy : enemies_) {
-		if (!enemy) continue;
+		if (!enemy)
+			continue;
 
 		// 敵の AABB を更新して取得
 		enemy->UpdateAABB();
@@ -108,10 +131,16 @@ void GameScene::CollisionCheck() {
 		}
 #pragma endregion PlayerとEnemyの衝突判定
 
-#pragma endregion EnemyとBloodVesselsの衝突判定
-		if (IsCollisionAABBAABB(aabbEnemy, aabbBlood)) {
-			enemy->HandleCollision();
+#pragma endregion EnemyとWallの衝突判定
+		// Enemy と Wall の衝突判定（walls_ は list に対応）
+		for (Wall* wall : walls_) {
+			if (!wall)
+				continue;
+			const AABB& aabbWall = wall->GetAABB();
+			if (IsCollisionAABBAABB(aabbEnemy, aabbWall)) {
+				enemy->HandleCollision();
+			}
 		}
+#pragma endregion EnemyとWallの衝突判定
 	}
-#pragma endregion EnemyとBloodVesselsの衝突判定
 }

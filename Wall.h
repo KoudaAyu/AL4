@@ -2,10 +2,10 @@
 #include "KamataEngine.h"
 #include "MathUtl.h"
 // 血管(壁)
-class BloodVessels {
+class Wall {
 public:
-	BloodVessels();
-	~BloodVessels();
+	Wall();
+	~Wall();
 	void Initialize(KamataEngine::Camera* camera, const KamataEngine::Vector3& pos);
 	void Update();
 	void Draw();
@@ -14,6 +14,9 @@ public:
 
 	// AABB の取得
 	const AABB& GetAABB() const;
+
+	// 位置の取得
+	const KamataEngine::Vector3& GetPosition() const;
 
 private:
 	AABB aabb_{};

@@ -1,10 +1,10 @@
 #pragma once
 #include "KamataEngine.h"
 
-#include<list>
+#include <list>
 
-#include "BloodVessels.h"
-#include"Enemy.h"
+#include "Wall.h"
+#include "Enemy.h"
 #include "Player.h"
 
 class GameScene {
@@ -21,9 +21,8 @@ public:
 	void CollisionCheck();
 
 private:
-
-	BloodVessels* bloodVessels_ = nullptr;
-
+	std::list<Wall*> walls_;
+	static inline const int32_t kMaxWall_ = 3;
 
 	std::list<Enemy*> enemies_;
 	static inline const int32_t kMaxEnemy_ = 5;

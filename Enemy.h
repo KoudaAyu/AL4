@@ -1,13 +1,17 @@
 #pragma once
 #include "KamataEngine.h"
 #include "MathUtl.h"
+#include <list>
+
+class Wall;
 
 class Enemy {
 public:
 	Enemy();
 	~Enemy();
 	void Initialize(KamataEngine::Camera* camera, KamataEngine::Vector3 pos);
-	void Update();
+
+	void Update(const std::list<Wall*>& walls);
 	void Draw();
 
 	void UpdateAABB();
