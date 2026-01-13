@@ -879,8 +879,9 @@ void Player::SwitchingTheGrounding(CollisionMapInfo& info) {
 					if (i == 1) continue; // centerは既に見た
 					Vector3 samplePos = worldTransform_.translation_ + Vector3{ sampleXOffsets[i], - (kHeight * 0.5f) - kGroundCheckExtra, 0.0f };
 					IndexSet idx = mapChipField_->GetMapChipIndexSetByPosition(samplePos);
-					MapChipType type = mapChipField_->GetMapChipTypeByIndex(idx.xIndex, idx.yIndex);
+					
 #ifdef _DEBUG
+					MapChipType type = mapChipField_->GetMapChipTypeByIndex(idx.xIndex, idx.yIndex);
 					DebugText::GetInstance()->ConsolePrintf("GroundSample i=%d pos=(%.3f,%.3f) idx=(%d,%d) type=%d\n", i, samplePos.x, samplePos.y, idx.xIndex, idx.yIndex, static_cast<int>(type));
 #endif
 				}

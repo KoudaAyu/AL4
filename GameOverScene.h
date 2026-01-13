@@ -47,9 +47,16 @@ private:
     uint32_t optionRightTextureHandle_ = 0u;  // bottom
     KamataEngine::Sprite* optionRightSprite_ = nullptr;
 
+    uint32_t gameOverHandle = 0u;
+	KamataEngine::Sprite* gameOverSprite = nullptr;
+
     // Selection index: 0=top, 1=middle, 2=bottom
     int selectedIndex_ = 0;
     Result result_ = Result::kNone;
 
     Phase phase_ = Phase::kFadeIn;
+
+    uint32_t seDecisionDataHandle_ = 0u;
+
+
 };

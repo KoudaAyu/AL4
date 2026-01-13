@@ -203,4 +203,6 @@ private:
 	uint32_t bgmDataHandle_ = 0u;
 	uint32_t bgmVoiceHandle_ = 0u;
 	bool bgmStarted_ = false;
+
+	uint32_t seClearDataHandle_ = 0u;
 };

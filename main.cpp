@@ -14,6 +14,9 @@ SelectScene* selectScene = nullptr;
 GameScene* gameScene = nullptr;
 GameOverScene* gameOverScene = nullptr;
 
+// 現在のステージインデックスを保持
+static int gCurrentStageIndex = 0;
+
 enum class Scene {
 
 	kUnknown = 0,
@@ -37,14 +40,14 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	DirectXCommon* dxCommom = DirectXCommon::GetInstance();
 
 	// 先にエンジンを初期化してからシーンを初期化する
-	KamataEngine::Initialize(L"LE2B_07_コウダ_アユ");
+	KamataEngine::Initialize(L"LE2B_07_コウダ_アユ_ねこきり");
 
 #ifdef _DEBUG
 	ImGuiManager* imguiManager = ImGuiManager::GetInstance();
 #endif //  _DEBUG
 #ifdef _DEBUG
 	// デバッグビルドではセレクトシーンから開始
-	scene = Scene::kGame;
+	scene = Scene::kGameOver;
 #else
 	scene = Scene::kTitle;
 #endif
@@ -54,7 +57,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		titleScene = new TitleScene();
 		titleScene->Initialize();
 	} else if (scene == Scene::kGame) {
-		gameScene = new GameScene();
+		// 初期ゲームシーン開始時のステージを設定
+		gCurrentStageIndex = 0;
+		gameScene = new GameScene(gCurrentStageIndex);
 		gameScene->Initialize();
 	} else if (scene == Scene::kSelect) {
 		selectScene = new SelectScene();
@@ -126,9 +131,10 @@ void ChangeScene() {
 			// read chosen stage index and pass to GameScene
 			int chosen = selectScene->GetChosenStageIndex();
 			if (chosen < 0) chosen = 0;
+			gCurrentStageIndex = chosen; // 選択されたステージを保持
 			delete selectScene;
 			selectScene = nullptr;
-			gameScene = new GameScene(chosen);
+			gameScene = new GameScene(gCurrentStageIndex);
 			gameScene->Initialize();
 		}
 		break;
@@ -176,9 +182,9 @@ void ChangeScene() {
 			delete gameOverScene;
 			gameOverScene = nullptr;
 			if (r == GameOverScene::Result::kRetryGame) {
-				// restart game scene (default stage)
+				// restart game scene with the current stage
 				scene = Scene::kGame;
-				gameScene = new GameScene();
+				gameScene = new GameScene(gCurrentStageIndex);
 				gameScene->Initialize();
 			} else if (r == GameOverScene::Result::kBackSelect) {
 				// go back to stage select

@@ -26,6 +26,8 @@ void GameOverScene::Initialize() {
     uint32_t texMid = TextureManager::Load("Sprite/GameOver/BackSelect.png");
     uint32_t texBot = TextureManager::Load("Sprite/GameOver/BackTitle.png");
 
+    uint32_t gameOverTex = TextureManager::Load("Sprite/GameOver/GameOver.png");
+
     // load background texture (full screen)
     uint32_t texBg = TextureManager::Load("Sprite/GameOver/BackScreen.png");
 
@@ -60,10 +62,23 @@ void GameOverScene::Initialize() {
         if (optionRightSprite_) optionRightSprite_->SetSize(KamataEngine::Vector2{itemW, itemH});
     }
 
+    if (gameOverTex != 0u) {
+        gameOverHandle = gameOverTex;
+        gameOverSprite = KamataEngine::Sprite::Create(gameOverTex, KamataEngine::Vector2{centerX, centerY -230}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 0.5f});
+        if (gameOverSprite) gameOverSprite->SetSize(KamataEngine::Vector2{500.0f, 100.0f});
+	}
+
     selectedIndex_ = 0; // start at top (MorePlay)
+
+    seDecisionDataHandle_ = Audio::GetInstance()->LoadWave("Audio/BGM/GameOver.wav");
+    // Play the sound once (no loop) when the GameOver scene initializes
+    if (seDecisionDataHandle_ != 0u) {
+        Audio::GetInstance()->PlayWave(seDecisionDataHandle_, false, 1.0f);
+    }
 }
 
 void GameOverScene::Update() {
+
     // Layout constants
     const float centerX = static_cast<float>(kWindowWidth) * 0.5f;
     const float centerY = static_cast<float>(kWindowHeight) * 0.5f;
@@ -159,6 +174,8 @@ void GameOverScene::Draw() {
     if (optionLeftSprite_) optionLeftSprite_->Draw();
     if (gameOverSprite_) gameOverSprite_->Draw();
     if (optionRightSprite_) optionRightSprite_->Draw();
+	if (gameOverSprite)
+		gameOverSprite->Draw();
 
     if (fade_) fade_->Draw();
 
