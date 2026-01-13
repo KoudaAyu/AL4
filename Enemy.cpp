@@ -46,7 +46,7 @@ void Enemy::Update(const std::list<Wall*>& walls) {
 			float dirLen = Length(direction);
 			
 			if (dirLen > 0.0f) {
-				direction = Normalize(direction); // MathUtl.h の Normalize
+				direction = Normalize(direction);
 
 				float speed = 0.1f;                               // 移動速度（適宜調整）
 				worldTransform_.translation_ += direction * speed; // Vector3の演算
