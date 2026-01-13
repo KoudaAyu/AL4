@@ -1,5 +1,8 @@
 #pragma once
 #include "KamataEngine.h"
+
+#include<list>
+
 #include "BloodVessels.h"
 #include"Enemy.h"
 #include "Player.h"
@@ -20,7 +23,11 @@ public:
 private:
 
 	BloodVessels* bloodVessels_ = nullptr;
-	Enemy* enemy_ = nullptr;
+
+
+	std::list<Enemy*> enemies_;
+	static inline const int32_t kMaxEnemy_ = 5;
+
 	Player* player_ = nullptr;
 
 private:
