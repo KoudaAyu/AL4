@@ -365,7 +365,7 @@ void Player::HandleMovementInput() {
             if (inputIntensityRight > 0.0f) {
                 if (velocity_.x < 0.0f) {
                     // 反転時の減衰量を摩擦に応じて決定
-                    float reverseDamp = onIce_ ? 0.8f : (1.0f - groundFriction * 0.7f);
+                    float reverseDamp = onIce_ ? 0.8f : 0.3f;
                     velocity_.x *= reverseDamp;
 
                     if (std::fabs(velocity_.x) < 0.01f)

@@ -167,19 +167,19 @@ public:
 	// カメラコントローラの参照を渡す（カメラシェイクを呼ぶため）
 	void SetCameraController(CameraController* controller) { cameraController_ = controller; }
 
-	// HP accessor
+	
 	int GetHP() const { return hp_; }
 
-	// Key management
-	void ConsumeKey(); // called when player picks up a key
+
+	void ConsumeKey(); 
 	int GetKeyCount() const { return keyCount_; }
 
-	// Apply temporary invincibility for given duration (seconds)
+	
 	void ApplyInvincibility(float duration);
-	// Query invincibility state
+
 	bool IsInvincible() const { return invincible_; }
 
-	// Prevent jump input being recognized on the next update (useful when resuming from pause)
+
 	void SuppressNextJump();
 
 private:
@@ -207,21 +207,42 @@ private:
 	
 private:
 
+	#pragma region 地上での移動関係
+
+	// 加速量
+	static inline const float kAcceleration = 0.01f; 
+	// 横移動の最大速度
+	static inline const float kLimitRunSpeed = 0.2f;
+
+	#pragma endregion 地上での移動関係
+
+	#pragma region 梯子での移動関係
+	// 空中での横移動加速度（地上より弱め）
+	static inline const float kAirAcceleration = kAcceleration;
+	// 空中での最大横移動速度（地上より少し低め）
+	static inline const float kAirLimitRunSpeed = kLimitRunSpeed;
+	#pragma region 梯子での移動関係
+
+	#pragma region ジャンプ関係
+
+	// ジャンプ用の上向き速度（地上からの一段目）
+	// 固定値で上向き速度を設定することで、二段ジャンプの高さが入力時の落下速度に依存しないようにする
+	static inline const float kJumpVelocityGround = 0.55f;
+	// 空中での二段ジャンプ時の上向き速度（地上ジャンプよりやや小さめに）
+	static inline const float kJumpVelocityAir = 0.6f; 
+
+	#pragma endregion ジャンプ関係
+
 	uint32_t textureHandle_ = 0u;
 
-	//加速量
-	static inline const float kAcceleration = 0.04f; 
-	// 空中での横移動加速度（地上より弱め）
-	static inline const float kAirAcceleration = 0.02f;
-	// 空中での最大横移動速度（地上より少し低め）
-	static inline const float kAirLimitRunSpeed = 0.45f;
+	
+	
 
 	// 速度減衰（慣性制御）
 	// 値を増やして慣性を減らす（入力停止時にすばやく速度を落とす）
 	static inline const float kAttenuation = 0.25f; 
 
-	//横移動の最大速度
-	static inline const float kLimitRunSpeed = 0.5f;
+	
 
 	// ジャンプ直後の横方向ダンピング（地上からジャンプしたときの横慣性を抑える）
 	static inline const float kJumpHorizontalDamp = 0.7f;
@@ -268,11 +289,7 @@ private:
 	static inline const float kLimitFallSpeed = 5.0f;
 
 
-	// ジャンプ用の上向き速度（地上からの一段目）
-	// 固定値で上向き速度を設定することで、二段ジャンプの高さが入力時の落下速度に依存しないようにする
-	static inline const float kJumpVelocityGround = 0.7f; 
-	// 空中での二段ジャンプ時の上向き速度（地上ジャンプよりやや小さめに）
-	static inline const float kJumpVelocityAir = 0.6f; 
+	
 
 	// 最大落下速度(上方向)
 	static inline const float kJumpAcceleration = 1.0f;
