@@ -20,8 +20,15 @@ public:
 
 	void HandleCollision();
 
+	bool IsAlive() const { return alive_; }
+	void Kill() { alive_ = false; }
+
 private:
 	AABB aabb_{};
+
+	float speed;
+
+	bool alive_ = true;
 
 private:
 	KamataEngine::Model* model_ = nullptr;

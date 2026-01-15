@@ -22,7 +22,7 @@ public:
 
 private:
 	std::list<Wall*> walls_;
-	static inline const int32_t kMaxWall_ = 3;
+	static inline const int32_t kMaxWall_ = 16;
 
 	std::list<Enemy*> enemies_;
 	static inline const int32_t kMaxEnemy_ = 5;

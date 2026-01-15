@@ -1,5 +1,8 @@
 #include "GameScene.h"
 #include "Player.h"
+#include "Random.h"
+#include <cmath>
+#include <numbers>
 
 using namespace KamataEngine;
 
@@ -24,6 +27,9 @@ void GameScene::Initialize() {
 
 	camera_.Initialize();
 
+
+	Random::SeedEngine();
+
 #pragma region Player初期化
 	player_ = new Player();
 	player_->Initialize(&camera_, Vector3{-5.0f, 0.0f, 0.0f});
@@ -31,17 +37,31 @@ void GameScene::Initialize() {
 
 #pragma region Wall初期化
 
-	for (int32_t i = 0; i < kMaxWall_; ++i) {
-		Wall* wall = new Wall();
-		wall->Initialize(&camera_, Vector3{static_cast<float>(i * 5 ), static_cast<float>(i * 8), 0.0f});
-		walls_.push_back(wall);
+	
+	{
+		const float radius = 20.0f; 
+		const float twoPi = 2.0f * std::numbers::pi_v<float>;
+		for (int32_t i = 0; i < kMaxWall_; ++i) {
+			float angle = twoPi * static_cast<float>(i) / static_cast<float>(kMaxWall_);
+			float x = radius * std::cos(angle);
+			float y = radius * std::sin(angle);
+			Wall* wall = new Wall();
+			wall->Initialize(&camera_, Vector3{x, y, 0.0f});
+			
+			float rotZ = angle + std::numbers::pi_v<float> * 0.5f; 
+			wall->SetRotation(Vector3{0.0f, 0.0f, rotZ});
+			walls_.push_back(wall);
+		}
 	}
 #pragma endregion Wall初期化
 
 #pragma region Enemy初期化
 	for (int32_t i = 0; i < kMaxEnemy_; ++i) {
 		Enemy* enemy = new Enemy();
-		enemy->Initialize(&camera_, Vector3{static_cast<float>(i * 5 - 10), static_cast<float>(i * 10), 0.0f});
+	
+		float x = Random::GeneratorFloat(-10.0f, 10.0f);
+		float y = Random::GeneratorFloat(-10.0f, 10.0f);
+		enemy->Initialize(&camera_, Vector3{x, y, 0.0f});
 		enemies_.push_back(enemy);
 	}
 #pragma endregion Enemy初期化
@@ -53,13 +73,15 @@ void GameScene::Initialize() {
 void GameScene::Update() {
 
 	for (int32_t i = 0; i < kMaxWall_; ++i) {
-		walls_.front()->Update();
+		Wall* w = walls_.front();
+		if (w) w->Update();
 		walls_.push_back(walls_.front());
 		walls_.pop_front();
 	}
 
 	for (int32_t i = 0; i < kMaxEnemy_; ++i) {
-		enemies_.front()->Update(walls_);
+		Enemy* e = enemies_.front();
+		if (e) e->Update(walls_);
 		enemies_.push_back(enemies_.front());
 		enemies_.pop_front();
 	}
@@ -76,13 +98,15 @@ void GameScene::Draw() {
 	/*model_->Draw(worldTransform_, camera_);*/
 
 	for (int32_t i = 0; i < kMaxWall_; ++i) {
-		walls_.front()->Draw();
+		Wall* w = walls_.front();
+		if (w) w->Draw();
 		walls_.push_back(walls_.front());
 		walls_.pop_front();
 	}
 
 	for (int32_t i = 0; i < kMaxEnemy_; ++i) {
-		enemies_.front()->Draw();
+		Enemy* e = enemies_.front();
+		if (e) e->Draw();
 		enemies_.push_back(enemies_.front());
 		enemies_.pop_front();
 	}
@@ -129,18 +153,49 @@ void GameScene::CollisionCheck() {
 			player_->HandleCollision();
 			enemy->HandleCollision();
 		}
+	}
 #pragma endregion PlayerとEnemyの衝突判定
 
-#pragma endregion EnemyとWallの衝突判定
-		// Enemy と Wall の衝突判定（walls_ は list に対応）
-		for (Wall* wall : walls_) {
-			if (!wall)
-				continue;
-			const AABB& aabbWall = wall->GetAABB();
+	// Enemy と Wall の衝突判定（接触フレームを蓄積して HP を減らす）
+	for (auto wallIt = walls_.begin(); wallIt != walls_.end(); ++wallIt) {
+		Wall* wall = *wallIt;
+		if (!wall) continue;
+
+		wall->UpdateAABB();
+		const AABB& aabbWall = wall->GetAABB();
+
+		bool touched = false;
+
+		for (auto enemyIt = enemies_.begin(); enemyIt != enemies_.end(); ++enemyIt) {
+			Enemy* enemy = *enemyIt;
+			if (!enemy || !enemy->IsAlive()) continue;
+
+			enemy->UpdateAABB();
+			const AABB& aabbEnemy = enemy->GetAABB();
+
 			if (IsCollisionAABBAABB(aabbEnemy, aabbWall)) {
-				enemy->HandleCollision();
+				touched = true;
+				bool destroyed = wall->AccumulateContactFrame();
+				if (destroyed) {
+				
+					for (auto eIt = enemies_.begin(); eIt != enemies_.end(); ++eIt) {
+						Enemy* e = *eIt;
+						if (!e || !e->IsAlive()) continue;
+						e->UpdateAABB();
+						if (IsCollisionAABBAABB(e->GetAABB(), aabbWall)) {
+							e->Kill();
+						}
+					}
+
+					delete wall;
+					*wallIt = nullptr;
+					break; // この壁は破壊されたので次の壁へ
+				}
 			}
 		}
-#pragma endregion EnemyとWallの衝突判定
+
+		if (*wallIt != nullptr && !touched) {
+			wall->ResetContactFrames();
+		}
 	}
 }

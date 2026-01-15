@@ -24,7 +24,7 @@ void Wall::Update() {
 	worldTransform_.TransferMatrix();
 }
 
-void Wall::Draw() { model_->Draw(worldTransform_, *camera_); }
+void Wall::Draw() { if (model_) model_->Draw(worldTransform_, *camera_); }
 
 void Wall::UpdateAABB() {
 	aabb_.min.x = worldTransform_.translation_.x - worldTransform_.scale_.x;
@@ -41,3 +41,17 @@ const AABB& Wall::GetAABB() const {
 }
 
 const KamataEngine::Vector3& Wall::GetPosition() const { return worldTransform_.translation_; }
+
+void Wall::SetRotation(const KamataEngine::Vector3& rot) { worldTransform_.rotation_ = rot; }
+
+bool Wall::AccumulateContactFrame() {
+	++contactFrames_;
+	if (contactFrames_ >= kRequiredContactFrames_) {
+		contactFrames_ = 0;
+		--hp_;
+		if (hp_ <= 0) {
+			return true;
+		}
+	}
+	return false;
+}

@@ -16,6 +16,7 @@ void Enemy::Initialize(KamataEngine::Camera* camera, KamataEngine::Vector3 pos) 
 }
 
 void Enemy::Update(const std::list<Wall*>& walls) {
+	if (!alive_) return;
 
 	#pragma region 一番近くのWallに移動する処理
 
@@ -48,8 +49,33 @@ void Enemy::Update(const std::list<Wall*>& walls) {
 			if (dirLen > 0.0f) {
 				direction = Normalize(direction);
 
-				float speed = 0.1f;                               // 移動速度（適宜調整）
-				worldTransform_.translation_ += direction * speed; // Vector3の演算
+				const AABB& wallAABB = nearestWall->GetAABB();
+				
+				float wallHalfExtentX = (wallAABB.max.x - wallAABB.min.x) * 0.5f;
+				float wallHalfExtentY = (wallAABB.max.y - wallAABB.min.y) * 0.5f;
+				float wallHalfExtentZ = (wallAABB.max.z - wallAABB.min.z) * 0.5f;
+				
+				float wallExtent = (wallHalfExtentX > wallHalfExtentY) ? wallHalfExtentX : wallHalfExtentY;
+				wallExtent = (wallExtent > wallHalfExtentZ) ? wallExtent : wallHalfExtentZ;
+
+				
+				float enemyExtent = (worldTransform_.scale_.x > worldTransform_.scale_.y) ? worldTransform_.scale_.x : worldTransform_.scale_.y;
+				enemyExtent = (enemyExtent > worldTransform_.scale_.z) ? enemyExtent : worldTransform_.scale_.z;
+
+				float stopDistance = enemyExtent + wallExtent + 0.01f;
+
+				
+				speed = 0.1f;                               // 移動速度（適宜調整）
+
+				if (dirLen > stopDistance) {
+					
+					worldTransform_.translation_ += direction * speed; // Vector3の演算
+				} else {
+				
+					worldTransform_.translation_ = nearestWall->GetPosition() - direction * stopDistance;
+					HandleCollision(); 
+					speed = 0.0f;
+				}
 			}
 		}
 	}
@@ -62,7 +88,7 @@ void Enemy::Update(const std::list<Wall*>& walls) {
 	worldTransform_.TransferMatrix();
 }
 
-void Enemy::Draw() { model_->Draw(worldTransform_, *camera_); }
+void Enemy::Draw() { if (alive_ && model_) model_->Draw(worldTransform_, *camera_); }
 
 void Enemy::UpdateAABB()
 {
@@ -77,6 +103,4 @@ void Enemy::UpdateAABB()
 
 const AABB& Enemy::GetAABB() const { return aabb_; }
 
-void Enemy::HandleCollision() {
-	
-}
+void Enemy::HandleCollision() { speed = 0.0f; }
