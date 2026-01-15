@@ -62,16 +62,18 @@ void Enemy::Update(const std::list<Wall*>& walls) {
 				float enemyExtent = (worldTransform_.scale_.x > worldTransform_.scale_.y) ? worldTransform_.scale_.x : worldTransform_.scale_.y;
 				enemyExtent = (enemyExtent > worldTransform_.scale_.z) ? enemyExtent : worldTransform_.scale_.z;
 
-				float stopDistance = enemyExtent + wallExtent + 0.01f;
+				// 停止距離を少し小さめにして、AABBが確実に重なるようにする（衝突判定が確実に発生するように）
+				float stopDistance = enemyExtent + wallExtent - 0.05f; // 少し重なる設定
+				if (stopDistance < 0.01f) stopDistance = 0.01f; // 最小値を確保
 
-				
+				// 移動速度
 				speed = 0.1f;                               // 移動速度（適宜調整）
 
 				if (dirLen > stopDistance) {
 					
 					worldTransform_.translation_ += direction * speed; // Vector3の演算
 				} else {
-				
+					// 停止位置は壁に少しめり込むように設定してAABB衝突が発生するようにする
 					worldTransform_.translation_ = nearestWall->GetPosition() - direction * stopDistance;
 					HandleCollision(); 
 					speed = 0.0f;

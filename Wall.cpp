@@ -44,6 +44,8 @@ const KamataEngine::Vector3& Wall::GetPosition() const { return worldTransform_.
 
 void Wall::SetRotation(const KamataEngine::Vector3& rot) { worldTransform_.rotation_ = rot; }
 
+const KamataEngine::Vector3& Wall::GetRotation() const { return worldTransform_.rotation_; }
+
 bool Wall::AccumulateContactFrame() {
 	++contactFrames_;
 	if (contactFrames_ >= kRequiredContactFrames_) {
@@ -54,4 +56,12 @@ bool Wall::AccumulateContactFrame() {
 		}
 	}
 	return false;
+}
+
+void Wall::DecayContactFrames() {
+	// 被触続していないときに徐々に接触フレームを減少させる
+	if (contactFrames_ > 0) {
+		contactFrames_ -= 1; // 1フレーム分だけ減らす。必要なら緩やかに変更。
+		if (contactFrames_ < 0) contactFrames_ = 0;
+	}
 }

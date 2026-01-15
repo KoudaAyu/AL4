@@ -21,9 +21,15 @@ public:
 	// 回転を設定（z軸回転など）
 	void SetRotation(const KamataEngine::Vector3& rot);
 
+	// 回転の取得
+	const KamataEngine::Vector3& GetRotation() const;
+
 	// ダメージ蓄積（敵に触れたフレームをカウントし、一定フレームでHPを減らす）
 	// 戻り値: true の場合、HP が 0 以下となり破壊される
 	bool AccumulateContactFrame();
+
+	// 接触フレームを徐々に減らす（即時リセットではなくゆっくりデクリメント）
+	void DecayContactFrames();
 
 	int GetHP() const { return hp_; }
 	void ResetContactFrames() { contactFrames_ = 0; }

@@ -154,6 +154,7 @@
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Healer.cpp" />
     <ClCompile Include="Random.cpp" />
     <ClCompile Include="Wall.cpp" />
     <ClCompile Include="Enemy.cpp" />
@@ -260,6 +261,7 @@
     <None Include="Resources\shaders\Sprite.hlsli" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Healer.h" />
     <ClInclude Include="Random.h" />
     <ClInclude Include="Wall.h" />
     <ClInclude Include="Enemy.h" />

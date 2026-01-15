@@ -6,6 +6,7 @@
 #include "Wall.h"
 #include "Enemy.h"
 #include "Player.h"
+#include "Healer.h"
 
 class GameScene {
 public:
@@ -28,6 +29,8 @@ private:
 	static inline const int32_t kMaxEnemy_ = 5;
 
 	Player* player_ = nullptr;
+
+	Healer* healer_ = nullptr;
 
 private:
 	KamataEngine::Model* model_ = nullptr;

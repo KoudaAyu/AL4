@@ -20,6 +20,7 @@ GameScene::~GameScene() {
 
 	delete player_;
 	delete model_;
+	delete healer_;
 }
 
 void GameScene::Initialize() {
@@ -68,6 +69,9 @@ void GameScene::Initialize() {
 
 	// GameScene用のModel
 	model_ = Model::Create();
+
+	// Healer 初期化
+	healer_ = new Healer();
 }
 
 void GameScene::Update() {
@@ -88,6 +92,9 @@ void GameScene::Update() {
 	player_->Update();
 
 	CollisionCheck();
+
+	// Healer は壊れた順に修復を試みる
+	if (healer_) healer_->Update(&camera_, walls_);
 }
 
 void GameScene::Draw() {
@@ -187,6 +194,9 @@ void GameScene::CollisionCheck() {
 						}
 					}
 
+					// 壊された位置を Healer に通知
+					if (healer_) healer_->NotifyWallDestroyed(wall->GetPosition(), wall->GetRotation());
+
 					delete wall;
 					*wallIt = nullptr;
 					break; // この壁は破壊されたので次の壁へ
@@ -195,7 +205,8 @@ void GameScene::CollisionCheck() {
 		}
 
 		if (*wallIt != nullptr && !touched) {
-			wall->ResetContactFrames();
+			// 徐々に接触フレームを減らし、断続的な接触でもHPが減るようにする
+			wall->DecayContactFrames();
 		}
 	}
 }
