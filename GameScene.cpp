@@ -9,12 +9,16 @@ using namespace KamataEngine;
 GameScene::GameScene() {}
 
 GameScene::~GameScene() {
-	for (int32_t i = 0; i < kMaxEnemy_; ++i) {
-		delete enemies_.front();
+	
+	while (!enemies_.empty()) {
+		Enemy* e = enemies_.front();
+		if (e) delete e;
 		enemies_.pop_front();
 	}
-	for (int32_t i = 0; i < kMaxWall_; ++i) {
-		delete walls_.front();
+	
+	while (!walls_.empty()) {
+		Wall* w = walls_.front();
+		if (w) delete w;
 		walls_.pop_front();
 	}
 
