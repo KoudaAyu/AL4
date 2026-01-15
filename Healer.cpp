@@ -23,6 +23,7 @@ void Healer::Update(KamataEngine::Camera* camera, std::list<Wall*>& walls) {
 			const DestroyedWallInfo info = destroyedQueue_.front();
 			newWall->Initialize(camera, info.pos);
 			newWall->SetRotation(info.rot);
+			newWall->Update();
 			w = newWall;
 			destroyedQueue_.pop();
 			break;
