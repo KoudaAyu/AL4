@@ -16,7 +16,7 @@ void Spike::Initialize() {
     worldTransform_.translation_ = position_;
     worldTransform_.translation_.z = 0.0f;
     worldTransform_.rotation_ = {0, 0, 0};
-    worldTransform_.scale_ = {0.8f, 0.8f, 0.8f};
+    worldTransform_.scale_ = {1.0f, 1.0f, 1.0f};
 
     worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
     worldTransform_.TransferMatrix();
@@ -56,15 +56,22 @@ void Spike::Draw(KamataEngine::Camera* camera) {
 }
 
 AABB Spike::GetAABB() const {
-    static constexpr float kWidth = 0.8f * 2.0f;
-    static constexpr float kHeight = 0.8f * 2.0f;
-    static constexpr float kDepth = 0.8f * 2.0f;
+	// 横幅を1マス(1.0f)よりわずかに小さく（0.9fなど）する
+	// これで隣のブロックとの境界で「壁」として衝突するリスクをゼロにします
+	static constexpr float kWidth = 0.9f;
+	static constexpr float kDepth = 0.9f;
 
-    Vector3 center = position_;
-    Vector3 half = {kWidth * 0.5f, kHeight * 0.5f, kDepth * 0.5f};
+	// 高さは、ブロックの表面(0.8f)より少しだけ高く(0.85fなど)設定
+	static constexpr float kHeightOffset = 0.85f;
 
-    AABB aabb;
-    aabb.min = {center.x - half.x, center.y - half.y, center.z - half.z};
-    aabb.max = {center.x + half.x, center.y + half.y, center.z + half.z};
-    return aabb;
+	Vector3 center = position_;
+	float halfW = kWidth * 0.5f;
+	float halfD = kDepth * 0.5f;
+
+	AABB aabb;
+	aabb.min = {center.x - halfW, center.y - 0.8f, center.z - halfD};
+	// 0.85f にすることで、トゲの上に立っている時に足先が 0.05f だけ重なり、ダメージが通ります
+	aabb.max = {center.x + halfW, center.y + kHeightOffset, center.z + halfD};
+
+	return aabb;
 }

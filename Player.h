@@ -229,7 +229,7 @@ private:
 	// 固定値で上向き速度を設定することで、二段ジャンプの高さが入力時の落下速度に依存しないようにする
 	static inline const float kJumpVelocityGround = 0.55f;
 	// 空中での二段ジャンプ時の上向き速度（地上ジャンプよりやや小さめに）
-	static inline const float kJumpVelocityAir = 0.6f; 
+	static inline const float kJumpVelocityAir = 0.7f; 
 
 	#pragma endregion ジャンプ関係
 

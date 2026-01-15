@@ -179,19 +179,18 @@ void Player::HandleMovementInput() {
         return;
     }
 
-    // Q handling: tap = roll (trigger)
+  
     bool qTriggered = Input::GetInstance()->TriggerKey(DIK_Q);
-    
-    // Also allow Xbox left trigger (LT) rising to trigger dodge
-    static bool prevLeftTriggerPressed = false;
+
+	static bool prevLeftTriggerPressed = false;
     bool leftTriggerPressed = (state.Gamepad.bLeftTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
     bool leftTriggerRising = leftTriggerPressed && !prevLeftTriggerPressed;
     prevLeftTriggerPressed = leftTriggerPressed;
     
-    // combine keyboard Q and gamepad LT rising
+  
     bool dodgeTriggered = qTriggered || leftTriggerRising;
 
-    // If Q was tapped, initiate roll/dodge
+  
     if (dodgeTriggered && !isDodging_ && dodgeCooldown_ <= 0.0f && behavior_ != Behavior::kAttack && !isDying_) {
         float dir = (lrDirection_ == LRDirection::kRight) ? 1.0f : -1.0f;
         velocity_.x = dir * kDodgeSpeed;
@@ -202,15 +201,15 @@ void Player::HandleMovementInput() {
 		if (seSlidingDecisionDataHandle_ != 0u) {
 			Audio::GetInstance()->PlayWave(seSlidingDecisionDataHandle_, false, 1.0f);
 		}
-		// force crouch visually during roll
+		
         if (!isCrouching_) {
             isCrouching_ = true;
             crouchForcedByDodge_ = true;
-            // compute half-heights in world units (use absolute scales) so scaling pivots at the bottom
+          
             float oldHalfHeight = kHeight * 0.5f * worldTransform_.scale_.y;
             float newScaleY = baseScaleY_ * kCrouchVisualScale;
             float newHalfHeight = kHeight * 0.5f * newScaleY;
-            // set new scale and move translation so feet (bottom) remain at same world Y
+            
             worldTransform_.scale_.y = newScaleY;
             worldTransform_.translation_.y += (newHalfHeight - oldHalfHeight);
             UpdateAABB();
@@ -501,7 +500,7 @@ void Player::HandleMovementInput() {
 			velocity_.y = kJumpVelocityAir;
 		}
 		// 急速な二段ジャンプ入力で想定外に高くなるのを防ぐため、上向き速度を上限でクランプする
-		velocity_.y = std::min(velocity_.y, kJumpVelocityGround);
+	
 
 		// play jump sound asynchronously
 		if (seJumpDecisionDataHandle_ != 0u) {
@@ -895,7 +894,7 @@ void Player::SwitchingTheGrounding(CollisionMapInfo& info) {
 #ifdef _DEBUG
 					DebugText::GetInstance()->ConsolePrintf("GroundSample i=%d pos=(%.3f,%.3f) idx=(%d,%d) type=%d\n", i, samplePos.x, samplePos.y, idx.xIndex, idx.yIndex, static_cast<int>(type));
 #endif
-					if (type == MapChipType::kBlock || type == MapChipType::kIce) {
+					if (type == MapChipType::kBlock || type == MapChipType::kIce || type == MapChipType::kSpike) {
 						hits++;
 					}
 				}
@@ -1022,7 +1021,7 @@ void Player::HandleMapCollisionDown(CollisionMapInfo& info) {
 		IndexSet index = mapChipField_->GetMapChipIndexSetByPosition(pos);
 		MapChipType type = mapChipField_->GetMapChipTypeByIndex(index.xIndex, index.yIndex);
 
-		if (type == MapChipType::kBlock || type == MapChipType::kIce) {
+		if (type == MapChipType::kBlock || type == MapChipType::kIce || type == MapChipType::kSpike) {
 			// ★ここがポイント：ブロックの「実際の座標」を取得する
 			Rects rect = mapChipField_->GetRectByIndex(index.xIndex, index.yIndex);
 
