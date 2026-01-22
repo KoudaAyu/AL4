@@ -155,6 +155,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Healer.cpp" />
+    <ClCompile Include="HealerActor.cpp" />
     <ClCompile Include="Random.cpp" />
     <ClCompile Include="Wall.cpp" />
     <ClCompile Include="Enemy.cpp" />
@@ -262,6 +263,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Healer.h" />
+    <ClInclude Include="HealerActor.h" />
     <ClInclude Include="Random.h" />
     <ClInclude Include="Wall.h" />
     <ClInclude Include="Enemy.h" />

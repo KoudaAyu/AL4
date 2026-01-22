@@ -7,6 +7,7 @@
 #include "Enemy.h"
 #include "Player.h"
 #include "Healer.h"
+#include"HealerActor.h"
 
 class GameScene {
 public:
@@ -27,6 +28,9 @@ private:
 
 	std::list<Enemy*> enemies_;
 	static inline const int32_t kMaxEnemy_ = 5;
+
+	std::list<HealerActor*> healerActor_;
+	static inline const int32_t kMaxHealerActor_ = 20;
 
 	Player* player_ = nullptr;
 

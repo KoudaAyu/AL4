@@ -21,7 +21,7 @@ public:
 	void HandleCollision();
 
 	bool IsAlive() const { return alive_; }
-	void Kill() { alive_ = false; }
+	void Kill();
 
 private:
 	AABB aabb_{};
@@ -29,6 +29,10 @@ private:
 	float speed;
 
 	bool alive_ = true;
+
+	// Respawn support
+	int respawnCounter_ = 0;
+	static inline const int kRespawnFrames = 300; // フレーム数でリスポーンまでの待ち
 
 private:
 	KamataEngine::Model* model_ = nullptr;

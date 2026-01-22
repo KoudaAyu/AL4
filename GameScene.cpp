@@ -43,7 +43,7 @@ void GameScene::Initialize() {
 #pragma region Wall初期化
 
 	
-	{
+	
 		const float radius = 20.0f; 
 		const float twoPi = 2.0f * std::numbers::pi_v<float>;
 		for (int32_t i = 0; i < kMaxWall_; ++i) {
@@ -57,7 +57,7 @@ void GameScene::Initialize() {
 			wall->SetRotation(Vector3{0.0f, 0.0f, rotZ});
 			walls_.push_back(wall);
 		}
-	}
+	
 #pragma endregion Wall初期化
 
 #pragma region Enemy初期化
@@ -70,6 +70,18 @@ void GameScene::Initialize() {
 		enemies_.push_back(enemy);
 	}
 #pragma endregion Enemy初期化
+
+	#pragma region HealerActor初期化
+
+	for (int32_t i = 0; i < kMaxHealerActor_; ++i) {
+		HealerActor* healerActor = new HealerActor();
+		float x = Random::GeneratorFloat(-15.0f, 15.0f);
+		float y = Random::GeneratorFloat(-15.0f, 15.0f);
+		healerActor->Initialize(&camera_, Vector3{ x, y, 0.0f });
+		healerActor_.push_back(healerActor);
+	}
+
+	#pragma endregion HealerActor初期化
 
 	// GameScene用のModel
 	model_ = Model::Create();
@@ -93,12 +105,21 @@ void GameScene::Update() {
 		enemies_.push_back(enemies_.front());
 		enemies_.pop_front();
 	}
+
+	for (int32_t i = 0; i < kMaxHealerActor_; ++i)
+	{
+		HealerActor* ha = healerActor_.front();
+		if (ha)
+			ha->Update();
+		healerActor_.push_back(healerActor_.front());
+		healerActor_.pop_front();
+	}
 	player_->Update();
 
 	CollisionCheck();
 
 	// Healer は壊れた順に修復を試みる
-	if (healer_) healer_->Update(&camera_, walls_);
+	if (healer_) healer_->Update(&camera_, walls_, healerActor_);
 }
 
 void GameScene::Draw() {
@@ -121,6 +142,16 @@ void GameScene::Draw() {
 		enemies_.push_back(enemies_.front());
 		enemies_.pop_front();
 	}
+
+	for (int32_t i = 0; i < kMaxHealerActor_; ++i)
+	{
+		HealerActor* ha = healerActor_.front();
+		if (ha)
+			ha->Draw();
+		healerActor_.push_back(healerActor_.front());
+		healerActor_.pop_front();
+	}
+
 	player_->Draw();
 
 	// Model描画後処理

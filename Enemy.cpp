@@ -1,5 +1,6 @@
 #include "Enemy.h"
 #include "Wall.h"
+#include "Random.h"
 #include <limits>
 #include <cfloat>
 using namespace KamataEngine;
@@ -16,7 +17,26 @@ void Enemy::Initialize(KamataEngine::Camera* camera, KamataEngine::Vector3 pos) 
 }
 
 void Enemy::Update(const std::list<Wall*>& walls) {
-	if (!alive_) return;
+	if (!alive_) {
+		// カウントダウンでリスポーン判定
+		if (respawnCounter_ > 0) {
+			--respawnCounter_;
+		} else {
+			// リスポーン
+			alive_ = true;
+			// ランダム位置に再配置（適宜範囲は調整）
+			float x = Random::GeneratorFloat(-10.0f, 10.0f);
+			float y = Random::GeneratorFloat(-10.0f, 10.0f);
+			worldTransform_.translation_ = Vector3{x, y, 0.0f};
+			// 初期速度をリセット
+			speed = 0.0f;
+		}
+		// UpdateAABB と transform 更新はリスポーン後も行う
+		UpdateAABB();
+		worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
+		worldTransform_.TransferMatrix();
+		return;
+	}
 
 	#pragma region 一番近くのWallに移動する処理
 
@@ -106,3 +126,5 @@ void Enemy::UpdateAABB()
 const AABB& Enemy::GetAABB() const { return aabb_; }
 
 void Enemy::HandleCollision() { speed = 0.0f; }
+
+void Enemy::Kill() { alive_ = false; respawnCounter_ = kRespawnFrames; }
