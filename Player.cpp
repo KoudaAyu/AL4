@@ -9,7 +9,7 @@ Player::~Player() {}
 
 void Player::Initialize(KamataEngine::Camera* camera, const Vector3& pos) {
 
-	model_ = Model::Create();
+	model_ = Model::CreateFromOBJ("TD_player", true);
 
 	camera_ = camera;
 
