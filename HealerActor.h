@@ -16,10 +16,15 @@ public:
 	void MoveTowards(const KamataEngine::Vector3& target, float speed);
 	void RefreshTransform();
 
+
+	void SetAssigned(bool assigned);
+	bool IsAssigned() const;
+
 	private:
 
 		KamataEngine::Model* model_ = nullptr;
 	    KamataEngine::WorldTransform worldTransform_;
 	    KamataEngine::Camera* camera_ = nullptr;
+		bool assigned_ = false;
 
 };

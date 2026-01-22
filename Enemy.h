@@ -4,6 +4,7 @@
 #include <list>
 
 class Wall;
+class HealerActor;
 
 class Enemy {
 public:
@@ -11,7 +12,7 @@ public:
 	~Enemy();
 	void Initialize(KamataEngine::Camera* camera, KamataEngine::Vector3 pos);
 
-	void Update(const std::list<Wall*>& walls);
+	void Update(const std::list<Wall*>& walls, const std::list<HealerActor*>& healers);
 	void Draw();
 
 	void UpdateAABB();
@@ -30,7 +31,7 @@ private:
 
 	bool alive_ = true;
 
-	// Respawn support
+
 	int respawnCounter_ = 0;
 	static inline const int kRespawnFrames = 300; // フレーム数でリスポーンまでの待ち
 

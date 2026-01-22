@@ -2,13 +2,15 @@
 
 #include <cfloat>
 #include <cmath>
+#include <vector>
+#include <algorithm>
 
 Healer::Healer() {}
 
 Healer::~Healer() {}
 
 void Healer::NotifyWallDestroyed(const KamataEngine::Vector3& pos, const KamataEngine::Vector3& rot) {
-	destroyedQueue_.push_back(DestroyedWallInfo{pos, rot, nullptr});
+	destroyedQueue_.push_back(DestroyedWallInfo{pos, rot, {}});
 }
 
 
@@ -22,38 +24,49 @@ static float DistanceSq(const KamataEngine::Vector3& a, const KamataEngine::Vect
 void Healer::Update(KamataEngine::Camera* camera, std::list<Wall*>& walls, std::list<HealerActor*>& healers) {
 	if (destroyedQueue_.empty()) return;
 
+	// 最大同一壁あたりの割り当て数
+	static const int kMaxPerWall = 5;
+
 	
-	for (DestroyedWallInfo& info : destroyedQueue_) {
-		if (info.assignedHealer != nullptr) continue;
-
-		float bestDist = FLT_MAX;
-		HealerActor* best = nullptr;
-
-		for (HealerActor* ha : healers) {
-			if (!ha) continue;
-
-			bool alreadyAssigned = false;
-			for (const DestroyedWallInfo& other : destroyedQueue_) {
-				if (other.assignedHealer == ha) { alreadyAssigned = true; break; }
-			}
-			if (alreadyAssigned) continue;
-
-			float d = DistanceSq(ha->GetPosition(), info.pos);
-			if (d < bestDist) {
-				bestDist = d;
-				best = ha;
-			}
-		}
-
-		info.assignedHealer = best;
+	std::vector<HealerActor*> availableHealers;
+	availableHealers.reserve(healers.size());
+	for (HealerActor* ha : healers) {
+		if (!ha) continue;
+		if (ha->IsAssigned()) continue;
+		availableHealers.push_back(ha);
 	}
 
 	
-	const float speed = 0.05f;
 	for (DestroyedWallInfo& info : destroyedQueue_) {
-		if (info.assignedHealer) {
-			info.assignedHealer->MoveTowards(info.pos, speed);
-			info.assignedHealer->RefreshTransform();
+		int need = kMaxPerWall - static_cast<int>(info.assignedHealers.size());
+		if (need <= 0) continue;
+
+		while (need > 0 && !availableHealers.empty()) {
+		
+			int bestIdx = -1;
+			float bestDist = FLT_MAX;
+			for (int i = 0; i < (int)availableHealers.size(); ++i) {
+				HealerActor* ha = availableHealers[i];
+				float d = DistanceSq(ha->GetPosition(), info.pos);
+				if (d < bestDist) { bestDist = d; bestIdx = i; }
+			}
+			if (bestIdx < 0) break;
+			HealerActor* chosen = availableHealers[bestIdx];
+			info.assignedHealers.push_back(chosen);
+			chosen->SetAssigned(true);
+			
+			availableHealers.erase(availableHealers.begin() + bestIdx);
+			--need;
+		}
+	}
+
+
+	const float speed = 0.1f;
+	for (DestroyedWallInfo& info : destroyedQueue_) {
+		for (HealerActor* ha : info.assignedHealers) {
+			if (!ha) continue;
+			ha->MoveTowards(info.pos, speed);
+			ha->RefreshTransform();
 		}
 	}
 
@@ -72,10 +85,11 @@ void Healer::Update(KamataEngine::Camera* camera, std::list<Wall*>& walls, std::
 			newWall->Update();
 			w = newWall;
 
-		
-			if (info.assignedHealer) {
+			// 割り当てられていた HealerActor がいれば削除してスロットを nullptr にする
+			for (HealerActor* assigned : info.assignedHealers) {
+				if (!assigned) continue;
 				for (HealerActor*& slot : healers) {
-					if (slot == info.assignedHealer) {
+					if (slot == assigned) {
 						delete slot;
 						slot = nullptr;
 						break;

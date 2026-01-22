@@ -1,4 +1,5 @@
 #include "HealerActor.h"
+#include <cmath>
 
 using namespace KamataEngine;
 
@@ -48,3 +49,7 @@ void HealerActor::RefreshTransform() {
 	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
 	worldTransform_.TransferMatrix();
 }
+
+void HealerActor::SetAssigned(bool assigned) { assigned_ = assigned; }
+
+bool HealerActor::IsAssigned() const { return assigned_; }

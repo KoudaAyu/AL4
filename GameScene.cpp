@@ -101,7 +101,7 @@ void GameScene::Update() {
 
 	for (int32_t i = 0; i < kMaxEnemy_; ++i) {
 		Enemy* e = enemies_.front();
-		if (e) e->Update(walls_);
+		if (e) e->Update(walls_, healerActor_);
 		enemies_.push_back(enemies_.front());
 		enemies_.pop_front();
 	}

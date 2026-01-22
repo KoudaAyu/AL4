@@ -1,6 +1,7 @@
 #include "Enemy.h"
 #include "Wall.h"
 #include "Random.h"
+#include "HealerActor.h"
 #include <limits>
 #include <cfloat>
 using namespace KamataEngine;
@@ -16,7 +17,7 @@ void Enemy::Initialize(KamataEngine::Camera* camera, KamataEngine::Vector3 pos) 
 	worldTransform_.translation_ = pos;
 }
 
-void Enemy::Update(const std::list<Wall*>& walls) {
+void Enemy::Update(const std::list<Wall*>& walls, const std::list<HealerActor*>& healers) {
 	if (!alive_) {
 		// カウントダウンでリスポーン判定
 		if (respawnCounter_ > 0) {
@@ -38,10 +39,23 @@ void Enemy::Update(const std::list<Wall*>& walls) {
 		return;
 	}
 
-	#pragma region 一番近くのWallに移動する処理
+	// まずは修復中のHealerActorの位置を優先して狙う
+	HealerActor const* targetHealer = nullptr;
+	float bestHealerDist = FLT_MAX;
+	for (HealerActor const* ha : healers) {
+		if (!ha) continue;
+		if (!ha->IsAssigned()) continue; // 修復中のもののみ
+		float d = (ha->GetPosition() - worldTransform_.translation_).Length();
+		if (d < bestHealerDist) { bestHealerDist = d; targetHealer = ha; }
+	}
 
-	if (!walls.empty())
-	{
+	KamataEngine::Vector3 targetPos{0,0,0};
+	bool hasTarget = false;
+	if (targetHealer) {
+		hasTarget = true;
+		targetPos = targetHealer->GetPosition();
+	} else {
+		// 修復中のHealerがいなければ従来通り最寄りのWallを狙う
 		Wall* nearestWall = nullptr;
 
 		float nearestDistance = FLT_MAX;
@@ -61,48 +75,25 @@ void Enemy::Update(const std::list<Wall*>& walls) {
 			}
 		}
 
-		if (nearestWall)
-		{
-			Vector3 direction = nearestWall->GetPosition() - worldTransform_.translation_;
-			float dirLen = Length(direction);
-			
-			if (dirLen > 0.0f) {
-				direction = Normalize(direction);
-
-				const AABB& wallAABB = nearestWall->GetAABB();
-				
-				float wallHalfExtentX = (wallAABB.max.x - wallAABB.min.x) * 0.5f;
-				float wallHalfExtentY = (wallAABB.max.y - wallAABB.min.y) * 0.5f;
-				float wallHalfExtentZ = (wallAABB.max.z - wallAABB.min.z) * 0.5f;
-				
-				float wallExtent = (wallHalfExtentX > wallHalfExtentY) ? wallHalfExtentX : wallHalfExtentY;
-				wallExtent = (wallExtent > wallHalfExtentZ) ? wallExtent : wallHalfExtentZ;
-
-				
-				float enemyExtent = (worldTransform_.scale_.x > worldTransform_.scale_.y) ? worldTransform_.scale_.x : worldTransform_.scale_.y;
-				enemyExtent = (enemyExtent > worldTransform_.scale_.z) ? enemyExtent : worldTransform_.scale_.z;
-
-				// 停止距離を少し小さめにして、AABBが確実に重なるようにする（衝突判定が確実に発生するように）
-				float stopDistance = enemyExtent + wallExtent - 0.05f; // 少し重なる設定
-				if (stopDistance < 0.01f) stopDistance = 0.01f; // 最小値を確保
-
-				// 移動速度
-				speed = 0.1f;                               // 移動速度（適宜調整）
-
-				if (dirLen > stopDistance) {
-					
-					worldTransform_.translation_ += direction * speed; // Vector3の演算
-				} else {
-					// 停止位置は壁に少しめり込むように設定してAABB衝突が発生するようにする
-					worldTransform_.translation_ = nearestWall->GetPosition() - direction * stopDistance;
-					HandleCollision(); 
-					speed = 0.0f;
-				}
-			}
+		if (nearestWall) {
+			hasTarget = true;
+			targetPos = nearestWall->GetPosition();
 		}
 	}
 
-	#pragma endregion 一番近くのWallに移動する処理
+	if (hasTarget) {
+		Vector3 direction = targetPos - worldTransform_.translation_;
+		float dirLen = Length(direction);
+		
+		if (dirLen > 0.0f) {
+			direction = Normalize(direction);
+
+			// 移動速度
+			speed = 0.1f;                               // 移動速度（適宜調整）
+
+			worldTransform_.translation_ += direction * speed; // Vector3の演算
+		}
+	}
 
 	UpdateAABB();
 

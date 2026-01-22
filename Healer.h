@@ -5,6 +5,7 @@
 
 #include <deque>
 #include <list>
+#include <vector>
 
 // 壊された壁を順番に直す役割
 class Healer {
@@ -17,14 +18,13 @@ public:
 
 	// 毎フレーム呼び出す。修復可能なときに次の壊れた壁を復元する。
 	// camera は Wall の初期化に必要。walls は復元先のコンテナ（nullptr のスロットを探す）
-
 	void Update(KamataEngine::Camera* camera, std::list<Wall*>& walls, std::list<HealerActor*>& healers);
 
 private:
 	struct DestroyedWallInfo {
 		KamataEngine::Vector3 pos;
 		KamataEngine::Vector3 rot;
-		HealerActor* assignedHealer = nullptr;
+		std::vector<HealerActor*> assignedHealers; // 演出用に割り当てられたHealerActor複数
 	};
 
 	std::deque<DestroyedWallInfo> destroyedQueue_{};
