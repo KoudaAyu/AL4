@@ -15,6 +15,8 @@ void Enemy::Initialize(KamataEngine::Camera* camera, KamataEngine::Vector3 pos) 
 	model_ = Model::Create();
 	worldTransform_.Initialize();
 	worldTransform_.translation_ = pos;
+	preferHealer_ = false;
+	preferHealerTimer_ = 0;
 }
 
 void Enemy::Update(const std::list<Wall*>& walls, const std::list<HealerActor*>& healers) {
@@ -39,7 +41,17 @@ void Enemy::Update(const std::list<Wall*>& walls, const std::list<HealerActor*>&
 		return;
 	}
 
-	// まずは修復中のHealerActorの位置を優先して狙う
+	
+	if (preferHealerTimer_ <= 0) {
+		// roll once and cache result for kPreferHealerFrames
+		float prob = Random::GeneratorFloat(0.0f, 1.0f);
+		preferHealer_ = (prob <= 0.5f);
+		preferHealerTimer_ = kPreferHealerFrames;
+	} else {
+		--preferHealerTimer_;
+	}
+
+	// まずは修復中のHealerActorの位置を優先して狙う（ただし確率で切り替える）
 	HealerActor const* targetHealer = nullptr;
 	float bestHealerDist = FLT_MAX;
 	for (HealerActor const* ha : healers) {
@@ -51,11 +63,11 @@ void Enemy::Update(const std::list<Wall*>& walls, const std::list<HealerActor*>&
 
 	KamataEngine::Vector3 targetPos{0,0,0};
 	bool hasTarget = false;
-	if (targetHealer) {
+	if (targetHealer && preferHealer_) {
 		hasTarget = true;
 		targetPos = targetHealer->GetPosition();
 	} else {
-		// 修復中のHealerがいなければ従来通り最寄りのWallを狙う
+		// 修復中のHealerを選ばなかった、または存在しなかった場合は従来通り最寄りのWallを狙う
 		Wall* nearestWall = nullptr;
 
 		float nearestDistance = FLT_MAX;

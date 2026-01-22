@@ -35,6 +35,11 @@ private:
 	int respawnCounter_ = 0;
 	static inline const int kRespawnFrames = 300; // フレーム数でリスポーンまでの待ち
 
+
+	bool preferHealer_ = false;
+	int preferHealerTimer_ = 0;
+	static inline const int kPreferHealerFrames = 60; 
+
 private:
 	KamataEngine::Model* model_ = nullptr;
 	KamataEngine::WorldTransform worldTransform_;
