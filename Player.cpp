@@ -179,7 +179,7 @@ void Player::HandleMovementInput() {
         return;
     }
 
-  
+	//緊急回避用キー  
     bool qTriggered = Input::GetInstance()->TriggerKey(DIK_Q);
 
 	static bool prevLeftTriggerPressed = false;

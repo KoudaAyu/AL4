@@ -128,7 +128,6 @@ void ChangeScene() {
 	case Scene::kSelect:
 		if (selectScene && selectScene->IsFinished()) {
 			scene = Scene::kGame;
-			// read chosen stage index and pass to GameScene
 			int chosen = selectScene->GetChosenStageIndex();
 			if (chosen < 0) chosen = 0;
 			gCurrentStageIndex = chosen; // 選択されたステージを保持
@@ -140,15 +139,14 @@ void ChangeScene() {
 		break;
 	case Scene::kGame:
 		if (gameScene) {
-			// check request to go back to select from pause menu
 			if (gameScene->IsBackToSelectRequested()) {
-				// switch to select scene
+			
 				delete gameScene;
 				gameScene = nullptr;
 				scene = Scene::kSelect;
 				selectScene = new SelectScene();
 				selectScene->Initialize();
-				// prevent leftover confirm input (space/A) from making the select-scene player jump
+				
 				selectScene->SuppressPlayerNextJump();
 				return;
 			}
@@ -164,35 +162,35 @@ void ChangeScene() {
 
 			// クリア完了 -> ステージセレクトへ遷移
 			if (gameScene->IsFinished()) {
-				// go back to stage select instead of game clear scene
+		
 				delete gameScene;
 				gameScene = nullptr;
 				scene = Scene::kSelect;
 				selectScene = new SelectScene();
 				selectScene->Initialize();
-				// prevent leftover confirm input from affecting select scene
+			
 				selectScene->SuppressPlayerNextJump();
 			}
 		}
 		break;
 	case Scene::kGameOver:
 		if (gameOverScene && gameOverScene->IsFinished()) {
-			// decide where to go based on selection result
+			
 			GameOverScene::Result r = gameOverScene->GetResult();
 			delete gameOverScene;
 			gameOverScene = nullptr;
 			if (r == GameOverScene::Result::kRetryGame) {
-				// restart game scene with the current stage
+				
 				scene = Scene::kGame;
 				gameScene = new GameScene(gCurrentStageIndex);
 				gameScene->Initialize();
 			} else if (r == GameOverScene::Result::kBackSelect) {
-				// go back to stage select
+				
 				scene = Scene::kSelect;
 				selectScene = new SelectScene();
 				selectScene->Initialize();
 			} else {
-				// back to title by default
+			
 				scene = Scene::kTitle;
 				titleScene = new TitleScene();
 				titleScene->Initialize();

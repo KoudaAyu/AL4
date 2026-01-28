@@ -17,13 +17,13 @@
 #pragma comment(lib, "winmm.lib")
 using namespace KamataEngine;
 
-// margin from right edge for top-right UI elements (increase to move UI left)
+
 static constexpr float kUIRightMargin = 230.0f;
-// additional left offset for the small top-right left-variant (uiBottomRightSprite_)
+
 static constexpr float kUIBottomRightOffset = 40.0f;
-// margin from right edge for the mid UI (Menu / TAB). Increase to move mid UI left.
+
 static constexpr float kUIMidRightMargin = 300.0f;
-// add dedicated offset for Phase sprite positioning to the right of mid UI
+
 static constexpr float kUIPhaseRightOffset = 150.0f;
 
 GameScene::GameScene() : GameScene(0) {}
@@ -54,6 +54,10 @@ GameScene::~GameScene() {
 	delete player_;
 
 	delete deathParticle_;
+	for (EnemyDeathParticle* enemyDeathParticle : enemyDeathParticles_)
+	{
+		delete enemyDeathParticle;
+	}
 
 	for (std::vector<WorldTransform*>& row : worldTransformBlocks_) {
 		for (WorldTransform* wt : row) {
@@ -83,7 +87,7 @@ GameScene::~GameScene() {
 		delete uiRightSprite_;
 		uiRightSprite_ = nullptr;
 	}
-	// delete top-right left-variant sprite if present
+
 	if (uiBottomRightSprite_) {
 		delete uiBottomRightSprite_;
 		uiBottomRightSprite_ = nullptr;
@@ -95,7 +99,7 @@ GameScene::~GameScene() {
 		countdownSprite_ = nullptr;
 	}
 
-	// delete hearts_ sprites
+
 	for (auto& h : hearts_) {
 		if (h.sprite) delete h.sprite;
 	}
@@ -107,7 +111,7 @@ GameScene::~GameScene() {
 		pauseSprite_ = nullptr;
 	}
 
-	// delete pause menu sprites
+
 	for (int i = 0; i < 3; ++i) {
 		if (pauseMenuSprites_[i]) {
 			delete pauseMenuSprites_[i];
@@ -124,19 +128,18 @@ GameScene::~GameScene() {
 	}
 	goals_.clear();
 
-	// delete keys
+
 	for (Key* k : keys_) {
 		delete k;
 	}
 	keys_.clear();
 
-	// delete ladders
 for (Ladder* l : ladders_) {
 		delete l;
 	}
 	ladders_.clear();
 
-	// delete ice model
+
 	delete iceModel_;
 }
 
@@ -926,6 +929,20 @@ void GameScene::Update() {
             }
         }
 
+		for (auto it = enemyDeathParticles_.begin(); it != enemyDeathParticles_.end();) {
+			EnemyDeathParticle* p = *it;
+			if (!p) {
+				it = enemyDeathParticles_.erase(it);
+				continue;
+			}
+			p->Update();
+			if (p->IsFinished()) {
+				delete p;
+				it = enemyDeathParticles_.erase(it);
+			} else
+				++it;
+		}
+
 #ifndef _DEBUG
 		cameraController_->Update();
 		camera_.UpdateMatrix();
@@ -1084,6 +1101,21 @@ void GameScene::Update() {
 			
 			if (deathParticle_->IsFinished()) {
 				readyForGameOver_ = true;
+			}
+		}
+
+		for (auto it = enemyDeathParticles_.begin(); it != enemyDeathParticles_.end();) {
+			EnemyDeathParticle* p = *it;
+			if (!p) {
+				it = enemyDeathParticles_.erase(it);
+				continue;
+			}
+			p->Update();
+			if (p->IsFinished()) {
+				delete p;
+				it = enemyDeathParticles_.erase(it);
+			} else {
+				++it;
 			}
 		}
 
@@ -1261,16 +1293,15 @@ void GameScene::Update() {
 			bool accept = Input::GetInstance()->TriggerKey(DIK_SPACE) || padATriggered;
 			if (accept) {
 				switch (pauseMenuSelectedIndex_) {
-				case 0: // Back to game (resume)
+				case 0:
 					phase_ = Phase::kPlay;
-					// prevent the immediate next frame from treating SPACE/A as jump
+				
 					if (player_) player_->SuppressNextJump();
 					break;
-				case 1: // Reset
+				case 1: 
 					Reset();
 					break;
-				case 2: // Back to select scene
-					// request main to switch back to select
+				case 2: 
 					backToSelectRequested_ = true;
 					break;
 				}
@@ -1290,7 +1321,7 @@ void GameScene::Draw() {
         skydome_->Draw();
     }
 
-    // Draw all enemies unconditionally (visible under fade and during countdown)
+   
     for (Enemy* enemy : enemies_) {
         if (enemy && enemy->isAlive()) {
             enemy->Draw();
@@ -1341,6 +1372,21 @@ void GameScene::Draw() {
     if ((phase_ == Phase::kDeath || phase_ == Phase::kVictory) && deathParticle_) {
         deathParticle_->Draw();
     }
+
+for (auto it = enemyDeathParticles_.begin(); it != enemyDeathParticles_.end();) {
+		EnemyDeathParticle* p = *it;
+		if (!p) {
+			it = enemyDeathParticles_.erase(it);
+			continue;
+		}
+		p->Draw();
+		if (p->IsFinished()) {
+			delete p;
+			it = enemyDeathParticles_.erase(it);
+		} else {
+			++it;
+		}
+	}
 
     Model::PostDraw();
 
@@ -1439,14 +1485,25 @@ void GameScene::CheckAllCollisions() {
         if (!enemy || !enemy->isAlive())
             continue;
 
-        if (player_->IsAttacking()) {
-            AABB attackBox = player_->GetAttackAABB();
-            if (IsCollisionAABBAABB(attackBox, enemy->GetAABB())) {
-                enemy->OnCollision(player_);
-                if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(1.0f, 0.15f);
-                continue;
-            }
-        }
+      if (player_->IsAttacking()) {
+			AABB attackBox = player_->GetAttackAABB();
+			if (IsCollisionAABBAABB(attackBox, enemy->GetAABB())) {
+				enemy->OnCollision(player_);
+				if (cameraController_ && !player_->IsDying())
+					cameraController_->StartShake(1.0f, 0.15f);
+
+				if (!enemy->isAlive()) {
+					AABB ea = enemy->GetAABB();
+					KamataEngine::Vector3 pos = {(ea.min.x + ea.max.x) * 0.5f, (ea.min.y + ea.max.y) * 0.5f, 0.0f};
+					EnemyDeathParticle* p = new EnemyDeathParticle();
+					p->Initialize(nikukyuModel_, &camera_, pos);
+					enemyDeathParticles_.push_back(p);
+
+					// オブジェクト削除はループ終了後に行う（安全）
+				}
+				continue;
+			}
+		}
 
         if (IsCollisionAABBAABB(player_->GetAABB(), enemy->GetAABB())) {
             player_->OnCollision(enemy);
@@ -1984,26 +2041,25 @@ for (Ladder* l : ladders_) {
 					keys_.push_back(k);
 				} else if (t == MapChipType::kEnemySpawnLeft) {
 					Enemy* enemy = new Enemy();
-					enemy->Initialize(&camera_, pos, true); // face left
+					enemy->Initialize(&camera_, pos, true); 
 					enemies_.push_back(enemy);
 				}
 			}
 		}
 	}
 
-	// ensure shooters are disabled during countdown on reset
+	
 	for (Enemy* e : enemies_) {
 		ShooterEnemy* se = dynamic_cast<ShooterEnemy*>(e);
 		if (se) se->SetAllowShooting(false);
 	}
 
-	// 
+	
 	phase_ = Phase::kCountdown;
 	countdownTime_ = countdownStart_;
 
 	victoryTimer_ = 0.0f;
 
-	// reset pending flag finished, start fade-in to return visually
 	resetPending_ = false;
 	if (fade_) {
 		fade_->Start(Fade::Status::FadeIn, introFadeDuration_);
