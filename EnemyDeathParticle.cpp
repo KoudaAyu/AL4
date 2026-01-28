@@ -32,7 +32,7 @@ void EnemyDeathParticle::Initialize(Model* model, Camera* camera, const Vector3&
 
         const float angle = angDist(rnd_);
         const float speed = speedDist(rnd_);
-        // upward-biased initial direction with smaller horizontal spread
+       
         Vector3 dir = { std::cos(angle) * 0.6f, 0.5f + (std::uniform_real_distribution<float>(0.0f, 0.5f))(rnd_),
                         (std::uniform_real_distribution<float>(-0.15f, 0.15f))(rnd_) };
         velocities_[i] = Normalize(dir) * speed;

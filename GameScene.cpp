@@ -1513,73 +1513,39 @@ void GameScene::CheckAllCollisions() {
 
 #pragma endregion
 
-    // Spike とプレイヤーの当たり判定（Spike 側で AABB を提供）
-    for (Spike* s : spikes_) {
-        if (!s) continue;
-        AABB pA = player_->GetAABB();
-        AABB sA = s->GetAABB();
-        if (IsCollisionAABBAABB(pA, sA)) {
-          
-            float overlapX = std::min<float>(pA.max.x, sA.max.x) - std::max<float>(pA.min.x, sA.min.x);
-            float overlapY = std::min<float>(pA.max.y, sA.max.y) - std::max<float>(pA.min.y, sA.min.y);
+for (Spike* s : spikes_) {
+		if (!s)
+			continue;
+		AABB pA = player_->GetAABB();
+		AABB sA = s->GetAABB();
 
-          
-            Vector3 pCenter = {(pA.min.x + pA.max.x) * 0.5f, (pA.min.y + pA.max.y) * 0.5f, 0.0f};
-            Vector3 sCenter = {(sA.min.x + sA.max.x) * 0.5f, (sA.min.y + sA.max.y) * 0.5f, 0.0f};
+		// 当たっているかどうかの判定
+		if (IsCollisionAABBAABB(pA, sA)) {
 
-         
-            KamataEngine::WorldTransform& pwt = player_->GetWorldTransform();
-            if (overlapX < overlapY) {
-                float dir = (pCenter.x < sCenter.x) ? -1.0f : 1.0f;
-                pwt.translation_.x += dir * overlapX;
-                player_->velocity_.x = 0.0f;
-            } else {
-                float dir = (pCenter.y < sCenter.y) ? -1.0f : 1.0f;
-                pwt.translation_.y += dir * overlapY;
-                player_->velocity_.y = 0.0f;
-            }
+			// --- 物理的な座標補正・速度補正をすべて削除 ---
+			// ここに以前あった overlapX, overlapY, nudge などの処理を消すことで
+			// プレイヤーが勝手に動いたりガタガタ震えたりする現象を修正します。
 
+			// 無敵時間中でなければダメージ処理を実行
+			bool wasInvincible = (player_) ? player_->IsInvincible() : false;
+			if (!wasInvincible) {
+				// ダメージ・死亡処理を呼ぶ
+				player_->OnCollision(nullptr);
 
-            player_->UpdateAABB();
+				// 無敵時間を付与
+				if (player_)
+					player_->ApplyInvincibility(1.25f);
 
-            // Only apply damage and shake if player was not already invincible
-            bool wasInvincible = (player_) ? player_->IsInvincible() : false;
-            if (!wasInvincible) {
-                player_->OnCollision(nullptr);
-                // Extend invincibility for spike-specific escape window
-                if (player_) player_->ApplyInvincibility(1.25f);
-                // Single short, mild camera shake for spike hit
-                if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(0.4f, 0.08f);
-            }
+				// カメラシェイク
+				if (cameraController_ && !player_->IsDying()) {
+					cameraController_->StartShake(0.4f, 0.08f);
+				}
+			}
 
-            // decide nudge direction based on spike/player centers (horizontal preference)
-            float nudgeDir = (pCenter.x < sCenter.x) ? -1.0f : 1.0f;
-
-            // Allow immediate horizontal escape using AD (or arrow keys).
-            bool keyRight = Input::GetInstance()->PushKey(DIK_RIGHT) || Input::GetInstance()->PushKey(DIK_D);
-            bool keyLeft = Input::GetInstance()->PushKey(DIK_LEFT) || Input::GetInstance()->PushKey(DIK_A);
-            if (keyRight) {
-                player_->velocity_.x = std::fabs(player_->velocity_.x) < 0.001f ? 0.35f : std::fabs(player_->velocity_.x);
-            } else if (keyLeft) {
-                player_->velocity_.x = - (std::fabs(player_->velocity_.x) < 0.001f ? 0.35f : std::fabs(player_->velocity_.x));
-            } else {
-                // small automatic nudge away from spike so player isn't stuck
-                player_->velocity_.x += nudgeDir * 0.18f;
-                // clamp to reasonable walk speed
-                if (player_->velocity_.x > 0.5f) player_->velocity_.x = 0.5f;
-                if (player_->velocity_.x < -0.5f) player_->velocity_.x = -0.5f;
-            }
-
-            // If we were pushed vertically into a step, also nudge the player's position slightly horizontally
-            if (overlapY >= overlapX) {
-                KamataEngine::WorldTransform& pwt2 = player_->GetWorldTransform();
-                pwt2.translation_.x += nudgeDir * 0.22f; // small position nudge to get off the edge
-                player_->UpdateAABB();
-            }
-
-            break;
-        }
-    }
+			// 1つのトゲと判定されれば十分なのでループを抜ける
+			break;
+		}
+	}
 
     // Goal とプレイヤーの当たり判定
     for (Goal* g : goals_) {

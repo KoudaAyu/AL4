@@ -153,6 +153,8 @@ public:
 	// 攻撃エフェクトのワールド変換を更新
 	void UpdateAttackEffectTransform();
 
+	
+
 public:
 	KamataEngine::WorldTransform& GetWorldTransform() { return worldTransform_; }
 	KamataEngine::Vector3 GetPosition() const { return worldTransform_.translation_; }

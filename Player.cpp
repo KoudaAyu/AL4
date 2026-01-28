@@ -524,19 +524,15 @@ void Player::Update() {
 	// Update rumble state so vibration stops after its duration
 	UpdateRumble();
 
-	
 	if (isDying_) {
-		
-		velocity_ = {0.0f, 0.0f, 0.0f};
-		
 		deathDelayTimer_ -= 1.0f / 60.0f;
 		if (deathDelayTimer_ <= 0.0f) {
+			deathDelayTimer_ = 0.0f;
 			isAlive_ = false;
-			isDying_ = false; // フラグをクリア
+			isDying_ = false;
 		}
 		return;
 	}
-
 
 	if (invincible_) {
 		invincibleTimer_ -= 1.0f / 60.0f;
@@ -1384,6 +1380,8 @@ void Player::UpdateAttackEffectTransform() {
 	// カメラに少し近づけるバイアス（Z軸）
 	attackWorldTransform_.translation_.z += kAttackEffectZBias;
 }
+
+
 
 // 新しい関数: プレイヤーの攻撃用AABBを返す
 AABB Player::GetAttackAABB() const {
