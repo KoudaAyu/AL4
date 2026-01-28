@@ -1,0 +1,2067 @@
+#include "GameScene.h"
+#include "AABB.h"
+#include "FrontShieldEnemy.h"
+#include "MapChipField.h"
+#include "MathUtl.h"
+#include <2d/Sprite.h>
+#include "KeyInput.h"
+#include "Spike.h"
+#include "Goal.h"
+#include "Key.h"
+#include "Ladder.h"
+#include "Fade.h"
+#include <algorithm>
+#include "Enemy/ShooterEnemy.h"
+#include <cmath>
+#include <mmsystem.h>
+#pragma comment(lib, "winmm.lib")
+using namespace KamataEngine;
+
+
+static constexpr float kUIRightMargin = 230.0f;
+
+static constexpr float kUIBottomRightOffset = 40.0f;
+
+static constexpr float kUIMidRightMargin = 300.0f;
+
+static constexpr float kUIPhaseRightOffset = 150.0f;
+
+GameScene::GameScene() : GameScene(0) {}
+
+GameScene::GameScene(int startingStage) : readyForGameOver_(false), startingStage_(startingStage) {}
+
+GameScene::~GameScene() {
+#ifdef _DEBUG
+	delete debugCamera_;
+#endif 
+
+	  if (bgmStarted_) {
+		Audio::GetInstance()->StopWave(bgmVoiceHandle_);
+		bgmVoiceHandle_ = 0u;
+		bgmStarted_ = false;
+	}
+
+	delete blockModel_;
+	delete cameraController_;
+	delete mapChipField_;
+	delete nikukyuModel_;
+	delete model_;
+
+	for (Enemy* enemy : enemies_) {
+		delete enemy;
+	}
+	enemies_.clear();
+	delete player_;
+
+	delete deathParticle_;
+	for (EnemyDeathParticle* enemyDeathParticle : enemyDeathParticles_)
+	{
+		delete enemyDeathParticle;
+	}
+
+	for (std::vector<WorldTransform*>& row : worldTransformBlocks_) {
+		for (WorldTransform* wt : row) {
+			delete wt;
+		}
+	}
+	worldTransformBlocks_.clear();
+
+	delete skydome_;
+	
+
+	if (hudSprite_) {
+		delete hudSprite_;
+		hudSprite_ = nullptr;
+	}
+
+	
+	if (uiLeftSprite_) {
+		delete uiLeftSprite_;
+		uiLeftSprite_ = nullptr;
+	}
+	if (uiMidSprite_) {
+		delete uiMidSprite_;
+		uiMidSprite_ = nullptr;
+	}
+	if (uiRightSprite_) {
+		delete uiRightSprite_;
+		uiRightSprite_ = nullptr;
+	}
+
+	if (uiBottomRightSprite_) {
+		delete uiBottomRightSprite_;
+		uiBottomRightSprite_ = nullptr;
+	}
+
+	
+	if (countdownSprite_) {
+		delete countdownSprite_;
+		countdownSprite_ = nullptr;
+	}
+
+
+	for (auto& h : hearts_) {
+		if (h.sprite) delete h.sprite;
+	}
+	hearts_.clear();
+
+	
+	if (pauseSprite_) {
+		delete pauseSprite_;
+		pauseSprite_ = nullptr;
+	}
+
+
+	for (int i = 0; i < 3; ++i) {
+		if (pauseMenuSprites_[i]) {
+			delete pauseMenuSprites_[i];
+			pauseMenuSprites_[i] = nullptr;
+		}
+	}
+
+	for (Spike* s : spikes_) {
+		delete s;
+	}
+	spikes_.clear();
+	for (Goal* g : goals_) {
+		delete g;
+	}
+	goals_.clear();
+
+
+	for (Key* k : keys_) {
+		delete k;
+	}
+	keys_.clear();
+
+for (Ladder* l : ladders_) {
+		delete l;
+	}
+	ladders_.clear();
+
+
+	delete iceModel_;
+}
+
+void GameScene::Initialize() {
+
+#ifdef _DEBUG
+
+	// デバックカメラの生成
+	debugCamera_ = new KamataEngine::DebugCamera(kWindowWidth, kWindowHeight);
+
+#endif //  _DEBUG
+
+	model_ = Model::Create();
+	textureHandle_ = TextureManager::Load("uvChecker.png");
+
+	// Use Block.obj for map chip blocks
+	blockModel_ = Model::CreateFromOBJ("Block");
+	// Load Ice.obj for map chip type 8
+	iceModel_ = Model::CreateFromOBJ("Ice");
+
+	nikukyuModel_ = Model::CreateFromOBJ("Nikukyuu");
+#ifdef _DEBUG
+	assert(textureHandle_);
+#endif
+	camera_.Initialize();
+	camera_.farZ = 3000.0f;
+	camera_.UpdateProjectionMatrix();
+	camera_.TransferMatrix();
+
+	mapChipField_ = new MapChipField();
+
+	const char* mapFiles[] = {"Resources/Debug/Map/Block.csv", "Resources/Debug/Map/Block1.csv", "Resources/Debug/Map/Block2.csv"};
+	const int numMapFiles = static_cast<int>(std::size(mapFiles));
+	int idx = startingStage_;
+	if (idx < 0)
+		idx = 0;
+	if (idx >= numMapFiles)
+		idx = numMapFiles - 1;
+	mapChipField_->LoadMapChipCsv(mapFiles[idx]);
+
+	player_ = new Player();
+	Vector3 playerPosition = {4.0f, 4.0f, 0.0f};
+	if (mapChipField_) {
+		uint32_t vh = mapChipField_->GetNumBlockVertical();
+		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
+		bool found = false;
+		for (uint32_t y = 0; y < vh && !found; ++y) {
+			for (uint32_t x = 0; x < wh; ++x) {
+				if (mapChipField_->GetMapChipTypeByIndex(x, y) == MapChipType::kReserved2) {
+					playerPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					found = true;
+					break;
+				}
+			}
+		}
+	}
+	player_->Initialize(&camera_, playerPosition);
+	player_->SetMapChipField(mapChipField_);
+
+	heartTextureHandle_ = TextureManager::Load("Sprite/PlayerHP.png");
+	if (heartTextureHandle_ != 0u && player_) {
+		int hp = player_->GetHP();
+		const float heartSize = 32.0f;
+		const float heartMarginX = 20.0f;
+		const float heartSpacing = 8.0f;
+		for (int i = 0; i < hp; ++i) {
+			float x = heartMarginX + i * (heartSize + heartSpacing);
+			float y = 20.0f; // moved to top margin
+			KamataEngine::Sprite* s = KamataEngine::Sprite::Create(heartTextureHandle_, KamataEngine::Vector2{x, y}, KamataEngine::Vector4{1, 1, 1, 1}, KamataEngine::Vector2{0.0f, 0.0f});
+			if (s)
+				s->SetSize(KamataEngine::Vector2{heartSize, heartSize});
+
+			HeartUI h;
+			h.sprite = s;
+			h.baseSize = heartSize;
+			h.currentSize = heartSize;
+			h.animTimer = 0.0f;
+			h.removing = false;
+			hearts_.push_back(h);
+		}
+		lastPlayerHP_ = hp;
+	}
+
+	if (mapChipField_) {
+		uint32_t vh = mapChipField_->GetNumBlockVertical();
+		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
+		bool goalSpawned = false;
+		for (uint32_t y = 0; y < vh; ++y) {
+			for (uint32_t x = 0; x < wh; ++x) {
+				MapChipType t = mapChipField_->GetMapChipTypeByIndex(x, y);
+				if (t == MapChipType::kEnemySpawn) {
+					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					Enemy* enemy = new Enemy();
+
+					enemy->Initialize(&camera_, enemyPosition);
+					// provide map reference for patrol behavior
+					enemy->SetMapChipField(mapChipField_);
+					enemies_.push_back(enemy);
+				} else if (t == MapChipType::kEnemySpawnShield) {
+					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					FrontShieldEnemy* fse = new FrontShieldEnemy();
+					fse->Initialize(&camera_, enemyPosition);
+					fse->SetFrontDotThreshold(0.6f);
+					// enable patrol map awareness
+					fse->SetMapChipField(mapChipField_);
+					enemies_.push_back(fse);
+				} else if (t == MapChipType::kEnemySpawnShieldRight) {
+					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					FrontShieldEnemy* fse = new FrontShieldEnemy();
+					fse->Initialize(&camera_, enemyPosition, false); // face right
+					fse->SetFrontDotThreshold(0.6f);
+					fse->SetMapChipField(mapChipField_);
+					enemies_.push_back(fse);
+				} else if (t == MapChipType::kShooter) {
+					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					ShooterEnemy* se = new ShooterEnemy();
+					se->Initialize(&camera_, enemyPosition);
+					se->SetBulletSpeed(0.2f);
+					se->SetFireInterval(2.0f);
+					se->SetMapChipField(mapChipField_);
+					enemies_.push_back(se);
+				} else if (t == MapChipType::kShooterRight) {
+					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					ShooterEnemy* se = new ShooterEnemy();
+					se->Initialize(&camera_, enemyPosition);
+					se->SetFacingRight(true); // face right
+					se->SetBulletSpeed(0.2f);
+					se->SetFireInterval(2.0f);
+					se->SetMapChipField(mapChipField_);
+					enemies_.push_back(se);
+				} else if (t == MapChipType::kSpike) {
+					Spike* s = new Spike();
+					Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
+					s->SetPosition(pos);
+					s->Initialize();
+					spikes_.push_back(s);
+				} else if (t == MapChipType::kGoal && !goalSpawned) {
+					Goal* g = new Goal();
+					Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
+					g->SetPosition(pos);
+					g->Initialize();
+					goals_.push_back(g);
+					goalSpawned = true;
+				} else if (t == MapChipType::kLadder) {
+					Ladder* l = new Ladder();
+					Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
+					l->SetPosition(pos);
+					l->Initialize();
+					ladders_.push_back(l);
+				} else if (t == MapChipType::kEnemySpawnLeft) {
+					Vector3 enemyPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					Enemy* enemy = new Enemy();
+					enemy->Initialize(&camera_, enemyPosition, true); // face left
+					enemies_.push_back(enemy);
+				}
+			}
+			// Do not break here; continue scanning to spawn all spikes and enemies
+		}
+	}
+
+	// spawn keys
+	if (mapChipField_) {
+		uint32_t vh = mapChipField_->GetNumBlockVertical();
+		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
+		for (uint32_t y = 0; y < vh; ++y) {
+			for (uint32_t x = 0; x < wh; ++x) {
+				if (mapChipField_->GetMapChipTypeByIndex(x, y) == MapChipType::kKey) {
+					Key* k = new Key();
+					Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
+					k->SetPosition(pos);
+					k->Initialize();
+					keys_.push_back(k);
+				}
+			}
+		}
+	}
+
+	if (!spikes_.empty()) {
+		DebugText::GetInstance()->ConsolePrintf("GameScene: created %u spikes\n", static_cast<uint32_t>(spikes_.size()));
+		for (uint32_t i = 0; i < spikes_.size(); ++i) {
+			Spike* s = spikes_[i];
+			if (s) {
+				DebugText::GetInstance()->ConsolePrintf(
+				    "  spike[%u] HasModel=%s pos=(%.2f,%.2f,%.2f)\n", i, s->HasModel() ? "true" : "false", s->GetPosition().x, s->GetPosition().y, s->GetPosition().z);
+			} else {
+				DebugText::GetInstance()->ConsolePrintf("  spike[%u] is null\n", i);
+			}
+		}
+	}
+
+	cameraController_ = new CameraController();
+
+	if (mapChipField_) {
+		cameraController_->SetMovableArea(mapChipField_->GetMovableArea());
+	} else {
+		cameraController_->SetMovableArea({-50.0f, 50.0f, 50.0f, -50.0f});
+	}
+	cameraController_->Initialize(&camera_);
+	cameraController_->SetTarget(player_);
+	// プレイヤーにカメラコントローラ参照を渡す（初回割当て）
+	if (player_) {
+		player_->SetCameraController(cameraController_);
+	}
+	cameraController_->Reset();
+
+	// CSV に従ってブロック生成（全マス生成は行わない）
+	GenerateBlocks();
+
+	// Skydome の生成と初期化
+	skydome_ = new Skydome();
+	skydome_->Initialize();
+	skydome_->SetCamera(&camera_);
+
+	// Particle関係
+
+	readyForGameOver_ = false;
+
+	hudTextureHandle_ = TextureManager::Load("Debug/Goal.png");
+	if (hudTextureHandle_ != 0u) {
+
+		const float hudWidth = 250.0f;
+		const float hudHeight = 30.0f;
+		const float hudMargin = 20.0f;
+
+		hudSprite_ = KamataEngine::Sprite::Create(
+		    hudTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, hudMargin}, KamataEngine::Vector4{1, 1, 1, 1}, KamataEngine::Vector2{0.5f, 0.0f});
+		if (hudSprite_) {
+			hudSprite_->SetSize(KamataEngine::Vector2{hudWidth, hudHeight});
+		}
+	}
+
+	// Do not load main left Attack UI — keep it hidden by default
+	uiLeftTextureHandle_ = 0u;
+	// Load left UI variants: RT for gamepad, E for keyboard
+	uiLeftGamepadTextureHandle_ = TextureManager::Load("Sprite/GameScene/RT.png");
+	uiLeftKeyboardTextureHandle_ = TextureManager::Load("Sprite/GameScene/E.png");
+	uiAttackTextureHandle_ = TextureManager::Load("Sprite/GameScene/Attack.png");
+
+	// If preferred variants exist, prefer keyboard E initially
+	uint32_t defaultLeftHandle = uiLeftKeyboardTextureHandle_ != 0u ? uiLeftKeyboardTextureHandle_ : uiLeftGamepadTextureHandle_;
+	if (defaultLeftHandle != 0u && !uiLeftSprite_) {
+		// Instead of placing the small variant at bottom-left, place it at top-right under the mid/right icons
+		const float topMargin = 20.0f;
+		const float midHeight = 40.0f;
+		const float spacingBelowMid = 8.0f;
+		const float spacingBelowRight = 8.0f;
+		float rightX = static_cast<float>(kWindowWidth) - kUIRightMargin;
+		float rightY = topMargin + midHeight + spacingBelowMid;
+		float bottomY = rightY + midHeight + spacingBelowRight;
+		float bottomRightX = rightX - kUIBottomRightOffset; // shift small icon further left
+		uiBottomRightSprite_ = KamataEngine::Sprite::Create(defaultLeftHandle, KamataEngine::Vector2{bottomRightX, bottomY}, KamataEngine::Vector4{1, 1, 1, 1}, KamataEngine::Vector2{1.0f, 0.0f});
+		if (uiBottomRightSprite_) {
+			uiBottomRightSprite_->SetSize(KamataEngine::Vector2{70.0f, 40.0f});
+			auto desc = TextureManager::GetInstance()->GetResoureDesc(defaultLeftHandle);
+			uiBottomRightSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
+		}
+	}
+
+	// --- Phase.png の生成と配置 ---
+	if (uiAttackTextureHandle_ != 0u && !uiJumpSprite_) {
+		// uiMidSprite_ の位置を基準にする
+		// uiMidSprite_ はアンカー {1.0f, 0.0f} なので、その座標 (x) は TAB画像の右端。
+		// そこに少しの余白 (10pxなど) を足して配置する。
+		float phasePadding = 10.0f;
+		Vector2 midPos = uiBottomRightSprite_->GetPosition();
+		Vector2 phasePos = {midPos.x + phasePadding + kUIPhaseRightOffset, midPos.y}; // move Phase further right via offset
+
+		// アンカーポイントを {0.0f, 0.0f} (左上) にすると、TABの右隣に並べやすくなります
+		uiJumpSprite_ = KamataEngine::Sprite::Create(uiAttackTextureHandle_, phasePos, {1, 1, 1, 1}, {0.0f, 0.0f});
+
+		if (uiJumpSprite_) {
+			// 画像のサイズを設定 (例: 80x40)
+			uiJumpSprite_->SetSize(Vector2{150.0f, 40.0f});
+
+			// 全領域を使用するように設定
+			auto desc = TextureManager::GetInstance()->GetResoureDesc(uiAttackTextureHandle_);
+			uiJumpSprite_->SetTextureRect({0.0f, 0.0f}, {static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
+		}
+	}
+
+	uiMidTextureHandle_ = TextureManager::Load("Debug/Reset.png");
+	if (uiMidTextureHandle_ != 0u) {
+		// place mid UI at top-right
+		uiMidSprite_ = KamataEngine::Sprite::Create(
+		    uiMidTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) - kUIMidRightMargin, 20.0f}, KamataEngine::Vector4{1, 1, 1, 1}, KamataEngine::Vector2{0.5f, 0.0f});
+		if (uiMidSprite_) {
+			uiMidSprite_->SetSize(KamataEngine::Vector2{280.0f, 40.0f});
+			auto desc = TextureManager::GetInstance()->GetResoureDesc(uiMidTextureHandle_);
+			uiMidSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
+		}
+	}
+
+	// Load separate textures for mid UI (keyboard TAB vs gamepad Menu button)
+	uiMidGamepadTextureHandle_ = TextureManager::Load("Sprite/GameScene/MenuButton.png");
+	uiMidKeyboardTextureHandle_ = TextureManager::Load("Sprite/GameScene/TAB.png");
+	uiPhaseTextureHandle_ = TextureManager::Load("Sprite/GameScene/Pause.png");
+
+	// set initial mid sprite according to available resources (prefer keyboard TAB)
+	uint32_t defaultMidHandle = uiMidKeyboardTextureHandle_ != 0u ? uiMidKeyboardTextureHandle_ : uiMidGamepadTextureHandle_;
+	if (defaultMidHandle != 0u && !uiMidSprite_) {
+		// place the mid UI at top-right
+		uiMidSprite_ = KamataEngine::Sprite::Create(
+		    defaultMidHandle, KamataEngine::Vector2{static_cast<float>(kWindowWidth) - kUIMidRightMargin, 20.0f}, KamataEngine::Vector4{1, 1, 1, 1}, KamataEngine::Vector2{1.0f, 0.0f});
+		if (uiMidSprite_) {
+			uiMidSprite_->SetSize(KamataEngine::Vector2{280.0f, 40.0f});
+			// ensure sprite uses full texture region
+			{
+				auto desc = TextureManager::GetInstance()->GetResoureDesc(defaultMidHandle);
+				uiMidSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
+			}
+		}
+	}
+
+	// --- Phase.png の生成と配置 ---
+	if (uiPhaseTextureHandle_ != 0u && !uiPhaseSprite_) {
+		// uiMidSprite_ の位置を基準にする
+		// uiMidSprite_ はアンカー {1.0f, 0.0f} なので、その座標 (x) は TAB画像の右端。
+		// そこに少しの余白 (10pxなど) を足して配置する。
+		float phasePadding = 10.0f;
+		Vector2 midPos = uiMidSprite_->GetPosition();
+		Vector2 phasePos = {midPos.x + phasePadding + kUIPhaseRightOffset, midPos.y}; // move Phase further right via offset
+
+		// アンカーポイントを {0.0f, 0.0f} (左上) にすると、TABの右隣に並べやすくなります
+		uiPhaseSprite_ = KamataEngine::Sprite::Create(uiPhaseTextureHandle_, phasePos, {1, 1, 1, 1}, {0.0f, 0.0f});
+
+		if (uiPhaseSprite_) {
+			// 画像のサイズを設定 (例: 80x40)
+			uiPhaseSprite_->SetSize(Vector2{200.0f, 40.0f});
+
+			// 全領域を使用するように設定
+			auto desc = TextureManager::GetInstance()->GetResoureDesc(uiPhaseTextureHandle_);
+			uiPhaseSprite_->SetTextureRect({0.0f, 0.0f}, {static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
+		}
+	}
+	// Load separate keyboard/gamepad textures for right UI
+	uiRightGamepadTextureHandle_ = TextureManager::Load("Sprite/GameScene/AButton.png");
+	uiRightKeyboardTextureHandle_ = TextureManager::Load("Sprite/GameScene/SPACE.png");
+	uiJumpTextureHandle_ = TextureManager::Load("Sprite/GameScene/Jump.png");
+
+	// Default choice: keyboard image if present, otherwise gamepad
+	uint32_t defaultRightHandle = uiRightKeyboardTextureHandle_ != 0u ? uiRightKeyboardTextureHandle_ : uiRightGamepadTextureHandle_;
+	if (defaultRightHandle != 0u) {
+		// place right UI at the top-right below the mid UI (align right)
+		const float topMargin = 20.0f;
+		const float midHeight = 40.0f;
+		const float spacingBelowMid = 8.0f;
+		float rightX = static_cast<float>(kWindowWidth) - kUIRightMargin; // 20px -> margin constant
+		float rightY = topMargin + midHeight + spacingBelowMid;           // below mid UI
+		uiRightSprite_ = KamataEngine::Sprite::Create(defaultRightHandle, KamataEngine::Vector2{rightX, rightY}, KamataEngine::Vector4{1, 1, 1, 1}, KamataEngine::Vector2{1.0f, 0.0f});
+		if (uiRightSprite_) {
+			uiRightSprite_->SetSize(KamataEngine::Vector2{156.0f, 40.0f});
+			// ensure sprite uses full texture region
+			{
+				auto desc = TextureManager::GetInstance()->GetResoureDesc(defaultRightHandle);
+				uiRightSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
+			}
+		}
+	}
+
+	if (uiJumpTextureHandle_ != 0u && !uiAttackSprite_) {
+		// uiMidSprite_ の位置を基準にする
+		// uiMidSprite_ はアンカー {1.0f, 0.0f} なので、その座標 (x) は TAB画像の右端。
+		// そこに少しの余白 (10pxなど) を足して配置する。
+		float phasePadding = 10.0f;
+		Vector2 midPos = uiRightSprite_->GetPosition();
+		Vector2 phasePos = {midPos.x + phasePadding + kUIPhaseRightOffset - 120, midPos.y}; // move Phase further right via offset
+
+		// アンカーポイントを {0.0f, 0.0f} (左上) にすると、TABの右隣に並べやすくなります
+		uiAttackSprite_ = KamataEngine::Sprite::Create(uiJumpTextureHandle_, phasePos, {1, 1, 1, 1}, {0.0f, 0.0f});
+
+		if (uiAttackSprite_) {
+			// 画像のサイズを設定 (例: 80x40)
+			uiAttackSprite_->SetSize(Vector2{200.0f, 40.0f});
+
+			// 全領域を使用するように設定
+			auto desc = TextureManager::GetInstance()->GetResoureDesc(uiJumpTextureHandle_);
+			uiAttackSprite_->SetTextureRect({0.0f, 0.0f}, {static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
+		}
+	}
+
+	victoryTimer_ = 0.0f;
+
+	countdownTime_ = countdownStart_;
+
+	for (int i = 0; i < 10; ++i) {
+		char buf[64];
+		sprintf_s(buf, "Number/%d.png", i);
+		countdownTextureHandles_[i] = TextureManager::Load(buf);
+	}
+
+	int initialIndex = static_cast<int>(std::ceil(countdownTime_));
+	if (initialIndex < 0)
+		initialIndex = 0;
+	if (initialIndex > 9)
+		initialIndex = 9;
+	if (countdownTextureHandles_[initialIndex] != 0u) {
+		countdownSprite_ = KamataEngine::Sprite::Create(
+		    countdownTextureHandles_[initialIndex], KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) / 2.0f}, KamataEngine::Vector4{1, 1, 1, 1},
+		    KamataEngine::Vector2{0.5f, 0.5f});
+		if (countdownSprite_) {
+
+			countdownSprite_->SetSize(KamataEngine::Vector2{200.0f, 200.0f});
+		}
+	}
+
+	// pauseTextureHandle_ = TextureManager::Load("Sprite/Pause/Pause.png");
+	if (pauseTextureHandle_ != 0u) {
+		pauseSprite_ = KamataEngine::Sprite::Create(
+		    pauseTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) / 2.0f}, KamataEngine::Vector4{1, 1, 1, 1},
+		    KamataEngine::Vector2{0.5f, 0.5f});
+		if (pauseSprite_)
+			pauseSprite_->SetSize(KamataEngine::Vector2{300.0f, 100.0f});
+	}
+
+	// Load pause menu item textures and create sprites (stacked top-down)
+	pauseMenuTextureHandles_[0] = TextureManager::Load("Sprite/Pause/BackGame.png");
+	pauseMenuTextureHandles_[1] = TextureManager::Load("Sprite/Pause/Reset.png");
+	pauseMenuTextureHandles_[2] = TextureManager::Load("Sprite/Pause/BackSelect.png");
+
+	const float menuWidth = 400.0f;
+	const float menuHeight = 80.0f;
+	const float spacing = 20.0f;
+	const float centerY = static_cast<float>(kWindowHeight) * 0.5f;
+	for (int i = 0; i < 3; ++i) {
+		if (pauseMenuTextureHandles_[i] != 0u) {
+			// position so that the middle item (i==1) is centered vertically
+			float y = centerY + (i - 1) * (menuHeight + spacing);
+			pauseMenuSprites_[i] = KamataEngine::Sprite::Create(
+			    pauseMenuTextureHandles_[i], KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, y}, KamataEngine::Vector4{1, 1, 1, 1}, KamataEngine::Vector2{0.5f, 0.5f} // center pivot
+			);
+			if (pauseMenuSprites_[i])
+				pauseMenuSprites_[i]->SetSize(KamataEngine::Vector2{menuWidth, menuHeight});
+		}
+	}
+
+	phase_ = Phase::kCountdown;
+
+	fade_ = new Fade();
+	fade_->Initialize();
+
+	fade_->Start(Fade::Status::FadeIn, introFadeDuration_);
+
+	seDecisionDataHandle_ = Audio::GetInstance()->LoadWave("Audio/SE/Player_Death.wav");
+	bgmDataHandle_ = Audio::GetInstance()->LoadWave("Audio/BGM/GameScene.wav");
+	seClearDataHandle_ = Audio::GetInstance()->LoadWave("Audio/BGM/Clear.wav");
+}
+
+void GameScene::Update() {
+
+	  if (!bgmStarted_) {
+		bgmVoiceHandle_ = Audio::GetInstance()->PlayWave(bgmDataHandle_, true, 0.8f);
+		bgmStarted_ = true;
+	}
+
+	// If a reset is already pending, ignore additional reset requests
+	if (resetPending_) {
+		if (fade_) fade_->Update();
+		if (fade_ && fade_->IsFinished()) {
+			// Proceed with the reset
+			PerformResetNow();
+		}
+		return;
+	}
+
+	// リセットキーでシーンをリセット
+	if (Input::GetInstance()->TriggerKey(DIK_R) || KeyInput::GetInstance()->TriggerPadButton(XINPUT_GAMEPAD_B)) {
+		Reset();
+		return;
+	}
+
+	// Tab と XBOX Start/Back でポーズ切替（Start/Back は押下の立ち上がりのみで1回だけ反応）
+    {
+        static bool prevPadPausePressed = false; // フレーム間の押下状態
+        bool padPausePressed = KeyInput::GetInstance()->PushPadButton(XINPUT_GAMEPAD_START) ||
+            KeyInput::GetInstance()->PushPadButton(XINPUT_GAMEPAD_BACK);
+        bool padPauseTriggered = padPausePressed && !prevPadPausePressed; // 立ち上がり検出
+        prevPadPausePressed = padPausePressed;
+
+        if (Input::GetInstance()->TriggerKey(DIK_TAB) || padPauseTriggered) {
+            if (phase_ == Phase::kPlay) {
+                phase_ = Phase::kPause;
+                // initialize pause menu selection when entering pause
+                pauseMenuSelectedIndex_ = 0;
+                // ensure menu tint updated immediately
+                for (int i = 0; i < 3; i++) {
+                    if (pauseMenuSprites_[i]) {
+                        if (i == pauseMenuSelectedIndex_)
+                            pauseMenuSprites_[i]->SetColor(KamataEngine::Vector4{1,0,0,1});
+                        else
+                            pauseMenuSprites_[i]->SetColor(KamataEngine::Vector4{1,1,1,1});
+                    }
+                }
+            } else if (phase_ == Phase::kPause) {
+                phase_ = Phase::kPlay;
+            }
+        }
+    }
+
+    // Dynamic right-side UI: show gamepad A icon when pad used, SPACE image when keyboard used
+    {
+        KeyInput* ki = KeyInput::GetInstance();
+        // detect any pad input this frame
+        KamataEngine::Vector2 lst = ki->GetLStick();
+        const float stickThreshold = 0.3f;
+        bool padInputThisFrame = (std::fabs(lst.x) > stickThreshold || std::fabs(lst.y) > stickThreshold);
+        const int padButtons[] = { XINPUT_GAMEPAD_A, XINPUT_GAMEPAD_B, XINPUT_GAMEPAD_X, XINPUT_GAMEPAD_Y,
+                                   XINPUT_GAMEPAD_DPAD_UP, XINPUT_GAMEPAD_DPAD_DOWN, XINPUT_GAMEPAD_DPAD_LEFT, XINPUT_GAMEPAD_DPAD_RIGHT,
+                                   XINPUT_GAMEPAD_START, XINPUT_GAMEPAD_BACK, XINPUT_GAMEPAD_LEFT_SHOULDER, XINPUT_GAMEPAD_RIGHT_SHOULDER };
+        for (int b : padButtons) {
+            if (ki->PushPadButton(b)) { padInputThisFrame = true; break; }
+        }
+		// Also consider trigger/edge events as pad input to be more responsive
+		for (int b : padButtons) {
+			if (ki->TriggerPadButton(b)) { padInputThisFrame = true; break; }
+		}
+
+        // If any pad input observed at any time, remember pad as last input
+        if (padInputThisFrame) lastInputWasPad_ = true;
+        // If SPACE pressed, consider keyboard as last input
+        if (Input::GetInstance()->TriggerKey(DIK_SPACE)) lastInputWasPad_ = false;
+
+        uint32_t desiredHandle = lastInputWasPad_ ? uiRightGamepadTextureHandle_ : uiRightKeyboardTextureHandle_;
+        if (desiredHandle == 0u) desiredHandle = lastInputWasPad_ ? uiRightKeyboardTextureHandle_ : uiRightGamepadTextureHandle_;
+        if (desiredHandle != 0u && uiRightSprite_) {
+            uiRightSprite_->SetTextureHandle(desiredHandle);
+            uiRightSprite_->SetSize(KamataEngine::Vector2{156.0f, 40.0f});
+            {
+                auto desc = TextureManager::GetInstance()->GetResoureDesc(desiredHandle);
+                uiRightSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
+            }
+        }
+    }
+
+    // Update left UI variant based on last input
+	{
+		uint32_t leftHandle = lastInputWasPad_ ? uiLeftGamepadTextureHandle_ : uiLeftKeyboardTextureHandle_;
+		if (leftHandle == 0u) leftHandle = lastInputWasPad_ ? uiLeftKeyboardTextureHandle_ : uiLeftGamepadTextureHandle_;
+		// Do not create or replace the bottom-left main left UI if the Attack texture is not loaded
+		if (uiLeftTextureHandle_ != 0u) {
+			// main left UI exists: ensure it's present or updated
+			if (!uiLeftSprite_) {
+				uiLeftSprite_ = KamataEngine::Sprite::Create(uiLeftTextureHandle_, KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 50.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 1.0f});
+				if (uiLeftSprite_) uiLeftSprite_->SetSize(KamataEngine::Vector2{70.0f, 40.0f});
+			}
+		} // else: don't create main left UI at all
+
+		// Always manage the small top-right left-variant (uiBottomRightSprite_)
+		if (leftHandle != 0u) {
+			uint32_t brHandle = leftHandle; // use same leftHandle (E or RT)
+			const float topMargin = 20.0f;
+			const float midHeight = 40.0f;
+			const float spacingBelowMid = 8.0f;
+			const float spacingBelowRight = 8.0f;
+			float rightX = static_cast<float>(kWindowWidth) - kUIRightMargin;
+			float rightY = topMargin + midHeight + spacingBelowMid; // position of uiRightSprite_
+			float bottomY = rightY + midHeight + spacingBelowRight; // below uiRightSprite_
+			if (brHandle != 0) {
+				if (!uiBottomRightSprite_) {
+					float bottomRightX = rightX - kUIBottomRightOffset;
+					uiBottomRightSprite_ = KamataEngine::Sprite::Create(brHandle, KamataEngine::Vector2{bottomRightX, bottomY}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{1.0f, 0.0f});
+					if (uiBottomRightSprite_) {
+						uiBottomRightSprite_->SetSize(KamataEngine::Vector2{70.0f, 40.0f});
+						auto desc2 = TextureManager::GetInstance()->GetResoureDesc(brHandle);
+						uiBottomRightSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc2.Width), static_cast<float>(desc2.Height)});
+					}
+				} else {
+					uiBottomRightSprite_->SetTextureHandle(brHandle);
+					uiBottomRightSprite_->SetSize(KamataEngine::Vector2{70.0f, 40.0f});
+					auto desc2 = TextureManager::GetInstance()->GetResoureDesc(brHandle);
+					uiBottomRightSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc2.Width), static_cast<float>(desc2.Height)});
+					float bottomRightX = rightX - kUIBottomRightOffset;
+					uiBottomRightSprite_->SetPosition(KamataEngine::Vector2{bottomRightX, bottomY});
+				}
+			}
+		}
+	}
+
+    // Dynamic mid UI: show MenuButton when pad last used, TAB image when keyboard TAB pressed
+    {
+        KeyInput* ki = KeyInput::GetInstance();
+        // detect any pad input this frame
+        KamataEngine::Vector2 lst = ki->GetLStick();
+        const float stickThreshold = 0.3f;
+        bool padInputThisFrame = (std::fabs(lst.x) > stickThreshold || std::fabs(lst.y) > stickThreshold);
+        const int padButtons[] = { XINPUT_GAMEPAD_A, XINPUT_GAMEPAD_B, XINPUT_GAMEPAD_X, XINPUT_GAMEPAD_Y,
+                                   XINPUT_GAMEPAD_DPAD_UP, XINPUT_GAMEPAD_DPAD_DOWN, XINPUT_GAMEPAD_DPAD_LEFT, XINPUT_GAMEPAD_DPAD_RIGHT,
+                                   XINPUT_GAMEPAD_START, XINPUT_GAMEPAD_BACK, XINPUT_GAMEPAD_LEFT_SHOULDER, XINPUT_GAMEPAD_RIGHT_SHOULDER };
+        for (int b : padButtons) {
+            if (ki->PushPadButton(b)) { padInputThisFrame = true; break; }
+        }
+
+        if (padInputThisFrame) lastInputWasPad_ = true;
+        // keyboard TAB switches mid UI to keyboard
+        if (Input::GetInstance()->TriggerKey(DIK_TAB)) lastInputWasPad_ = false;
+
+        uint32_t midHandle = lastInputWasPad_ ? uiMidGamepadTextureHandle_ : uiMidKeyboardTextureHandle_;
+        if (midHandle == 0u) midHandle = lastInputWasPad_ ? uiMidKeyboardTextureHandle_ : uiMidGamepadTextureHandle_;
+        if (midHandle != 0u) {
+            if (!uiMidSprite_) {
+                // create at top-right when dynamically created
+				uiMidSprite_ = KamataEngine::Sprite::Create(midHandle, KamataEngine::Vector2{static_cast<float>(kWindowWidth) - kUIMidRightMargin, 20.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{1.0f, 0.0f});
+                if (uiMidSprite_) uiMidSprite_->SetSize(KamataEngine::Vector2{280.0f, 40.0f});
+            } else {
+                uiMidSprite_->SetTextureHandle(midHandle);
+                uiMidSprite_->SetSize(KamataEngine::Vector2{280.0f, 40.0f});
+                {
+                    auto desc = TextureManager::GetInstance()->GetResoureDesc(midHandle);
+                    uiMidSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
+                }
+            }
+        }
+    }
+
+    switch (phase_) {
+	case Phase::kCountdown: {
+		
+		#ifdef _DEBUG
+		
+		if (Input::GetInstance()->TriggerKey(DIK_C)) {
+			isDebugCameraActive_ = !isDebugCameraActive_;
+		}
+		if (isDebugCameraActive_) {
+			debugCamera_->Update();
+			camera_.matView = debugCamera_->GetCamera().matView;
+			camera_.matProjection = debugCamera_->GetCamera().matProjection;
+			camera_.TransferMatrix();
+		} else {
+			cameraController_->Update();
+			camera_.UpdateMatrix();
+		}
+		#else
+		cameraController_->Update();
+		camera_.UpdateMatrix();
+		#endif
+
+		skydome_->Update();
+
+		// update enemies during countdown so they appear behind fade
+		for (Enemy* enemy : enemies_) {
+			if (enemy) enemy->Update();
+		}
+		// Cull bullets against map while in countdown (safety)
+		if (mapChipField_) {
+			for (Enemy* e : enemies_) {
+				ShooterEnemy* se = dynamic_cast<ShooterEnemy*>(e);
+				if (se) se->CullBulletsByMap(mapChipField_);
+			}
+		}
+
+		for (auto& row : worldTransformBlocks_) {
+			for (WorldTransform* wt : row) {
+				if (!wt) continue;
+				wt->matWorld_ = MakeAffineMatrix(wt->scale_, wt->rotation_, wt->translation_);
+				if (wt->parent_) wt->matWorld_ = Multiply(wt->parent_->matWorld_, wt->matWorld_);
+				wt->TransferMatrix();
+			}
+		}
+
+		if (player_) {
+			KamataEngine::WorldTransform& pwt = player_->GetWorldTransform();
+			pwt.matWorld_ = MakeAffineMatrix(pwt.scale_, pwt.rotation_, pwt.translation_);
+			pwt.TransferMatrix();
+		}
+
+		if (fade_) {
+			fade_->Update();
+			if (!fade_->IsFinished()) {
+				// keep countdown timer static until fade finished
+				break;
+			}
+		}
+
+		if (countdownTime_ <= 0.0f) {
+			
+ 			phase_ = Phase::kPlay;
+			// enable shooter enemies to fire now that gameplay begins
+			for (Enemy* e : enemies_) {
+				ShooterEnemy* se = dynamic_cast<ShooterEnemy*>(e);
+				if (se) se->SetAllowShooting(true);
+			}
+			
+			return;
+		} else {
+ 			
+ 			int display = static_cast<int>(std::ceil(countdownTime_));
+ 			if (display < 0) display = 0;
+ 			if (display > 9) display = 9;
+ 			if (countdownTextureHandles_[display] != 0u) {
+ 				if (!countdownSprite_) {
+ 					countdownSprite_ = KamataEngine::Sprite::Create(countdownTextureHandles_[display], KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) / 2.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 0.5f});
+ 					if (countdownSprite_) countdownSprite_->SetSize(KamataEngine::Vector2{200.0f, 200.0f});
+ 				} else {
+ 					countdownSprite_->SetTextureHandle(countdownTextureHandles_[display]);
+ 				}
+ 			}
+ 		}
+
+		// ensure countdown proceeds at real time now that fade has finished
+		countdownTime_ -= 1.0f / 60.0f;
+ 		
+ 		break;
+ 	}
+	case Phase::kPlay:
+
+#ifdef _DEBUG
+
+		ImGui::Begin("Window");
+
+		ImGui::End();
+
+		// トグル
+		if (Input::GetInstance()->TriggerKey(DIK_C)) {
+			isDebugCameraActive_ = !isDebugCameraActive_;
+		}
+
+		// 軸インジケータの表示と対象カメラ設定
+		AxisIndicator::GetInstance()->SetVisible(true);
+		if (isDebugCameraActive_) {
+		AxisIndicator::GetInstance()->SetTargetCamera(&debugCamera_->GetCamera());
+		} else {
+		AxisIndicator::GetInstance()->SetTargetCamera(&camera_);
+		}
+
+		// デバッグカメラ有効時はデバッグカメラの行列をゲーム用カメラへコピー
+		if (isDebugCameraActive_) {
+			debugCamera_->Update();
+			camera_.matView = debugCamera_->GetCamera().matView;
+			camera_.matProjection = debugCamera_->GetCamera().matProjection;
+			camera_.TransferMatrix();
+		} else {
+			// 通常時はカメラコントローラがカメラを更新
+			cameraController_->Update();
+			camera_.UpdateMatrix();
+		}
+
+#endif
+
+		skydome_->Update();
+
+		
+		for (Enemy* enemy : enemies_) {
+			if (enemy)
+				enemy->Update();
+		}
+		// Cull bullets against map in play
+		if (mapChipField_) {
+			for (Enemy* e : enemies_) {
+				ShooterEnemy* se = dynamic_cast<ShooterEnemy*>(e);
+				if (se) se->CullBulletsByMap(mapChipField_);
+			}
+		}
+
+		
+		if (!spikes_.empty()) {
+			for (Spike* s : spikes_) {
+				if (s) s->Update(1.0f / 60.0f);
+			}
+		}
+		if (!ladders_.empty()) {
+			for (Ladder* l : ladders_) {
+				if (l) l->Update(1.0f / 60.0f);
+			}
+		}
+		for (Goal* g : goals_) {
+			if (g) g->Update(1.0f / 60.0f);
+		}
+
+		player_->Update();
+
+		for (auto& row : worldTransformBlocks_) {
+			for (WorldTransform* wt : row) {
+				if (!wt) {
+					continue;
+				}
+				wt->matWorld_ = MakeAffineMatrix(wt->scale_, wt->rotation_, wt->translation_);
+				if (wt->parent_) {
+					wt->matWorld_ = Multiply(wt->parent_->matWorld_, wt->matWorld_);
+				}
+				wt->TransferMatrix();
+			}
+		}
+
+		// Update keys
+		if (!keys_.empty()) {
+            for (Key* k : keys_) {
+                if (k) k->Update(1.0f / 60.0f);
+            }
+        }
+
+		for (auto it = enemyDeathParticles_.begin(); it != enemyDeathParticles_.end();) {
+			EnemyDeathParticle* p = *it;
+			if (!p) {
+				it = enemyDeathParticles_.erase(it);
+				continue;
+			}
+			p->Update();
+			if (p->IsFinished()) {
+				delete p;
+				it = enemyDeathParticles_.erase(it);
+			} else
+				++it;
+		}
+
+#ifndef _DEBUG
+		cameraController_->Update();
+		camera_.UpdateMatrix();
+#endif 
+
+		CheckAllCollisions();
+
+		
+		if (hudSprite_) {
+			
+			const float hudMargin = 20.0f;
+			hudSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, hudMargin});
+		}
+	
+		if (uiLeftSprite_) {
+			uiLeftSprite_->SetPosition(KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 20.0f});
+		}
+		if (uiMidSprite_) {
+			// Update mid UI position to top-right (keep margin)
+			uiMidSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) - kUIMidRightMargin, 20.0f});
+		}
+		if (uiRightSprite_) {
+			// keep right UI at the top-right below the mid UI (align right) while paused as well
+			const float topMargin = 20.0f;
+			const float midHeight = 40.0f;
+			const float spacingBelowMid = 8.0f;
+			float rightX = static_cast<float>(kWindowWidth) - kUIRightMargin; // use same constant as in play
+			float rightY = topMargin + midHeight + spacingBelowMid; // below mid UI
+			uiRightSprite_->SetPosition(KamataEngine::Vector2{rightX, rightY});
+		}
+
+		// Update heart sprites to match player's current HP
+		{
+			if (player_) {
+				int hp = player_->GetHP();
+				if (hp < 0) hp = 0;
+				// If HP increased, rebuild by adding new hearts
+				if (hp > lastPlayerHP_) {
+					int toAdd = hp - lastPlayerHP_;
+					const float heartSize = 64.0f;
+					const float heartMarginX = 20.0f;
+					const float heartSpacing = 8.0f;
+					for (int i = 0; i < toAdd; ++i) {
+						float x = heartMarginX + static_cast<int>(hearts_.size()) * (heartSize + heartSpacing);
+						float y = 20.0f; // top-aligned
+						KamataEngine::Sprite* s = KamataEngine::Sprite::Create(heartTextureHandle_, KamataEngine::Vector2{x, y}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 0.0f});
+						if (s) s->SetSize(KamataEngine::Vector2{heartSize, heartSize});
+						HeartUI h; h.sprite = s; h.baseSize = heartSize; h.currentSize = heartSize; h.animTimer = 0.0f; h.removing = false; hearts_.push_back(h);
+					}
+					lastPlayerHP_ = hp;
+				}
+
+				// If HP decreased, mark the highest-index heart for removal (animate)
+				if (hp < lastPlayerHP_) {
+					int removeIndex = lastPlayerHP_ - 1; // remove last heart
+					if (removeIndex >= 0 && removeIndex < static_cast<int>(hearts_.size())) {
+						// record start position for the animation (current on-screen position)
+						const float heartMarginX = 20.0f;
+						const float heartSpacing = 8.0f;
+						float sx = heartMarginX + static_cast<int>(removeIndex) * (hearts_[removeIndex].baseSize + heartSpacing);
+						float sy = 20.0f; // top-aligned start position
+						hearts_[removeIndex].startPos = KamataEngine::Vector2{sx, sy};
+						hearts_[removeIndex].removing = true;
+						hearts_[removeIndex].animTimer = 0.0f;
+						// start heart shake
+						if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(1.0f, 0.15f);
+					}
+					lastPlayerHP_ = hp;
+				}
+
+				// Update animations for hearts
+				for (size_t i = 0; i < hearts_.size(); ++i) {
+					auto& h = hearts_[i];
+					if (!h.sprite) continue;
+					if (h.removing) {
+						// progress timer
+						h.animTimer += 1.0f / 60.0f;
+						float t = h.animTimer / heartRemoveDuration_;
+						if (t > 1.0f) t = 1.0f;
+						// scale down and fade out
+						h.currentSize = h.baseSize * (1.0f - t);
+						float alpha = 1.0f - t;
+						if (h.currentSize < 0.1f) h.currentSize = 0.0f;
+						h.sprite->SetSize(KamataEngine::Vector2{h.currentSize, h.currentSize});
+						h.sprite->SetColor(KamataEngine::Vector4{1.0f, 1.0f, 1.0f, alpha});
+						// keep the heart at its start position while shrinking/fading
+						h.sprite->SetPosition(h.startPos);
+						if (t >= 1.0f) {
+							// finished removal: delete sprite and erase element
+							if (h.sprite) { delete h.sprite; }
+							hearts_.erase(hearts_.begin() + static_cast<int>(i));
+							// adjust loop index
+							--i;
+						}
+					} else {
+						// ensure proper position/size for hearts that remain
+						const float heartMarginX = 20.0f;
+						const float heartSpacing = 8.0f;
+						float x = heartMarginX + static_cast<int>(i) * (h.baseSize + heartSpacing);
+						float y = 20.0f; // top-aligned
+						h.sprite->SetPosition(KamataEngine::Vector2{x, y});
+						// ensure fully visible
+						h.sprite->SetColor(KamataEngine::Vector4{1,1,1,1});
+						h.sprite->SetSize(KamataEngine::Vector2{h.currentSize, h.currentSize});
+					}
+				}
+			}
+		}
+		
+		// フェーズ切り替えをチェック
+		ChangePhase();
+		break;
+	case Phase::kDeath:
+
+#ifdef _DEBUG
+
+		ImGui::Begin("Window");
+
+		ImGui::End();
+
+		// トグル
+		if (Input::GetInstance()->TriggerKey(DIK_C)) {
+	 	isDebugCameraActive_ = !isDebugCameraActive_;
+		}
+		AxisIndicator::GetInstance()->SetVisible(true);
+		if (isDebugCameraActive_) {
+			AxisIndicator::GetInstance()->SetTargetCamera(&debugCamera_->GetCamera());
+			debugCamera_->Update();
+			camera_.matView = debugCamera_->GetCamera().matView;
+			camera_.matProjection = debugCamera_->GetCamera().matProjection;
+			camera_.TransferMatrix();
+		} else {
+			cameraController_->Update();
+			camera_.UpdateMatrix();
+		}
+
+#endif 
+
+		skydome_->Update();
+		// Update all enemies
+		for (Enemy* enemy : enemies_) {
+			if (enemy)
+				enemy->Update();
+		}
+		// Cull bullets against map in death
+		if (mapChipField_) {
+			for (Enemy* e : enemies_) {
+				ShooterEnemy* se = dynamic_cast<ShooterEnemy*>(e);
+				if (se) se->CullBulletsByMap(mapChipField_);
+			}
+		}
+
+		// Particle関係
+		if (phase_ == Phase::kDeath && deathParticle_) {
+			deathParticle_->Update();
+			
+			if (deathParticle_->IsFinished()) {
+				readyForGameOver_ = true;
+			}
+		}
+
+		for (auto it = enemyDeathParticles_.begin(); it != enemyDeathParticles_.end();) {
+			EnemyDeathParticle* p = *it;
+			if (!p) {
+				it = enemyDeathParticles_.erase(it);
+				continue;
+			}
+			p->Update();
+			if (p->IsFinished()) {
+				delete p;
+				it = enemyDeathParticles_.erase(it);
+			} else {
+				++it;
+			}
+		}
+
+#ifndef _DEBUG
+		cameraController_->Update();
+		camera_.UpdateMatrix();
+#endif //  _DEBUG
+
+		for (auto& row : worldTransformBlocks_) {
+			for (WorldTransform* wt : row) {
+				if (!wt) {
+					continue;
+				}
+				wt->matWorld_ = MakeAffineMatrix(wt->scale_, wt->rotation_, wt->translation_);
+				if (wt->parent_) {
+					wt->matWorld_ = Multiply(wt->parent_->matWorld_, wt->matWorld_);
+				}
+				wt->TransferMatrix();
+			}
+		}
+
+		break;
+	case Phase::kVictory:
+		// During victory, keep camera following player and update a particle effect
+		#ifndef _DEBUG
+		cameraController_->Update();
+		camera_.UpdateMatrix();
+		#else
+		// Allow debug camera toggle but still update camera controller when not debug camera
+		if (Input::GetInstance()->TriggerKey(DIK_C)) {
+			isDebugCameraActive_ = !isDebugCameraActive_;
+		}
+		if (isDebugCameraActive_) {
+			debugCamera_->Update();
+			camera_.matView = debugCamera_->GetCamera().matView;
+			camera_.matProjection = debugCamera_->GetCamera().matProjection;
+			camera_.TransferMatrix();
+		} else {
+			cameraController_->Update();
+			camera_.UpdateMatrix();
+		}
+		#endif
+
+		skydome_->Update();
+
+		// Update victory particle if present
+		if (deathParticle_) {
+			deathParticle_->Update();
+		}
+
+		// simple timer to delay scene change
+		victoryTimer_ += 1.0f / 60.0f;
+		if (victoryTimer_ >= victoryDuration_) {
+			finished_ = true; // signal main to change to GameClear
+		}
+
+		// keep world transforms updated for visuals
+		for (auto& row : worldTransformBlocks_) {
+			for (WorldTransform* wt : row) {
+				if (!wt) continue;
+				wt->matWorld_ = MakeAffineMatrix(wt->scale_, wt->rotation_, wt->translation_);
+				if (wt->parent_) wt->matWorld_ = Multiply(wt->parent_->matWorld_, wt->matWorld_);
+				wt->TransferMatrix();
+			}
+		}
+
+		break;
+	case Phase::kPause:
+#ifdef _DEBUG
+		// デバッグカメラのトグルは許可
+		if (Input::GetInstance()->TriggerKey(DIK_C)) {
+	 	isDebugCameraActive_ = !isDebugCameraActive_;
+		}
+		AxisIndicator::GetInstance()->SetVisible(true);
+		if (isDebugCameraActive_) {
+			AxisIndicator::GetInstance()->SetTargetCamera(&debugCamera_->GetCamera());
+			debugCamera_->Update();
+			camera_.matView = debugCamera_->GetCamera().matView;
+			camera_.matProjection = debugCamera_->GetCamera().matProjection;
+			camera_.TransferMatrix();
+		} else {
+			cameraController_->Update();
+			camera_.UpdateMatrix();
+		}
+#else
+		cameraController_->Update();
+		camera_.UpdateMatrix();
+#endif
+		// ワールド変換のみ反映（オブジェクトは更新しない）
+		for (auto& row : worldTransformBlocks_) {
+			for (WorldTransform* wt : row) {
+				if (!wt) continue;
+				wt->matWorld_ = MakeAffineMatrix(wt->scale_, wt->rotation_, wt->translation_);
+				if (wt->parent_) wt->matWorld_ = Multiply(wt->parent_->matWorld_, wt->matWorld_);
+				wt->TransferMatrix();
+			}
+		}
+		// UIの位置だけ維持
+		if (hudSprite_) {
+			const float hudMargin = 20.0f;
+			hudSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, hudMargin});
+		}
+		if (uiLeftSprite_) {
+			uiLeftSprite_->SetPosition(KamataEngine::Vector2{50.0f, static_cast<float>(kWindowHeight) - 20.0f});
+		}
+		if (uiMidSprite_) {
+			uiMidSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) - kUIMidRightMargin, 20.0f});
+		}
+		if (uiRightSprite_) {
+			// keep right UI at the top-right below the mid UI (align right) while paused as well
+			const float topMargin = 20.0f;
+			const float midHeight = 40.0f;
+			const float spacingBelowMid = 8.0f;
+			float rightX = static_cast<float>(kWindowWidth) - kUIRightMargin; // use same constant as in play
+			float rightY = topMargin + midHeight + spacingBelowMid; // below mid UI
+			uiRightSprite_->SetPosition(KamataEngine::Vector2{rightX, rightY});
+		}
+		if (pauseSprite_) {
+			pauseSprite_->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) / 2.0f});
+		}
+		// keep pause menu item positions in case window size changes
+		for (int i = 0; i < 3; ++i) {
+			if (pauseMenuSprites_[i]) {
+				const float menuHeightLocal = 80.0f;
+				const float spacingLocal = 20.0f;
+				const float centerYLocal = static_cast<float>(kWindowHeight) * 0.5f;
+				float y = centerYLocal + (i - 1) * (menuHeightLocal + spacingLocal);
+				pauseMenuSprites_[i]->SetPosition(KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, y});
+			}
+		}
+
+		// navigation: W/S or Up/Down or gamepad D-pad up/down
+		bool moveUp = Input::GetInstance()->TriggerKey(DIK_W) || Input::GetInstance()->TriggerKey(DIK_UP);
+		bool moveDown = Input::GetInstance()->TriggerKey(DIK_S) || Input::GetInstance()->TriggerKey(DIK_DOWN);
+		// gamepad dpad handled via KeyInput
+		if (KeyInput::GetInstance()->TriggerPadButton(XINPUT_GAMEPAD_DPAD_UP)) moveUp = true;
+		if (KeyInput::GetInstance()->TriggerPadButton(XINPUT_GAMEPAD_DPAD_DOWN)) moveDown = true;
+
+		// left stick: detect rising edge beyond threshold to act as trigger
+		{
+			static float prevStickY = 0.0f;
+			const float stickThreshold = 0.5f;
+			KamataEngine::Vector2 lstick = KeyInput::GetInstance()->GetLStick();
+			float stickY = lstick.y;
+			bool stickUpTriggered = (stickY > stickThreshold) && (prevStickY <= stickThreshold);
+			bool stickDownTriggered = (stickY < -stickThreshold) && (prevStickY >= -stickThreshold);
+			if (stickUpTriggered) moveUp = true;
+			if (stickDownTriggered) moveDown = true;
+			prevStickY = stickY;
+		}
+
+		if (moveUp) {
+			pauseMenuSelectedIndex_ = (pauseMenuSelectedIndex_ - 1 + 3) % 3;
+		}
+		if (moveDown) {
+			pauseMenuSelectedIndex_ = (pauseMenuSelectedIndex_ + 1) % 3;
+		}
+
+		// update tinting: selected red, others white
+		for (int i = 0; i < 3; ++i) {
+			if (pauseMenuSprites_[i]) {
+				if (i == pauseMenuSelectedIndex_)
+					pauseMenuSprites_[i]->SetColor(KamataEngine::Vector4{1,0,0,1});
+				else
+					pauseMenuSprites_[i]->SetColor(KamataEngine::Vector4{1,1,1,1});
+			}
+		}
+
+		// accept: Space or gamepad A
+		{
+			static bool prevPadA = false;
+			bool padA = KeyInput::GetInstance()->PushPadButton(KeyInput::XINPUT_BUTTON_A);
+			bool padATriggered = padA && !prevPadA; // rising edge
+			prevPadA = padA;
+			bool accept = Input::GetInstance()->TriggerKey(DIK_SPACE) || padATriggered;
+			if (accept) {
+				switch (pauseMenuSelectedIndex_) {
+				case 0:
+					phase_ = Phase::kPlay;
+				
+					if (player_) player_->SuppressNextJump();
+					break;
+				case 1: 
+					Reset();
+					break;
+				case 2: 
+					backToSelectRequested_ = true;
+					break;
+				}
+			}
+		}
+
+		break;
+	}
+}
+
+void GameScene::Draw() {
+
+    Model::PreDraw();
+
+    // 先にスカイドームを描画
+    if (skydome_) {
+        skydome_->Draw();
+    }
+
+   
+    for (Enemy* enemy : enemies_) {
+        if (enemy && enemy->isAlive()) {
+            enemy->Draw();
+        }
+    }
+
+    if (!spikes_.empty()) {
+        for (Spike* s : spikes_) {
+            if (s) s->Draw(&camera_);
+        }
+    }
+    for (Goal* g : goals_) {
+        if (g) g->Draw(&camera_);
+    }
+
+    // Draw keys
+    for (Key* k : keys_) {
+        if (k) k->Draw(&camera_);
+    }
+
+    // Draw ladders here so they render on top of blocks
+    for (Ladder* l : ladders_) {
+        if (l) l->Draw(&camera_);
+    }
+
+    // デス中はプレイヤーの描画を抑制してエフェクトを見やすくする
+    if (phase_ != Phase::kDeath) {
+        player_->Draw();
+    }
+
+    for (auto& row : worldTransformBlocks_) {
+        for (WorldTransform* wt : row) {
+            if (!wt) {
+                continue;
+            }
+		
+			IndexSet idx = mapChipField_->GetMapChipIndexSetByPosition(wt->translation_);
+			MapChipType t = mapChipField_->GetMapChipTypeByIndex(idx.xIndex, idx.yIndex);
+			if (t == MapChipType::kIce && iceModel_) {
+				iceModel_->Draw(*wt, camera_);
+			} else {
+				blockModel_->Draw(*wt, camera_);
+			}
+        }
+    }
+
+    // Particle関係
+    if ((phase_ == Phase::kDeath || phase_ == Phase::kVictory) && deathParticle_) {
+        deathParticle_->Draw();
+    }
+
+for (auto it = enemyDeathParticles_.begin(); it != enemyDeathParticles_.end();) {
+		EnemyDeathParticle* p = *it;
+		if (!p) {
+			it = enemyDeathParticles_.erase(it);
+			continue;
+		}
+		p->Draw();
+		if (p->IsFinished()) {
+			delete p;
+			it = enemyDeathParticles_.erase(it);
+		} else {
+			++it;
+		}
+	}
+
+    Model::PostDraw();
+
+    if (hudSprite_ || uiLeftSprite_ || uiMidSprite_ || uiRightSprite_ || uiBottomRightSprite_ || countdownSprite_ || pauseSprite_ || pauseMenuSprites_[0] || pauseMenuSprites_[1] || pauseMenuSprites_[2] || !hearts_.empty()) {
+        KamataEngine::DirectXCommon* dx = KamataEngine::DirectXCommon::GetInstance();
+        KamataEngine::Sprite::PreDraw(dx->GetCommandList());
+        if (hudSprite_) hudSprite_->Draw();
+        if (uiLeftSprite_) uiLeftSprite_->Draw();
+        // draw right first so mid is rendered on top
+        if (uiRightSprite_) uiRightSprite_->Draw();
+        // draw the small left-variant placed at top-right (e.g. RT / E)
+        if (uiBottomRightSprite_) uiBottomRightSprite_->Draw();
+        if (uiMidSprite_) uiMidSprite_->Draw();
+		if (uiPhaseSprite_) {
+			uiPhaseSprite_->Draw();
+		}
+		if (uiAttackSprite_) {
+			uiAttackSprite_->Draw();
+		}
+		if (uiJumpSprite_)
+		{
+			uiJumpSprite_->Draw();
+		}
+		if (phase_ == Phase::kCountdown && countdownSprite_) countdownSprite_->Draw();
+        if (phase_ == Phase::kPause && pauseSprite_) pauseSprite_->Draw();
+
+        // draw pause menu items when paused (stacked top-down)
+        if (phase_ == Phase::kPause) {
+            for (int i = 0; i < 3; ++i) {
+                if (pauseMenuSprites_[i]) pauseMenuSprites_[i]->Draw();
+            }
+        }
+
+        for (auto& h : hearts_) {
+            if (h.sprite) h.sprite->Draw();
+        }
+        // draw fade overlay last so it covers the screen during intro
+        if (fade_) fade_->Draw();
+        KamataEngine::Sprite::PostDraw();
+    }
+}
+
+void GameScene::GenerateBlocks() {
+
+	uint32_t numBlockVirtical = mapChipField_->GetNumBlockVertical();
+	uint32_t numBlockHorizontal = mapChipField_->GetNumBlockHorizontal();
+
+	// 既存を破棄しクリア
+	for (auto& row : worldTransformBlocks_) {
+		for (WorldTransform* wt : row) {
+			delete wt;
+		}
+	}
+	worldTransformBlocks_.clear();
+
+	// 要素数を設定し、nullptr で初期化
+	worldTransformBlocks_.assign(numBlockVirtical, std::vector<WorldTransform*>(numBlockHorizontal, nullptr));
+
+	for (uint32_t i = 0; i < numBlockVirtical; ++i) {
+		for (uint32_t j = 0; j < numBlockHorizontal; ++j) {
+			MapChipType t = mapChipField_->GetMapChipTypeByIndex(j, i);
+			if (t == MapChipType::kBlock || t == MapChipType::kIce) {
+				WorldTransform* worldTransform = new WorldTransform();
+				worldTransform->Initialize();
+				worldTransform->translation_ = mapChipField_->GetMapChipPositionByIndex(j, i);
+				worldTransformBlocks_[i][j] = worldTransform;
+			}
+		}
+	}
+}
+
+void GameScene::CheckAllCollisions() {
+#pragma region プレイヤーと敵の当たり判定
+
+    // 敵またはプレイヤーが死亡している場合は衝突判定をスキップ
+    if (!player_ || !player_->isAlive()) {
+        return;
+    }
+
+    // Check bullets hitting player (consume bullet and apply damage)
+    for (Enemy* e : enemies_) {
+        ShooterEnemy* se = dynamic_cast<ShooterEnemy*>(e);
+        if (!se) continue;
+        if (se->ConsumeBulletCollidingWithAABB(player_->GetAABB())) {
+            // only apply damage if player was not invincible
+            bool wasInvincible = player_->IsInvincible();
+            if (!wasInvincible) {
+                player_->OnCollision(nullptr);
+                if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(1.0f, 0.15f);
+            }
+            // continue checking other bullets/enemies
+        }
+    }
+
+    for (Enemy* enemy : enemies_) {
+        if (!enemy || !enemy->isAlive())
+            continue;
+
+      if (player_->IsAttacking()) {
+			AABB attackBox = player_->GetAttackAABB();
+			if (IsCollisionAABBAABB(attackBox, enemy->GetAABB())) {
+				enemy->OnCollision(player_);
+				if (cameraController_ && !player_->IsDying())
+					cameraController_->StartShake(1.0f, 0.15f);
+
+				if (!enemy->isAlive()) {
+					AABB ea = enemy->GetAABB();
+					KamataEngine::Vector3 pos = {(ea.min.x + ea.max.x) * 0.5f, (ea.min.y + ea.max.y) * 0.5f, 0.0f};
+					EnemyDeathParticle* p = new EnemyDeathParticle();
+					p->Initialize(nikukyuModel_, &camera_, pos);
+					enemyDeathParticles_.push_back(p);
+
+					// オブジェクト削除はループ終了後に行う（安全）
+				}
+				continue;
+			}
+		}
+
+        if (IsCollisionAABBAABB(player_->GetAABB(), enemy->GetAABB())) {
+            player_->OnCollision(enemy);
+            enemy->OnCollision(player_);
+        }
+    }
+
+#pragma endregion
+
+    // Spike とプレイヤーの当たり判定（Spike 側で AABB を提供）
+    for (Spike* s : spikes_) {
+        if (!s) continue;
+        AABB pA = player_->GetAABB();
+        AABB sA = s->GetAABB();
+        if (IsCollisionAABBAABB(pA, sA)) {
+          
+            float overlapX = std::min<float>(pA.max.x, sA.max.x) - std::max<float>(pA.min.x, sA.min.x);
+            float overlapY = std::min<float>(pA.max.y, sA.max.y) - std::max<float>(pA.min.y, sA.min.y);
+
+          
+            Vector3 pCenter = {(pA.min.x + pA.max.x) * 0.5f, (pA.min.y + pA.max.y) * 0.5f, 0.0f};
+            Vector3 sCenter = {(sA.min.x + sA.max.x) * 0.5f, (sA.min.y + sA.max.y) * 0.5f, 0.0f};
+
+         
+            KamataEngine::WorldTransform& pwt = player_->GetWorldTransform();
+            if (overlapX < overlapY) {
+                float dir = (pCenter.x < sCenter.x) ? -1.0f : 1.0f;
+                pwt.translation_.x += dir * overlapX;
+                player_->velocity_.x = 0.0f;
+            } else {
+                float dir = (pCenter.y < sCenter.y) ? -1.0f : 1.0f;
+                pwt.translation_.y += dir * overlapY;
+                player_->velocity_.y = 0.0f;
+            }
+
+
+            player_->UpdateAABB();
+
+            // Only apply damage and shake if player was not already invincible
+            bool wasInvincible = (player_) ? player_->IsInvincible() : false;
+            if (!wasInvincible) {
+                player_->OnCollision(nullptr);
+                // Extend invincibility for spike-specific escape window
+                if (player_) player_->ApplyInvincibility(1.25f);
+                // Single short, mild camera shake for spike hit
+                if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(0.4f, 0.08f);
+            }
+
+            // decide nudge direction based on spike/player centers (horizontal preference)
+            float nudgeDir = (pCenter.x < sCenter.x) ? -1.0f : 1.0f;
+
+            // Allow immediate horizontal escape using AD (or arrow keys).
+            bool keyRight = Input::GetInstance()->PushKey(DIK_RIGHT) || Input::GetInstance()->PushKey(DIK_D);
+            bool keyLeft = Input::GetInstance()->PushKey(DIK_LEFT) || Input::GetInstance()->PushKey(DIK_A);
+            if (keyRight) {
+                player_->velocity_.x = std::fabs(player_->velocity_.x) < 0.001f ? 0.35f : std::fabs(player_->velocity_.x);
+            } else if (keyLeft) {
+                player_->velocity_.x = - (std::fabs(player_->velocity_.x) < 0.001f ? 0.35f : std::fabs(player_->velocity_.x));
+            } else {
+                // small automatic nudge away from spike so player isn't stuck
+                player_->velocity_.x += nudgeDir * 0.18f;
+                // clamp to reasonable walk speed
+                if (player_->velocity_.x > 0.5f) player_->velocity_.x = 0.5f;
+                if (player_->velocity_.x < -0.5f) player_->velocity_.x = -0.5f;
+            }
+
+            // If we were pushed vertically into a step, also nudge the player's position slightly horizontally
+            if (overlapY >= overlapX) {
+                KamataEngine::WorldTransform& pwt2 = player_->GetWorldTransform();
+                pwt2.translation_.x += nudgeDir * 0.22f; // small position nudge to get off the edge
+                player_->UpdateAABB();
+            }
+
+            break;
+        }
+    }
+
+    // Goal とプレイヤーの当たり判定
+    for (Goal* g : goals_) {
+        if (!g) continue;
+        if (IsCollisionAABBAABB(player_->GetAABB(), g->GetAABB())) {
+            // require all keys to be collected before clearing
+            if (keys_.empty()) {
+                // Start a short victory sequence instead of immediately finishing
+		        if (phase_ != Phase::kVictory) {
+		            phase_ = Phase::kVictory;
+		            victoryTimer_ = 0.0f;
+		            // create a particle effect at player position to indicate victory
+		            const Vector3 victoryPos = player_->GetPosition();
+		            if (deathParticle_) { delete deathParticle_; deathParticle_ = nullptr; }
+		            deathParticle_ = new DeathParticle();
+					deathParticle_->Initialize(nikukyuModel_, &camera_, victoryPos);
+		             if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(0.8f, 0.2f);
+					 if (seClearDataHandle_ != 0u)
+					 {
+						 Audio::GetInstance()->PlayWave(seClearDataHandle_, false, 1.0f);
+						
+					 }
+		        }
+		        return;
+            } else {
+                // Inform (debug) that keys remain; do not clear yet
+                DebugText::GetInstance()->ConsolePrintf("GameScene: goal reached but keys remain\n");
+            }
+        }
+    }
+
+	// Key とプレイヤーの当たり判定
+	for (auto it = keys_.begin(); it != keys_.end();) {
+        Key* k = *it;
+        if (!k) {
+            it = keys_.erase(it);
+            continue;
+        }
+
+		// If key already finished its collection animation, give it to player and remove
+		if (k->IsCollected()) {
+			player_->ConsumeKey();
+			delete k;
+			it = keys_.erase(it);
+			continue;
+		}
+
+		// If player is colliding with key, start pickup animation (if not already started)
+		if (IsCollisionAABBAABB(player_->GetAABB(), k->GetAABB())) {
+			if (!k->IsPicked()) {
+				k->OnPicked(player_);
+				k->PlayGetSound();
+				if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(1.0f, 0.15f);
+			}
+		}
+
+		++it;
+    }
+}
+
+void GameScene::ChangePhase() {
+
+	switch (phase_) {
+	case Phase::kPlay:
+
+		if (!player_->isAlive()) {
+			
+			phase_ = Phase::kDeath;
+			const Vector3 deathPos = player_->GetPosition();
+
+			if (deathParticle_) {
+				delete deathParticle_;
+				deathParticle_ = nullptr;
+			}
+
+			deathParticle_ = new DeathParticle();
+			deathParticle_->Initialize(nikukyuModel_, &camera_, deathPos);
+
+			// play player death sound asynchronously
+			if (seDecisionDataHandle_ != 0u) {
+				Audio::GetInstance()->PlayWave(seDecisionDataHandle_, false, 1.0f);
+			}
+			//seDecisionDataHandle_
+			readyForGameOver_ = false;
+		}
+
+		break;
+	case Phase::kDeath:
+
+		break;
+	case Phase::kCountdown:
+		
+		break;
+	}
+}
+
+// リセット処理
+void GameScene::Reset() {
+	
+	// If a reset is already pending, ignore additional reset requests
+	if (resetPending_) return;
+
+	// Start a fade-out, defer the actual reset until fade finished
+	if (!fade_) {
+		fade_ = new Fade();
+		fade_->Initialize();
+	}
+	fade_->Start(Fade::Status::FadeOut, resetFadeDuration_);
+	resetPending_ = true;
+}
+
+void GameScene::PerformResetNow() {
+	// fully clean and re-create player and UI etc. - reuse much of Initialize's reset logic but avoid full re-init of entire scene
+	if (player_) {
+		delete player_;
+		player_ = nullptr;
+	}
+	Vector3 playerPosition = {4.0f, 4.0f, 0.0f};
+	// Recompute spawn position from map chip 2 if available
+	if (mapChipField_) {
+		uint32_t vh = mapChipField_->GetNumBlockVertical();
+		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
+		bool found = false;
+		for (uint32_t y = 0; y < vh && !found; ++y) {
+			for (uint32_t x = 0; x < wh; ++x) {
+				if (mapChipField_->GetMapChipTypeByIndex(x, y) == MapChipType::kReserved2) {
+					playerPosition = mapChipField_->GetMapChipPositionByIndex(x, y);
+					found = true;
+					break;
+				}
+			}
+			}
+	}
+	player_ = new Player();
+	player_->Initialize(&camera_, playerPosition);
+	player_->SetMapChipField(mapChipField_);
+	// 再生成したプレイヤーにもカメラコントローラを渡す
+	if (cameraController_) {
+		player_->SetCameraController(cameraController_);
+	}
+
+	// clear existing heart UI
+	for (auto& h : hearts_) {
+		if (h.sprite) delete h.sprite;
+	}
+	hearts_.clear();
+	lastPlayerHP_ = 0;
+
+	// create hearts for new player
+	if (heartTextureHandle_ != 0u && player_) {
+		int hp = player_->GetHP();
+		const float heartSize = 32.0f;
+		const float heartMarginX = 20.0f;
+		const float heartSpacing = 8.0f;
+		for (int i = 0; i < hp; ++i) {
+					float x = heartMarginX + i * (heartSize + heartSpacing);
+			float y = 20.0f; // top-aligned
+			KamataEngine::Sprite* s = KamataEngine::Sprite::Create(heartTextureHandle_, KamataEngine::Vector2{x, y}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.0f, 0.0f});
+			if (s) s->SetSize(KamataEngine::Vector2{heartSize, heartSize});
+			HeartUI h; h.sprite = s; h.baseSize = heartSize; h.currentSize = heartSize; h.animTimer = 0.0f; h.removing = false; hearts_.push_back(h);
+		}
+		lastPlayerHP_ = player_->GetHP();
+	}
+
+
+	if (deathParticle_) {
+		delete deathParticle_;
+		deathParticle_ = nullptr;
+	}
+
+
+	if (hudSprite_) {
+		delete hudSprite_;
+		hudSprite_ = nullptr;
+	}
+	if (hudTextureHandle_ != 0u) {
+		const float hudWidth = 250.0f;
+		const float hudHeight = 30.0f;
+		const float hudMargin = 20.0f;
+		
+		hudSprite_ = KamataEngine::Sprite::Create(hudTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, hudMargin}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 0.0f});
+		if (hudSprite_) {
+			hudSprite_->SetSize(KamataEngine::Vector2{hudWidth, hudHeight});
+		}
+	}
+
+
+	if (uiLeftSprite_) {
+		delete uiLeftSprite_;
+		uiLeftSprite_ = nullptr;
+	}
+	if (uiMidSprite_) {
+		delete uiMidSprite_;
+		uiMidSprite_ = nullptr;
+	}
+	if (uiRightSprite_) {
+		delete uiRightSprite_;
+		uiRightSprite_ = nullptr;
+	}
+	// delete top-right left-variant sprite if present
+	if (uiBottomRightSprite_) {
+		delete uiBottomRightSprite_;
+		uiBottomRightSprite_ = nullptr;
+	}
+
+	// During reset recreate preferred left UI
+	uint32_t leftHandleAfterReset = lastInputWasPad_ ? uiLeftGamepadTextureHandle_ : uiLeftKeyboardTextureHandle_;
+	if (leftHandleAfterReset == 0u) leftHandleAfterReset = lastInputWasPad_ ? uiLeftKeyboardTextureHandle_ : uiLeftGamepadTextureHandle_;
+	// Instead of creating a bottom-left main left UI here, recreate the small top-right left-variant so behavior matches Initialize()
+	if (leftHandleAfterReset != 0u) {
+		const float topMargin = 20.0f;
+		const float midHeight = 40.0f;
+		const float spacingBelowMid = 8.0f;
+		const float spacingBelowRight = 8.0f;
+		float rightX = static_cast<float>(kWindowWidth) - kUIRightMargin;
+		float rightY = topMargin + midHeight + spacingBelowMid;
+		float bottomY = rightY + midHeight + spacingBelowRight;
+		float bottomRightX = rightX - kUIBottomRightOffset;
+
+		if (!uiBottomRightSprite_) {
+			uiBottomRightSprite_ = KamataEngine::Sprite::Create(leftHandleAfterReset, KamataEngine::Vector2{bottomRightX, bottomY}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{1.0f, 0.0f});
+			if (uiBottomRightSprite_) {
+				uiBottomRightSprite_->SetSize(KamataEngine::Vector2{70.0f, 40.0f});
+				auto desc2 = TextureManager::GetInstance()->GetResoureDesc(leftHandleAfterReset);
+				uiBottomRightSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc2.Width), static_cast<float>(desc2.Height)});
+			}
+		} else {
+			uiBottomRightSprite_->SetTextureHandle(leftHandleAfterReset);
+			uiBottomRightSprite_->SetSize(KamataEngine::Vector2{70.0f, 40.0f});
+			auto desc2 = TextureManager::GetInstance()->GetResoureDesc(leftHandleAfterReset);
+			uiBottomRightSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc2.Width), static_cast<float>(desc2.Height)});
+			uiBottomRightSprite_->SetPosition(KamataEngine::Vector2{bottomRightX, bottomY});
+		}
+	}
+	if (uiMidTextureHandle_ != 0u) {
+		// place mid UI at top-right
+		uiMidSprite_ = KamataEngine::Sprite::Create(uiMidTextureHandle_, KamataEngine::Vector2{static_cast<float>(kWindowWidth) - kUIMidRightMargin, 20.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 0.0f});
+		if (uiMidSprite_) {
+			 uiMidSprite_->SetSize(KamataEngine::Vector2{280.0f, 40.0f});
+			 auto desc = TextureManager::GetInstance()->GetResoureDesc(uiMidTextureHandle_);
+			 uiMidSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
+		}
+	}
+	// Load separate textures for mid UI (keyboard TAB vs gamepad Menu button)
+	uiMidGamepadTextureHandle_ = TextureManager::Load("Sprite/GameScene/MenuButton.png");
+	uiMidKeyboardTextureHandle_ = TextureManager::Load("Sprite/GameScene/TAB.png");
+	// set initial mid sprite according to available resources (prefer keyboard TAB)
+	uint32_t defaultMidHandle = uiMidKeyboardTextureHandle_ != 0u ? uiMidKeyboardTextureHandle_ : uiMidGamepadTextureHandle_;
+	if (defaultMidHandle != 0u && !uiMidSprite_) {
+		// place the mid UI at top-right
+		uiMidSprite_ = KamataEngine::Sprite::Create(defaultMidHandle, KamataEngine::Vector2{static_cast<float>(kWindowWidth) - kUIMidRightMargin, 20.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{1.0f, 0.0f});
+		if (uiMidSprite_) {
+			uiMidSprite_->SetSize(KamataEngine::Vector2{280.0f, 40.0f});
+			// ensure sprite uses full texture region
+			{
+				auto desc = TextureManager::GetInstance()->GetResoureDesc(defaultMidHandle);
+				uiMidSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
+			}
+		}
+	}
+	// --- Phase.png の生成と配置 ---
+	if (uiPhaseTextureHandle_ != 0u && !uiPhaseSprite_) {
+		// uiMidSprite_ の位置を基準にする
+		// uiMidSprite_ はアンカー {1.0f, 0.0f} なので、その座標 (x) は TAB画像の右端。
+		// そこに少しの余白 (10pxなど) を足して配置する。
+		float phasePadding = 10.0f;
+		Vector2 midPos = uiMidSprite_->GetPosition();
+		Vector2 phasePos = {midPos.x + phasePadding + kUIPhaseRightOffset, midPos.y}; // move Phase further right via offset
+
+		// アンカーポイントを {0.0f, 0.0f} (左上) にすると、TABの右隣に並べやすくなります
+		uiPhaseSprite_ = KamataEngine::Sprite::Create(uiPhaseTextureHandle_, phasePos, {1, 1, 1, 1}, {0.0f, 0.0f});
+
+		if (uiPhaseSprite_) {
+			// 画像のサイズを設定 (例: 80x40)
+			uiPhaseSprite_->SetSize(Vector2{200.0f, 40.0f});
+
+			// 全領域を使用するように設定
+			auto desc = TextureManager::GetInstance()->GetResoureDesc(uiPhaseTextureHandle_);
+			uiPhaseSprite_->SetTextureRect({0.0f, 0.0f}, {static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
+		}
+	}
+	// Load separate keyboard/gamepad textures for right UI
+	uiRightGamepadTextureHandle_ = TextureManager::Load("Sprite/GameScene/AButton.png");
+	uiRightKeyboardTextureHandle_ = TextureManager::Load("Sprite/GameScene/SPACE.png");
+
+	// Default choice: keyboard image if present, otherwise gamepad
+	uint32_t defaultRightHandle = uiRightKeyboardTextureHandle_ != 0u ? uiRightKeyboardTextureHandle_ : uiRightGamepadTextureHandle_;
+	if (defaultRightHandle != 0u) {
+		// place right UI at the top-right below the mid UI (align right)
+		const float topMargin = 20.0f;
+		const float midHeight = 40.0f;
+		const float spacingBelowMid = 8.0f;
+		float rightX = static_cast<float>(kWindowWidth) - kUIRightMargin; // 20px -> margin constant
+		float rightY = topMargin + midHeight + spacingBelowMid; // below mid UI
+		uiRightSprite_ = KamataEngine::Sprite::Create(defaultRightHandle, KamataEngine::Vector2{rightX, rightY}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{1.0f, 0.0f});
+		if (uiRightSprite_) {
+			uiRightSprite_->SetSize(KamataEngine::Vector2{156.0f, 40.0f});
+			// ensure sprite uses full texture region
+			{
+				auto desc = TextureManager::GetInstance()->GetResoureDesc(defaultRightHandle);
+				uiRightSprite_->SetTextureRect(KamataEngine::Vector2{0.0f, 0.0f}, KamataEngine::Vector2{static_cast<float>(desc.Width), static_cast<float>(desc.Height)});
+			}
+		}
+	}
+
+
+	victoryTimer_ = 0.0f;
+
+	
+	countdownTime_ = countdownStart_;
+
+	for (int i = 0; i < 10; ++i) {
+		char buf[64];
+		sprintf_s(buf, "Number/%d.png", i);
+		countdownTextureHandles_[i] = TextureManager::Load(buf);
+	}
+
+	int initialIndex = static_cast<int>(std::ceil(countdownTime_));
+	if (initialIndex < 0) initialIndex = 0;
+	if (initialIndex > 9) initialIndex = 9;
+	if (countdownTextureHandles_[initialIndex] != 0u) {
+		countdownSprite_ = KamataEngine::Sprite::Create(countdownTextureHandles_[initialIndex], KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) / 2.0f}, KamataEngine::Vector4{1,1,1,1}, KamataEngine::Vector2{0.5f, 0.5f});
+		if (countdownSprite_) {
+			
+			countdownSprite_->SetSize(KamataEngine::Vector2{200.0f, 200.0f});
+		}
+	}
+
+
+
+	// pauseTextureHandle_ = TextureManager::Load("Sprite/Pause/Pause.png");
+	if (pauseTextureHandle_ != 0u) {
+		pauseSprite_ = KamataEngine::Sprite::Create(
+			pauseTextureHandle_,
+			KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, static_cast<float>(kWindowHeight) / 2.0f},
+			KamataEngine::Vector4{1,1,1,1},
+			KamataEngine::Vector2{0.5f, 0.5f}
+		);
+		if (pauseSprite_) pauseSprite_->SetSize(KamataEngine::Vector2{300.0f, 100.0f});
+	}
+
+	// Load pause menu item textures and create sprites (stacked top-down)
+	pauseMenuTextureHandles_[0] = TextureManager::Load("Sprite/Pause/BackGame.png");
+	pauseMenuTextureHandles_[1] = TextureManager::Load("Sprite/Pause/Reset.png");
+	pauseMenuTextureHandles_[2] = TextureManager::Load("Sprite/Pause/BackSelect.png");
+
+	const float menuWidth2 = 400.0f;
+	const float menuHeight2 = 80.0f;
+	const float spacing2 = 20.0f;
+	const float centerY2 = static_cast<float>(kWindowHeight) * 0.5f;
+	for (int i = 0; i < 3; ++i) {
+		if (pauseMenuTextureHandles_[i] != 0u) {
+			float y = centerY2 + (i - 1) * (menuHeight2 + spacing2);
+			pauseMenuSprites_[i] = KamataEngine::Sprite::Create(
+				pauseMenuTextureHandles_[i],
+				KamataEngine::Vector2{static_cast<float>(kWindowWidth) / 2.0f, y},
+				KamataEngine::Vector4{1,1,1,1},
+				KamataEngine::Vector2{0.5f, 0.5f} // center pivot
+			);
+			if (pauseMenuSprites_[i]) pauseMenuSprites_[i]->SetSize(KamataEngine::Vector2{menuWidth2, menuHeight2});
+		}
+	}
+
+	GenerateBlocks();
+
+	if (cameraController_) {
+		cameraController_->SetTarget(player_);
+		cameraController_->Reset();
+	}
+
+	// Ensure existing dynamic objects are cleared and respawned so reset creates fresh enemies, spikes, goals, keys, ladders
+	// Delete old enemies
+	for (Enemy* e : enemies_) {
+		if (e) delete e;
+	}
+	enemies_.clear();
+	// Delete spikes
+	for (Spike* s : spikes_) {
+		if (s) delete s;
+	}
+	spikes_.clear();
+	// Delete goals
+	for (Goal* g : goals_) {
+		if (g) delete g;
+	}
+	goals_.clear();
+	// Delete keys
+	for (Key* k : keys_) {
+		if (k) delete k;
+	}
+	keys_.clear();
+	// Delete ladders
+for (Ladder* l : ladders_) {
+		if (l) delete l;
+	}
+	ladders_.clear();
+
+	// Respawn entities from the map
+	if (mapChipField_) {
+		uint32_t vh = mapChipField_->GetNumBlockVertical();
+		uint32_t wh = mapChipField_->GetNumBlockHorizontal();
+		bool goalSpawned = false;
+		for (uint32_t y = 0; y < vh; ++y) {
+			for (uint32_t x = 0; x < wh; ++x) {
+				MapChipType t = mapChipField_->GetMapChipTypeByIndex(x, y);
+				Vector3 pos = mapChipField_->GetMapChipPositionByIndex(x, y);
+				if (t == MapChipType::kEnemySpawn) {
+					Enemy* enemy = new Enemy();
+					enemy->Initialize(&camera_, pos);
+					enemy->SetMapChipField(mapChipField_);
+					enemies_.push_back(enemy);
+				} else if (t == MapChipType::kEnemySpawnShield) {
+					FrontShieldEnemy* fse = new FrontShieldEnemy();
+					fse->Initialize(&camera_, pos);
+					fse->SetFrontDotThreshold(0.6f);
+					fse->SetMapChipField(mapChipField_);
+					enemies_.push_back(fse);
+				} else if (t == MapChipType::kEnemySpawnShieldRight) {
+					FrontShieldEnemy* fse = new FrontShieldEnemy();
+					fse->Initialize(&camera_, pos, false); // face right
+					fse->SetFrontDotThreshold(0.6f);
+					fse->SetMapChipField(mapChipField_);
+					enemies_.push_back(fse);
+				} else if (t == MapChipType::kShooter) {
+					ShooterEnemy* se = new ShooterEnemy();
+					se->Initialize(&camera_, pos);
+					se->SetBulletSpeed(0.2f);
+					se->SetFireInterval(2.0f);
+					se->SetMapChipField(mapChipField_);
+					enemies_.push_back(se);
+				} else if (t == MapChipType::kShooterRight) {
+					ShooterEnemy* se = new ShooterEnemy();
+					se->Initialize(&camera_, pos);
+					se->SetFacingRight(true); // face right
+					se->SetBulletSpeed(0.2f);
+					se->SetFireInterval(2.0f);
+					se->SetMapChipField(mapChipField_);
+					enemies_.push_back(se);
+				} else if (t == MapChipType::kSpike) {
+					Spike* s = new Spike();
+					s->SetPosition(pos);
+					s->Initialize();
+					spikes_.push_back(s);
+				} else if (t == MapChipType::kGoal && !goalSpawned) {
+					Goal* g = new Goal();
+					g->SetPosition(pos);
+					g->Initialize();
+					goals_.push_back(g);
+					goalSpawned = true;
+				} else if (t == MapChipType::kLadder) {
+					Ladder* l = new Ladder();
+					l->SetPosition(pos);
+					l->Initialize();
+					ladders_.push_back(l);
+				} else if (t == MapChipType::kKey) {
+					Key* k = new Key();
+					k->SetPosition(pos);
+					k->Initialize();
+					keys_.push_back(k);
+				} else if (t == MapChipType::kEnemySpawnLeft) {
+					Enemy* enemy = new Enemy();
+					enemy->Initialize(&camera_, pos, true); 
+					enemies_.push_back(enemy);
+				}
+			}
+		}
+	}
+
+	
+	for (Enemy* e : enemies_) {
+		ShooterEnemy* se = dynamic_cast<ShooterEnemy*>(e);
+		if (se) se->SetAllowShooting(false);
+	}
+
+	
+	phase_ = Phase::kCountdown;
+	countdownTime_ = countdownStart_;
+
+	victoryTimer_ = 0.0f;
+
+	resetPending_ = false;
+	if (fade_) {
+		fade_->Start(Fade::Status::FadeIn, introFadeDuration_);
+	}
+}
