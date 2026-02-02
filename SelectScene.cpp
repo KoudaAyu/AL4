@@ -41,6 +41,12 @@ SelectScene::~SelectScene() {
         stageModel_ = nullptr;
     }
 
+    // delete the special Stage1 model if created
+    if (stage1Model_) {
+        delete stage1Model_;
+        stage1Model_ = nullptr;
+    }
+
     if (cameraController_) {
         delete cameraController_;
         cameraController_ = nullptr;
@@ -118,7 +124,76 @@ void SelectScene::Initialize() {
     
     blockModel_ = Model::CreateFromOBJ("Block");
     
+    // default stage model
     stageModel_ = Model::CreateFromOBJ("Stage");
+    // load special Stage1/2/3 models (if exist) so we can use specific visuals per stage
+    // Attempt multiple candidate names so models placed in different resource layouts are found
+    stage1Model_ = nullptr;
+    const char* stage1Candidates[] = {
+        // simple names
+        "Stage1", "stage1",
+        // common folder/name combos
+        "Stage1/Stage", "Stage1/stage", "stage1/Stage", "stage1/stage",
+        "Stage/Stage1", "stage/stage1",
+        // same-name folder
+        "Stage1/Stage1", "stage1/stage1",
+        // other variations
+        "Stage_1", "stage_1", "StageOne", "stageone"
+    };
+    for (const char* cand : stage1Candidates) {
+        stage1Model_ = Model::CreateFromOBJ(cand);
+        if (stage1Model_) {
+            DebugText::GetInstance()->ConsolePrintf("SelectScene: loaded Stage1 model using '%s'\n", cand);
+            break;
+        }
+    }
+    if (!stage1Model_) {
+        DebugText::GetInstance()->ConsolePrintf("SelectScene: Stage1 model not found, will use default Stage.obj\n");
+    }
+
+    // Stage2
+    stage2Model_ = nullptr;
+    const char* stage2Candidates[] = {
+        "Stage2", "stage2",
+        "Stage2/Stage", "Stage2/stage", "stage2/Stage", "stage2/stage",
+        "Stage/Stage2", "stage/stage2",
+        "Stage2/Stage2", "stage2/stage2",
+        "Stage_2", "stage_2", "StageTwo", "stagetwo"
+    };
+    for (const char* cand : stage2Candidates) {
+        stage2Model_ = Model::CreateFromOBJ(cand);
+        if (stage2Model_) {
+            DebugText::GetInstance()->ConsolePrintf("SelectScene: loaded Stage2 model using '%s'\n", cand);
+            break;
+        }
+    }
+    if (!stage2Model_) {
+        DebugText::GetInstance()->ConsolePrintf("SelectScene: Stage2 model not found, will use default Stage.obj\n");
+    }
+
+    // Stage3
+    stage3Model_ = nullptr;
+    const char* stage3Candidates[] = {
+        "Stage3", "stage3",
+        "Stage3/Stage", "Stage3/stage", "stage3/Stage", "stage3/stage",
+        "Stage/Stage3", "stage/stage3",
+        "Stage3/Stage3", "stage3/stage3",
+        "Stage_3", "stage_3", "StageThree", "stagethree"
+    };
+    for (const char* cand : stage3Candidates) {
+        stage3Model_ = Model::CreateFromOBJ(cand);
+        if (stage3Model_) {
+            DebugText::GetInstance()->ConsolePrintf("SelectScene: loaded Stage3 model using '%s'\n", cand);
+            break;
+        }
+    }
+    if (!stage3Model_) {
+        DebugText::GetInstance()->ConsolePrintf("SelectScene: Stage3 model not found, will use default Stage.obj\n");
+    }
+
+    textureHandleStage1_ = TextureManager::Load("Number/1.png");
+    textureHandleStage2_ = TextureManager::Load("Number/2.png");
+    textureHandleStage3_ = TextureManager::Load("Number/3.png");
 
     
     if (mapChipField_) {
@@ -145,6 +220,9 @@ void SelectScene::Initialize() {
                     WorldTransform* swt = new WorldTransform();
                     swt->Initialize();
                     swt->translation_ = pos;
+                    // push stage node slightly behind the player (player z=0, negative is closer)
+                    // so use small positive z to place behind
+                    swt->translation_.z += 1.0f;
                     swt->scale_ = {1.0f, 1.0f, 1.0f};
                     tmpStageWts.push_back(swt);
                 }
@@ -446,10 +524,16 @@ void SelectScene::Draw() {
             float t = transitionProgress_;
             
             if (static_cast<int>(i) == chosenStage_) {
-                float s = LerpF(1.0f, 3.0f, t);
+                // Lift up and add a gentle tilt instead of large scaling
+                float lift = LerpF(0.0f, 2.0f, t);
+                swt->translation_.y += lift;
+                // small tilt around Z for a bit of flair
+                swt->rotation_.z = LerpF(0.0f, 0.35f, t);
+                // only a subtle scale up
+                float s = LerpF(1.0f, 1.2f, t);
                 swt->scale_ = {s, s, s};
             } else {
-                
+                // keep others at normal scale
                 swt->scale_ = {1.0f, 1.0f, 1.0f};
             }
         } else {
@@ -463,7 +547,16 @@ void SelectScene::Draw() {
         if (swt->parent_) swt->matWorld_ = Multiply(swt->parent_->matWorld_, swt->matWorld_);
         swt->TransferMatrix();
         if (stageModel_) {
-            stageModel_->Draw(*swt, camera_);
+            // draw stage model (use specific models for 1st/2nd/3rd if available)
+            Model* modelToDraw = stageModel_;
+            if (static_cast<int>(i) == 0 && stage1Model_) {
+                modelToDraw = stage1Model_;
+            } else if (static_cast<int>(i) == 1 && stage2Model_) {
+                modelToDraw = stage2Model_;
+            } else if (static_cast<int>(i) == 2 && stage3Model_) {
+                modelToDraw = stage3Model_;
+            }
+            modelToDraw->Draw(*swt, camera_);
         }
     }
 
@@ -493,7 +586,6 @@ void SelectScene::Draw() {
         Sprite::PostDraw();
     }
 
-    // Draw left-bottom UI sprite according to lastInputMode_
     {
         Sprite* toDraw = nullptr;
         if (lastInputMode_ == SelectScene::InputMode::kGamepad && ltSprite_) {
