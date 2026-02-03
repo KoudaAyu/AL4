@@ -72,19 +72,19 @@ SelectScene::~SelectScene() {
     stageNumberSprites_.clear();
     stageNumberTexHandles_.clear();
 
-    // release left-bottom UI sprite
-    if (ltSprite_) {
-        delete ltSprite_;
-        ltSprite_ = nullptr;
-    }
-    ltTexHandle_ = 0u;
+    //// release left-bottom UI sprite
+    //if (ltSprite_) {
+    //    delete ltSprite_;
+    //    ltSprite_ = nullptr;
+    //}
+    //ltTexHandle_ = 0u;
 
-    // release Q sprite
-    if (qSprite_) {
-        delete qSprite_;
-        qSprite_ = nullptr;
-    }
-    qTexHandle_ = 0u;
+    //// release Q sprite
+    //if (qSprite_) {
+    //    delete qSprite_;
+    //    qSprite_ = nullptr;
+    //}
+    //qTexHandle_ = 0u;
 
     // release skydome
     if (skydome_) {
@@ -272,26 +272,7 @@ void SelectScene::Initialize() {
         }
     }
 
-    // Load left-bottom UI texture and create sprite (size 300x50)
-    ltTexHandle_ = TextureManager::Load("Sprite/SelectScene/LT.png");
-    if (ltTexHandle_ != 0u) {
-        ltSprite_ = Sprite::Create(ltTexHandle_, {0.0f, 0.0f});
-        if (ltSprite_) {
-            ltSprite_->SetSize({300.0f, 50.0f});
-            // anchor bottom-left so position refers to bottom-left corner
-            ltSprite_->SetAnchorPoint({0.0f, 1.0f});
-        }
-    }
-
-    // Load keyboard Q texture
-    qTexHandle_ = TextureManager::Load("Sprite/SelectScene/Q.png");
-    if (qTexHandle_ != 0u) {
-        qSprite_ = Sprite::Create(qTexHandle_, {0.0f, 0.0f});
-        if (qSprite_) {
-            qSprite_->SetSize({300.0f, 50.0f});
-            qSprite_->SetAnchorPoint({0.0f, 1.0f});
-        }
-    }
+  
 
     
     player_ = new Player();
@@ -565,50 +546,47 @@ void SelectScene::Draw() {
     Model::PostDraw();
 
     // Draw stage number PNGs on HUD, aligned left-to-right (1,2,3,...)
-    if (!stageNumberSprites_.empty()) {
-        Sprite::PreDraw(nullptr, Sprite::BlendMode::kNormal);
-        const float startX = 64.0f;
-        const float gapX = 120.0f;
-        const float y = 64.0f;
-        for (size_t i = 0; i < stageNumberSprites_.size(); ++i) {
-            Sprite* sp = stageNumberSprites_[i];
-            if (!sp) continue;
-            float x = startX + gapX * static_cast<float>(i);
-            sp->SetPosition({x, y});
-            // slightly enlarge highlighted
-            if (static_cast<int>(i) == highlightedStage_ && !transitioning_) {
-                sp->SetSize({112.0f, 112.0f});
-            } else {
-                sp->SetSize({96.0f, 96.0f});
-            }
-            sp->Draw();
-        }
-        Sprite::PostDraw();
-    }
+    //if (!stageNumberSprites_.empty()) {
+    //    Sprite::PreDraw(nullptr, Sprite::BlendMode::kNormal);
+    //    const float startX = 64.0f;
+    //    const float gapX = 120.0f;
+    //    const float y = 64.0f;
+    //    for (size_t i = 0; i < stageNumberSprites_.size(); ++i) {
+    //        Sprite* sp = stageNumberSprites_[i];
+    //        if (!sp) continue;
+    //        float x = startX + gapX * static_cast<float>(i);
+    //        sp->SetPosition({x, y});
+    //        // slightly enlarge highlighted
+    //        if (static_cast<int>(i) == highlightedStage_ && !transitioning_) {
+    //            sp->SetSize({112.0f, 112.0f});
+    //        } else {
+    //            sp->SetSize({96.0f, 96.0f});
+    //        }
+    //        sp->Draw();
+    //    }
+    //    Sprite::PostDraw();
+    //}
 
-    {
-        Sprite* toDraw = nullptr;
-        if (lastInputMode_ == SelectScene::InputMode::kGamepad && ltSprite_) {
-            toDraw = ltSprite_;
-        } else if (lastInputMode_ == SelectScene::InputMode::kKeyboard && qSprite_) {
-            toDraw = qSprite_;
-        }
+    //{
+    //    Sprite* toDraw = nullptr;
+    //    if (lastInputMode_ == SelectScene::InputMode::kGamepad && ltSprite_) {
+    //        toDraw = ltSprite_;
+    //    } else if (lastInputMode_ == SelectScene::InputMode::kKeyboard && qSprite_) {
+    //        toDraw = qSprite_;
+    //    }
 
-        // fallback: if unknown, prefer keyboard sprite if exists
-        if (!toDraw) {
-            if (qSprite_) toDraw = qSprite_;
-            else if (ltSprite_) toDraw = ltSprite_;
-        }
+    //    // fallback: if unknown, prefer keyboard sprite if exists
+    //   
 
-        if (toDraw) {
-            int h = DirectXCommon::GetInstance()->GetBackBufferHeight();
-            Sprite::PreDraw(nullptr, Sprite::BlendMode::kNormal);
-            // place at 10 px margin from left and bottom
-            toDraw->SetPosition({10.0f, static_cast<float>(h) - 10.0f});
-            toDraw->Draw();
-            Sprite::PostDraw();
-        }
-    }
+    //    if (toDraw) {
+    //        int h = DirectXCommon::GetInstance()->GetBackBufferHeight();
+    //        Sprite::PreDraw(nullptr, Sprite::BlendMode::kNormal);
+    //        // place at 10 px margin from left and bottom
+    //        toDraw->SetPosition({10.0f, static_cast<float>(h) - 10.0f});
+    //        toDraw->Draw();
+    //        Sprite::PostDraw();
+    //    }
+    //}
 
     // draw fade on top
     if (fade_) fade_->Draw();

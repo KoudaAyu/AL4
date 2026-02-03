@@ -585,6 +585,27 @@ void GameScene::Initialize() {
 	seDecisionDataHandle_ = Audio::GetInstance()->LoadWave("Audio/SE/Player_Death.wav");
 	bgmDataHandle_ = Audio::GetInstance()->LoadWave("Audio/BGM/GameScene.wav");
 	seClearDataHandle_ = Audio::GetInstance()->LoadWave("Audio/BGM/Clear.wav");
+
+	  // Load left-bottom UI texture and create sprite (size 300x50)
+	ltTexHandle_ = TextureManager::Load("Sprite/SelectScene/LT.png");
+	if (ltTexHandle_ != 0u) {
+		ltSprite_ = Sprite::Create(ltTexHandle_, {0.0f, 0.0f});
+		if (ltSprite_) {
+			ltSprite_->SetSize({300.0f, 50.0f});
+			// anchor bottom-left so position refers to bottom-left corner
+			ltSprite_->SetAnchorPoint({0.0f, 1.0f});
+		}
+	}
+
+	// Load keyboard Q texture
+	qTexHandle_ = TextureManager::Load("Sprite/SelectScene/Q.png");
+	if (qTexHandle_ != 0u) {
+		qSprite_ = Sprite::Create(qTexHandle_, {0.0f, 0.0f});
+		if (qSprite_) {
+			qSprite_->SetSize({300.0f, 50.0f});
+			qSprite_->SetAnchorPoint({0.0f, 1.0f});
+		}
+	}
 }
 
 void GameScene::Update() {
@@ -752,6 +773,8 @@ void GameScene::Update() {
             }
         }
     }
+
+	lastInputMode_ = lastInputWasPad_ ? GameScene::InputMode::kGamepad : GameScene::InputMode::kKeyboard;
 
     switch (phase_) {
 	case Phase::kCountdown: {
@@ -1051,7 +1074,9 @@ void GameScene::Update() {
 				}
 			}
 		}
-		
+		lastInputMode_ = lastInputWasPad_ ? GameScene::InputMode::kGamepad : GameScene::InputMode::kKeyboard;
+
+
 		// フェーズ切り替えをチェック
 		ChangePhase();
 		break;
@@ -1308,6 +1333,8 @@ void GameScene::Update() {
 			}
 		}
 
+		lastInputMode_ = lastInputWasPad_ ? GameScene::InputMode::kGamepad : GameScene::InputMode::kKeyboard;
+
 		break;
 	}
 }
@@ -1409,6 +1436,24 @@ for (auto it = enemyDeathParticles_.begin(); it != enemyDeathParticles_.end();) 
 		if (uiJumpSprite_)
 		{
 			uiJumpSprite_->Draw();
+		}
+		Sprite* toDraw = nullptr;
+		if (lastInputMode_ == GameScene::InputMode::kGamepad && ltSprite_) {
+			toDraw = ltSprite_;
+		} else if (lastInputMode_ == GameScene::InputMode::kKeyboard && qSprite_) {
+			toDraw = qSprite_;
+		}
+
+		// fallback: if unknown, prefer keyboard sprite if exists
+
+		if (toDraw) {
+		
+			
+			// place at 10 px margin from left and bottom
+			toDraw->SetAnchorPoint({1.0f, 0.0f});
+			toDraw->SetPosition({static_cast<float>(kWindowWidth) + 10.0f, 150.0f});
+			toDraw->Draw();
+			
 		}
 		if (phase_ == Phase::kCountdown && countdownSprite_) countdownSprite_->Draw();
         if (phase_ == Phase::kPause && pauseSprite_) pauseSprite_->Draw();

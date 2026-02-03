@@ -204,4 +204,15 @@ private:
 	bool bgmStarted_ = false;
 
 	uint32_t seClearDataHandle_ = 0u;
+
+	 // 左下UI用スプライト（Resources/Sprite/SelectScene/LT.png を想定）
+	uint32_t ltTexHandle_ = 0u;
+	KamataEngine::Sprite* ltSprite_ = nullptr;
+
+	// キーボード用Qアイコン
+	uint32_t qTexHandle_ = 0u;
+	KamataEngine::Sprite* qSprite_ = nullptr;
+
+	 enum class InputMode { kUnknown = 0, kGamepad, kKeyboard };
+	InputMode lastInputMode_ = InputMode::kUnknown;
 };
