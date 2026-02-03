@@ -1561,7 +1561,7 @@ for (Spike* s : spikes_) {
 		            const Vector3 victoryPos = player_->GetPosition();
 		            if (deathParticle_) { delete deathParticle_; deathParticle_ = nullptr; }
 		            deathParticle_ = new DeathParticle();
-					deathParticle_->Initialize(nikukyuModel_, &camera_, victoryPos);
+					deathParticle_->Initialize(nikukyuModel_, &camera_, victoryPos,true);
 		             if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(0.8f, 0.2f);
 					 if (seClearDataHandle_ != 0u)
 					 {
