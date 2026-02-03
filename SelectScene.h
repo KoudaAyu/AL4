@@ -39,6 +39,11 @@ private:
     KamataEngine::Model* blockModel_ = nullptr;
     // ステージノード描画に使うモデル
     KamataEngine::Model* stageModel_ = nullptr;
+    // Special model for Stage1 (use Stage1.obj)
+    KamataEngine::Model* stage1Model_ = nullptr;
+    // Special models for Stage2 and Stage3
+    KamataEngine::Model* stage2Model_ = nullptr;
+    KamataEngine::Model* stage3Model_ = nullptr;
 
     // スカイドーム
     Skydome* skydome_ = nullptr;
@@ -81,15 +86,13 @@ private:
     std::vector<uint32_t> stageNumberTexHandles_; // TextureManager::Load で読み込んだハンドル
     std::vector<KamataEngine::Sprite*> stageNumberSprites_; // 画面左から 1,2,3... と並べて描画
 
-    // 左下UI用スプライト（Resources/Sprite/SelectScene/LT.png を想定）
-    uint32_t ltTexHandle_ = 0u;
-    KamataEngine::Sprite* ltSprite_ = nullptr;
-
-    // キーボード用Qアイコン
-    uint32_t qTexHandle_ = 0u;
-    KamataEngine::Sprite* qSprite_ = nullptr;
+   
 
     // 最後に使われた入力デバイスを記録（フレーム間で持続させる）
     enum class InputMode { kUnknown = 0, kGamepad, kKeyboard };
     InputMode lastInputMode_ = InputMode::kUnknown;
+
+    uint32_t textureHandleStage1_ = 0u; 
+    uint32_t textureHandleStage2_ = 0u;
+    uint32_t textureHandleStage3_ = 0u;
 };

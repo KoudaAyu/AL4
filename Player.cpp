@@ -524,19 +524,41 @@ void Player::Update() {
 	// Update rumble state so vibration stops after its duration
 	UpdateRumble();
 
-	
 	if (isDying_) {
-		
-		velocity_ = {0.0f, 0.0f, 0.0f};
-		
-		deathDelayTimer_ -= 1.0f / 60.0f;
-		if (deathDelayTimer_ <= 0.0f) {
-			isAlive_ = false;
-			isDying_ = false; // フラグをクリア
-		}
-		return;
-	}
+		// simple visual death animation: spin and shrink while fading time
+        // progress from 0 -> 1 over kDeathDelay
+        float remaining = deathDelayTimer_;
+        float total = kDeathDelay;
+        float t = 0.0f;
+        if (total > 0.0f) {
+            t = std::clamp(1.0f - (remaining / total), 0.0f, 1.0f);
+        }
+        // spin around Z and tilt X slightly
+        worldTransform_.rotation_.z += 0.15f; // constant spin
+        worldTransform_.rotation_.x = 0.3f * t; // slight tilt as progress increases
+        // shrink towards zero scale smoothly
+        float shrink = std::max(0.0f, 1.0f - t);
+        worldTransform_.scale_.x = 0.3f * shrink;
+        worldTransform_.scale_.y = 0.3f * shrink;
+        worldTransform_.scale_.z = 0.3f * shrink;
+        // brief upward pop at start then ease down
+        if (t < 0.3f) {
+            worldTransform_.translation_.y += 0.05f; // pop up
+        } else {
+            worldTransform_.translation_.y -= 0.02f; // drift down
+        }
+        // reflect transform
+        worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
+        worldTransform_.TransferMatrix();
 
+        deathDelayTimer_ -= 1.0f / 60.0f;
+        if (deathDelayTimer_ <= 0.0f) {
+            deathDelayTimer_ = 0.0f;
+            isAlive_ = false;
+            isDying_ = false;
+        }
+        return;
+	}
 
 	if (invincible_) {
 		invincibleTimer_ -= 1.0f / 60.0f;
@@ -558,147 +580,147 @@ void Player::Update() {
 	}
 
 #ifdef _DEBUG
-	ImGui::Begin("Debug");
-	ImGui::SliderFloat3("velocity", &velocity_.x, -10.0f, 10.0f);
-	ImGui::End();
+    ImGui::Begin("Debug");
+    ImGui::SliderFloat3("velocity", &velocity_.x, -10.0f, 10.0f);
+    ImGui::End();
 #endif //  _Debug
 
-	if (behaviorRequest_ != Behavior::kUnknown) {
-		// 振る舞いを変更
-		behavior_ = behaviorRequest_;
-		// 各振る舞い開始時の初期化処理
-		switch (behavior_) {
-		case Behavior::kRoot:
-		default:
-			BehaviorRootInitialize();
-			break;
-		case Behavior::kAttack:
-			BehaviorAttackInitialize();
-			break;
-		}
-		behaviorRequest_ = Behavior::kUnknown;
-	}
+    if (behaviorRequest_ != Behavior::kUnknown) {
+        // 振る舞いを変更
+        behavior_ = behaviorRequest_;
+        // 各振る舞い開始時の初期化処理
+        switch (behavior_) {
+        case Behavior::kRoot:
+        default:
+            BehaviorRootInitialize();
+            break;
+        case Behavior::kAttack:
+            BehaviorAttackInitialize();
+            break;
+        }
+        behaviorRequest_ = Behavior::kUnknown;
+    }
 
-	switch (behavior_) {
-	case Behavior::kRoot:
-		BehaviorRootUpdate();
-		break;
-	case Behavior::kAttack:
-		BehaviorAttackUpdate();
-		break;
-	default:
-		BehaviorRootUpdate();
-		break;
-	}
+    switch (behavior_) {
+    case Behavior::kRoot:
+        BehaviorRootUpdate();
+        break;
+    case Behavior::kAttack:
+        BehaviorAttackUpdate();
+        break;
+    default:
+        BehaviorRootUpdate();
+        break;
+    }
 
-	// 1. 移動入力
-	HandleMovementInput();
+    // 1. 移動入力
+    HandleMovementInput();
 
-	// 攻撃入力: Eキー（キーボード）またはRT（Xbox）の立ち上がり検知
-	bool eTriggered = Input::GetInstance()->TriggerKey(DIK_E);
-	bool rtPressed = (state.Gamepad.bRightTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
-	bool rtRising = rtPressed && !prevRightTriggerPressed_;
+    // 攻撃入力: Eキー（キーボード）またはRT（Xbox）の立ち上がり検知
+    bool eTriggered = Input::GetInstance()->TriggerKey(DIK_E);
+    bool rtPressed = (state.Gamepad.bRightTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD);
+    bool rtRising = rtPressed && !prevRightTriggerPressed_;
 
-	// 入力が来たらバッファに蓄える
-	if (eTriggered || rtRising) {
-		attackInputBufferTimer_ = kAttackInputBufferTime;
-	}
+    // 入力が来たらバッファに蓄える
+    if (eTriggered || rtRising) {
+        attackInputBufferTimer_ = kAttackInputBufferTime;
+    }
 
-	// クールタイム終了かつ未攻撃中、かつバッファが残っていれば攻撃開始
-	if (attackCooldown_ <= 0.0f && !IsAttacking() && attackInputBufferTimer_ > 0.0f) {
-		behaviorRequest_ = Behavior::kAttack;
-		attackInputBufferTimer_ = 0.0f; // 消費
-	}
-	// 現在のRT状態を保存（次フレームとの比較用）
-	prevRightTriggerPressed_ = rtPressed;
+    // クールタイム終了かつ未攻撃中、かつバッファが残っていれば攻撃開始
+    if (attackCooldown_ <= 0.0f && !IsAttacking() && attackInputBufferTimer_ > 0.0f) {
+        behaviorRequest_ = Behavior::kAttack;
+        attackInputBufferTimer_ = 0.0f; // 消費
+    }
+    // 現在のRT状態を保存（次フレームとの比較用）
+    prevRightTriggerPressed_ = rtPressed;
 
-	// 攻撃が要求されているフレームは回避入力処理を抑制（入力競合対策）
-	// NOTE: Q-trigger dodge is handled in HandleMovementInput(). Here we update dodge timers.
+    // 攻撃が要求されているフレームは回避入力処理を抑制（入力競合対策）
+    // NOTE: Q-trigger dodge is handled in HandleMovementInput(). Here we update dodge timers.
 
-	// decrease dodge timer if currently dodging; end dodge when timer elapses
-	if (isDodging_) {
-		dodgeTimer_ -= 1.0f / 60.0f;
-		if (dodgeTimer_ <= 0.0f) {
-			isDodging_ = false;
-			// reduce horizontal speed when dodge ends
-			velocity_.x *= 0.5f;
-			velocity_.x = std::clamp(velocity_.x, -kLimitRunSpeed, kLimitRunSpeed);
-			// restore visual crouch if it was forced by dodge
-			if (crouchForcedByDodge_) {
-				float oldHalfHeight = kHeight * 0.5f * worldTransform_.scale_.y;
-				worldTransform_.scale_.y = baseScaleY_;
-				float newHalfHeight = kHeight * 0.5f * worldTransform_.scale_.y;
-				worldTransform_.translation_.y += (newHalfHeight - oldHalfHeight);
-				isCrouching_ = false;
-				crouchForcedByDodge_ = false;
-				UpdateAABB();
-			}
-		}
-	}
+    // decrease dodge timer if currently dodging; end dodge when timer elapses
+    if (isDodging_) {
+        dodgeTimer_ -= 1.0f / 60.0f;
+        if (dodgeTimer_ <= 0.0f) {
+            isDodging_ = false;
+            // reduce horizontal speed when dodge ends
+            velocity_.x *= 0.5f;
+            velocity_.x = std::clamp(velocity_.x, -kLimitRunSpeed, kLimitRunSpeed);
+            // restore visual crouch if it was forced by dodge
+            if (crouchForcedByDodge_) {
+                float oldHalfHeight = kHeight * 0.5f * worldTransform_.scale_.y;
+                worldTransform_.scale_.y = baseScaleY_;
+                float newHalfHeight = kHeight * 0.5f * worldTransform_.scale_.y;
+                worldTransform_.translation_.y += (newHalfHeight - oldHalfHeight);
+                isCrouching_ = false;
+                crouchForcedByDodge_ = false;
+                UpdateAABB();
+            }
+        }
+    }
 
-	// dodge cooldown decrement
-	if (dodgeCooldown_ > 0.0f) {
-		dodgeCooldown_ -= 1.0f / 60.0f;
-		if (dodgeCooldown_ < 0.0f)
-			dodgeCooldown_ = 0.0f;
-	}
+    // dodge cooldown decrement
+    if (dodgeCooldown_ > 0.0f) {
+        dodgeCooldown_ -= 1.0f / 60.0f;
+        if (dodgeCooldown_ < 0.0f)
+            dodgeCooldown_ = 0.0f;
+    }
 
 
-	// 衝突情報を初期化
-	CollisionMapInfo collisionInfo;
-	// 移動量を加味して現在地を算定するために、現在の速度をcollisionInfoにセット
-	collisionInfo.movement_ = velocity_;
+    // 衝突情報を初期化
+    CollisionMapInfo collisionInfo;
+    // 移動量を加味して現在地を算定するために、現在の速度をcollisionInfoにセット
+    collisionInfo.movement_ = velocity_;
 
-	// 2. 移動量を加味して衝突判定する（軸ごとに解決してガタつきを抑制）"
-	mapChipCollisionCheck(collisionInfo);
+    // 2. 移動量を加味して衝突判定する（軸ごとに解決してガタつきを抑制）"
+    mapChipCollisionCheck(collisionInfo);
 
-	// 3. 判定結果を反映して移動させる
-	JudgmentResult(collisionInfo);
+    // 3. 判定結果を反映して移動させる
+    JudgmentResult(collisionInfo);
 
-	// 4. 天井に接触している場合の処理
-	HitCeilingCollision(collisionInfo);
+    // 4. 天井に接触している場合の処理
+    HitCeilingCollision(collisionInfo);
 
-	SwitchingTheGrounding(collisionInfo);
+    SwitchingTheGrounding(collisionInfo);
 
-	// 5. 壁に接触している場合の処理
-	HitWallCollision(collisionInfo);
+    // 5. 壁に接触している場合の処理
+    HitWallCollision(collisionInfo);
 
-	// 6. 壁滑り・壁ジャンプ処理（次フレームの速度に反映される）
-	UpdateWallSlide(collisionInfo);
-	HandleWallJump(collisionInfo);
+    // 6. 壁滑り・壁ジャンプ処理（次フレームの速度に反映される）
+    UpdateWallSlide(collisionInfo);
+    HandleWallJump(collisionInfo);
 
-	// 7. 旋回制御
-	if (turnTimer_ > 0.0f) {
-		turnTimer_ -= 1.0f / 60.0f;
-		turnTimer_ = std::max(turnTimer_, 0.0f);
+    // 7. 旋回制御
+    if (turnTimer_ > 0.0f) {
+        turnTimer_ -= 1.0f / 60.0f;
+        turnTimer_ = std::max(turnTimer_, 0.0f);
 
-		float t = 1.0f - (turnTimer_ / kTimeTurn);
-		float easeT = 1.0f - powf(1.0f - t, 3.0f);
+        float t = 1.0f - (turnTimer_ / kTimeTurn);
+        float easeT = 1.0f - powf(1.0f - t, 3.0f);
 
-		float destinationRotationYTable[] = {
-		    std::numbers::pi_v<float> / 2.0f,       // 右向き
-		    std::numbers::pi_v<float> * 3.0f / 2.0f // 左向き
-		};
-		float destination = destinationRotationYTable[static_cast<uint32_t>(lrDirection_)];
-		worldTransform_.rotation_.y = turnFirstRotationY_ + (destination - turnFirstRotationY_) * easeT;
-	} else {
-		float destinationRotationYTable[] = {std::numbers::pi_v<float> / 2.0f, std::numbers::pi_v<float> * 3.0f / 2.0f};
-		worldTransform_.rotation_.y = destinationRotationYTable[static_cast<uint32_t>(lrDirection_)];
-	}
+        float destinationRotationYTable[] = {
+            std::numbers::pi_v<float> / 2.0f,       // 右向き
+            std::numbers::pi_v<float> * 3.0f / 2.0f // 左向き
+        };
+        float destination = destinationRotationYTable[static_cast<uint32_t>(lrDirection_)];
+        worldTransform_.rotation_.y = turnFirstRotationY_ + (destination - turnFirstRotationY_) * easeT;
+    } else {
+        float destinationRotationYTable[] = {std::numbers::pi_v<float> / 2.0f, std::numbers::pi_v<float> * 3.0f / 2.0f};
+        worldTransform_.rotation_.y = destinationRotationYTable[static_cast<uint32_t>(lrDirection_)];
+    }
 
-	// Update AABB: adjust height when crouching
-	UpdateAABB();
+    // Update AABB: adjust height when crouching
+    UpdateAABB();
 
-	// 8. 行列計算
-	worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
-	worldTransform_.TransferMatrix();
+    // 8. 行列計算
+    worldTransform_.matWorld_ = MakeAffineMatrix(worldTransform_.scale_, worldTransform_.rotation_, worldTransform_.translation_);
+    worldTransform_.TransferMatrix();
 
-	// 攻撃中は攻撃エフェクトのワールド変換も更新
-	if (behavior_ == Behavior::kAttack) {
-		UpdateAttackEffectTransform();
-		attackWorldTransform_.matWorld_ = MakeAffineMatrix(attackWorldTransform_.scale_, attackWorldTransform_.rotation_, attackWorldTransform_.translation_);
-		attackWorldTransform_.TransferMatrix();
-	}
+    // 攻撃中は攻撃エフェクトのワールド変換も更新
+    if (behavior_ == Behavior::kAttack) {
+        UpdateAttackEffectTransform();
+        attackWorldTransform_.matWorld_ = MakeAffineMatrix(attackWorldTransform_.scale_, attackWorldTransform_.rotation_, attackWorldTransform_.translation_);
+        attackWorldTransform_.TransferMatrix();
+    }
 }
 
 void Player::Draw() {
@@ -1384,6 +1406,8 @@ void Player::UpdateAttackEffectTransform() {
 	// カメラに少し近づけるバイアス（Z軸）
 	attackWorldTransform_.translation_.z += kAttackEffectZBias;
 }
+
+
 
 // 新しい関数: プレイヤーの攻撃用AABBを返す
 AABB Player::GetAttackAABB() const {

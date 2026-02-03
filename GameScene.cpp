@@ -585,6 +585,27 @@ void GameScene::Initialize() {
 	seDecisionDataHandle_ = Audio::GetInstance()->LoadWave("Audio/SE/Player_Death.wav");
 	bgmDataHandle_ = Audio::GetInstance()->LoadWave("Audio/BGM/GameScene.wav");
 	seClearDataHandle_ = Audio::GetInstance()->LoadWave("Audio/BGM/Clear.wav");
+
+	  // Load left-bottom UI texture and create sprite (size 300x50)
+	ltTexHandle_ = TextureManager::Load("Sprite/SelectScene/LT.png");
+	if (ltTexHandle_ != 0u) {
+		ltSprite_ = Sprite::Create(ltTexHandle_, {0.0f, 0.0f});
+		if (ltSprite_) {
+			ltSprite_->SetSize({300.0f, 50.0f});
+			// anchor bottom-left so position refers to bottom-left corner
+			ltSprite_->SetAnchorPoint({0.0f, 1.0f});
+		}
+	}
+
+	// Load keyboard Q texture
+	qTexHandle_ = TextureManager::Load("Sprite/SelectScene/Q.png");
+	if (qTexHandle_ != 0u) {
+		qSprite_ = Sprite::Create(qTexHandle_, {0.0f, 0.0f});
+		if (qSprite_) {
+			qSprite_->SetSize({300.0f, 50.0f});
+			qSprite_->SetAnchorPoint({0.0f, 1.0f});
+		}
+	}
 }
 
 void GameScene::Update() {
@@ -752,6 +773,8 @@ void GameScene::Update() {
             }
         }
     }
+
+	lastInputMode_ = lastInputWasPad_ ? GameScene::InputMode::kGamepad : GameScene::InputMode::kKeyboard;
 
     switch (phase_) {
 	case Phase::kCountdown: {
@@ -1051,7 +1074,9 @@ void GameScene::Update() {
 				}
 			}
 		}
-		
+		lastInputMode_ = lastInputWasPad_ ? GameScene::InputMode::kGamepad : GameScene::InputMode::kKeyboard;
+
+
 		// フェーズ切り替えをチェック
 		ChangePhase();
 		break;
@@ -1308,6 +1333,8 @@ void GameScene::Update() {
 			}
 		}
 
+		lastInputMode_ = lastInputWasPad_ ? GameScene::InputMode::kGamepad : GameScene::InputMode::kKeyboard;
+
 		break;
 	}
 }
@@ -1409,6 +1436,24 @@ for (auto it = enemyDeathParticles_.begin(); it != enemyDeathParticles_.end();) 
 		if (uiJumpSprite_)
 		{
 			uiJumpSprite_->Draw();
+		}
+		Sprite* toDraw = nullptr;
+		if (lastInputMode_ == GameScene::InputMode::kGamepad && ltSprite_) {
+			toDraw = ltSprite_;
+		} else if (lastInputMode_ == GameScene::InputMode::kKeyboard && qSprite_) {
+			toDraw = qSprite_;
+		}
+
+		// fallback: if unknown, prefer keyboard sprite if exists
+
+		if (toDraw) {
+		
+			
+			// place at 10 px margin from left and bottom
+			toDraw->SetAnchorPoint({1.0f, 0.0f});
+			toDraw->SetPosition({static_cast<float>(kWindowWidth) + 10.0f, 150.0f});
+			toDraw->Draw();
+			
 		}
 		if (phase_ == Phase::kCountdown && countdownSprite_) countdownSprite_->Draw();
         if (phase_ == Phase::kPause && pauseSprite_) pauseSprite_->Draw();
@@ -1513,73 +1558,39 @@ void GameScene::CheckAllCollisions() {
 
 #pragma endregion
 
-    // Spike とプレイヤーの当たり判定（Spike 側で AABB を提供）
-    for (Spike* s : spikes_) {
-        if (!s) continue;
-        AABB pA = player_->GetAABB();
-        AABB sA = s->GetAABB();
-        if (IsCollisionAABBAABB(pA, sA)) {
-          
-            float overlapX = std::min<float>(pA.max.x, sA.max.x) - std::max<float>(pA.min.x, sA.min.x);
-            float overlapY = std::min<float>(pA.max.y, sA.max.y) - std::max<float>(pA.min.y, sA.min.y);
+for (Spike* s : spikes_) {
+		if (!s)
+			continue;
+		AABB pA = player_->GetAABB();
+		AABB sA = s->GetAABB();
 
-          
-            Vector3 pCenter = {(pA.min.x + pA.max.x) * 0.5f, (pA.min.y + pA.max.y) * 0.5f, 0.0f};
-            Vector3 sCenter = {(sA.min.x + sA.max.x) * 0.5f, (sA.min.y + sA.max.y) * 0.5f, 0.0f};
+		// 当たっているかどうかの判定
+		if (IsCollisionAABBAABB(pA, sA)) {
 
-         
-            KamataEngine::WorldTransform& pwt = player_->GetWorldTransform();
-            if (overlapX < overlapY) {
-                float dir = (pCenter.x < sCenter.x) ? -1.0f : 1.0f;
-                pwt.translation_.x += dir * overlapX;
-                player_->velocity_.x = 0.0f;
-            } else {
-                float dir = (pCenter.y < sCenter.y) ? -1.0f : 1.0f;
-                pwt.translation_.y += dir * overlapY;
-                player_->velocity_.y = 0.0f;
-            }
+			// --- 物理的な座標補正・速度補正をすべて削除 ---
+			// ここに以前あった overlapX, overlapY, nudge などの処理を消すことで
+			// プレイヤーが勝手に動いたりガタガタ震えたりする現象を修正します。
 
+			// 無敵時間中でなければダメージ処理を実行
+			bool wasInvincible = (player_) ? player_->IsInvincible() : false;
+			if (!wasInvincible) {
+				// ダメージ・死亡処理を呼ぶ
+				player_->OnCollision(nullptr);
 
-            player_->UpdateAABB();
+				// 無敵時間を付与
+				if (player_)
+					player_->ApplyInvincibility(1.25f);
 
-            // Only apply damage and shake if player was not already invincible
-            bool wasInvincible = (player_) ? player_->IsInvincible() : false;
-            if (!wasInvincible) {
-                player_->OnCollision(nullptr);
-                // Extend invincibility for spike-specific escape window
-                if (player_) player_->ApplyInvincibility(1.25f);
-                // Single short, mild camera shake for spike hit
-                if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(0.4f, 0.08f);
-            }
+				// カメラシェイク
+				if (cameraController_ && !player_->IsDying()) {
+					cameraController_->StartShake(0.4f, 0.08f);
+				}
+			}
 
-            // decide nudge direction based on spike/player centers (horizontal preference)
-            float nudgeDir = (pCenter.x < sCenter.x) ? -1.0f : 1.0f;
-
-            // Allow immediate horizontal escape using AD (or arrow keys).
-            bool keyRight = Input::GetInstance()->PushKey(DIK_RIGHT) || Input::GetInstance()->PushKey(DIK_D);
-            bool keyLeft = Input::GetInstance()->PushKey(DIK_LEFT) || Input::GetInstance()->PushKey(DIK_A);
-            if (keyRight) {
-                player_->velocity_.x = std::fabs(player_->velocity_.x) < 0.001f ? 0.35f : std::fabs(player_->velocity_.x);
-            } else if (keyLeft) {
-                player_->velocity_.x = - (std::fabs(player_->velocity_.x) < 0.001f ? 0.35f : std::fabs(player_->velocity_.x));
-            } else {
-                // small automatic nudge away from spike so player isn't stuck
-                player_->velocity_.x += nudgeDir * 0.18f;
-                // clamp to reasonable walk speed
-                if (player_->velocity_.x > 0.5f) player_->velocity_.x = 0.5f;
-                if (player_->velocity_.x < -0.5f) player_->velocity_.x = -0.5f;
-            }
-
-            // If we were pushed vertically into a step, also nudge the player's position slightly horizontally
-            if (overlapY >= overlapX) {
-                KamataEngine::WorldTransform& pwt2 = player_->GetWorldTransform();
-                pwt2.translation_.x += nudgeDir * 0.22f; // small position nudge to get off the edge
-                player_->UpdateAABB();
-            }
-
-            break;
-        }
-    }
+			// 1つのトゲと判定されれば十分なのでループを抜ける
+			break;
+		}
+	}
 
     // Goal とプレイヤーの当たり判定
     for (Goal* g : goals_) {
@@ -1595,7 +1606,7 @@ void GameScene::CheckAllCollisions() {
 		            const Vector3 victoryPos = player_->GetPosition();
 		            if (deathParticle_) { delete deathParticle_; deathParticle_ = nullptr; }
 		            deathParticle_ = new DeathParticle();
-					deathParticle_->Initialize(nikukyuModel_, &camera_, victoryPos);
+					deathParticle_->Initialize(nikukyuModel_, &camera_, victoryPos,true);
 		             if (cameraController_ && !player_->IsDying()) cameraController_->StartShake(0.8f, 0.2f);
 					 if (seClearDataHandle_ != 0u)
 					 {

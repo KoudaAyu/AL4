@@ -10,7 +10,7 @@ class DeathParticle {
 public:
 	DeathParticle();
 	~DeathParticle();
-	void Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera, const KamataEngine::Vector3& pos);
+	void Initialize(KamataEngine::Model* model, KamataEngine::Camera* camera, const KamataEngine::Vector3& pos, bool isVictory = false);
 	void Update();
 	void Draw();
 
@@ -35,6 +35,9 @@ private:
 	// 経過時間
 	float counter_ = 0.0f;
 
+	// 実使用する期間（勝利時は少し長めに）
+	float duration_ = kDuration;
+
 private:
 
 	std::array<KamataEngine::WorldTransform, kNumParticles> worldTransforms_{};
@@ -48,6 +51,9 @@ private:
 
 	// common color (base)
 	KamataEngine::Vector4 baseColor_ = {1.0f, 0.9f, 0.4f, 1.0f}; // warm burst by default
+
+	// mode flag
+	bool isVictory_ = false;
 
 	std::mt19937 rnd_;
 };
